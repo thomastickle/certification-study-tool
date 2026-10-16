@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "aws-study curated question bank v2",
-  "$comment": "Unknown extra fields remain accepted and ignored. Python also validates normalized answer uniqueness, source-reference uniqueness, exact select_count, calendar dates, finite JSON metadata, and absence of nested runtime/history metadata.",
+  "$comment": "Study classifications may be absent and are reported for later curation. Application validation additionally checks normalized answer uniqueness, source-reference uniqueness, and exact correct-answer counts.",
   "type": "object",
   "required": [
     "schema_version",
@@ -410,18 +410,6 @@
               }
             }
           }
-        }
-      ],
-      "anyOf": [
-        {
-          "required": [
-            "classification"
-          ]
-        },
-        {
-          "required": [
-            "source_classification"
-          ]
         }
       ]
     }

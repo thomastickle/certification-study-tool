@@ -12,6 +12,12 @@ export class LibraryRepository {
     this.db = new DatabaseSync(path, { timeout: 5000 });
     this.db.exec('PRAGMA foreign_keys = ON');
     const version = this.db.prepare('PRAGMA user_version').get()?.user_version;
+    const appId = this.db.prepare('PRAGMA application_id').get()?.application_id;
+    const occupied = Number(this.db.prepare("SELECT count(*) AS total FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").get()?.total) > 0;
+    if ((version === 0 && occupied) || (version !== 0 && appId !== 1096242004)) {
+      this.db.close();
+      throw new Error('Unrecognized database. Use a separate application database.');
+    }
     if (version !== 0 && version !== 1) {
       this.db.close();
       throw new Error('Unsupported database version. Use a separate application database.');
@@ -34,6 +40,7 @@ export class LibraryRepository {
         UNIQUE(source_id, reference)
       );
       CREATE INDEX questions_fingerprint ON questions(fingerprint);
+      PRAGMA application_id = 1096242004;
       PRAGMA user_version = 1;
       COMMIT;
     `);

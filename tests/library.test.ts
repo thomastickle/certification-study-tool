@@ -90,3 +90,31 @@ test('missing study classification is allowed and reported for later review', ()
     assert.equal(repository.questions().total, 1);
   } finally { repository.close(); }
 });
+
+test('questions with no classification at all can be imported for later curation', () => {
+  const repository = new LibraryRepository(':memory:');
+  try {
+    const service = new ImportService(repository);
+    const input = bank();
+    delete input.questions[0]!.classification;
+    const preview = service.preview(input);
+    assert.deepEqual(preview.unclassified, ['1']);
+    service.confirm(input, preview.token, false);
+    assert.equal(repository.questions().total, 1);
+  } finally { repository.close(); }
+});
+
+test('an import failure rolls back both source metadata and all questions', () => {
+  class FailingRepository extends LibraryRepository {
+    override saveQuestion(): void { throw new Error('Synthetic storage failure'); }
+  }
+  const repository = new FailingRepository(':memory:');
+  try {
+    const service = new ImportService(repository);
+    const input = bank();
+    const preview = service.preview(input);
+    assert.throws(() => service.confirm(input, preview.token, false), /Synthetic storage failure/);
+    assert.deepEqual(repository.sources(), []);
+    assert.equal(repository.revision(), 0);
+  } finally { repository.close(); }
+});
