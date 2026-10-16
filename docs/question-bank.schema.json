@@ -1,0 +1,429 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "aws-study curated question bank v2",
+  "$comment": "Unknown extra fields remain accepted and ignored. Python also validates normalized answer uniqueness, source-reference uniqueness, exact select_count, calendar dates, finite JSON metadata, and absence of nested runtime/history metadata.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "certification",
+    "source",
+    "questions"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 2
+    },
+    "certification": {
+      "type": "object",
+      "required": [
+        "provider",
+        "code",
+        "name"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "key",
+        "name",
+        "type",
+        "verification_status"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "type": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "observed_year": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 9999
+        },
+        "verified_year": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 9999
+        },
+        "verification_status": {
+          "enum": [
+            "official_current",
+            "verified_current",
+            "official_older",
+            "unverified",
+            "stale",
+            "superseded"
+          ]
+        },
+        "metadata": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "snapshot_family": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "\\S"
+        }
+      }
+    },
+    "classification": {
+      "description": "Optional informational metadata; the importer does not validate or persist it."
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    }
+  },
+  "$defs": {
+    "answer": {
+      "type": "object",
+      "required": [
+        "text",
+        "correct"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "correct": {
+          "type": "boolean"
+        },
+        "rationale": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "selected"
+            ]
+          },
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "content_hash"
+            ]
+          }
+        ]
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "question",
+        "type",
+        "select_count",
+        "answers"
+      ],
+      "properties": {
+        "source_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "question": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "type": {
+          "enum": [
+            "single_select",
+            "multi_select"
+          ]
+        },
+        "select_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "selection_group": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "classification": {
+          "type": "object",
+          "required": [
+            "area",
+            "topic"
+          ],
+          "properties": {
+            "area": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "topic": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          }
+        },
+        "answers": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/answer"
+          }
+        },
+        "source_classification": {
+          "type": "object",
+          "required": [
+            "area"
+          ],
+          "properties": {
+            "area": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "topic": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "\\S"
+            }
+          }
+        },
+        "source_metadata": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "explanation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verified_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "verification_status": {
+          "enum": [
+            "official_current",
+            "verified_current",
+            "official_older",
+            "unverified",
+            "stale",
+            "superseded",
+            null
+          ]
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "status"
+            ]
+          },
+          {
+            "required": [
+              "selected"
+            ]
+          },
+          {
+            "required": [
+              "confidence"
+            ]
+          },
+          {
+            "required": [
+              "original_confidence"
+            ]
+          },
+          {
+            "required": [
+              "time_to_answer_seconds"
+            ]
+          },
+          {
+            "required": [
+              "id"
+            ]
+          },
+          {
+            "required": [
+              "dedup_role"
+            ]
+          },
+          {
+            "required": [
+              "dedup_group"
+            ]
+          },
+          {
+            "required": [
+              "variant_group"
+            ]
+          },
+          {
+            "required": [
+              "content_hash"
+            ]
+          },
+          {
+            "required": [
+              "content_fingerprint"
+            ]
+          },
+          {
+            "required": [
+              "answer_key_fingerprint"
+            ]
+          },
+          {
+            "required": [
+              "fingerprint_version"
+            ]
+          },
+          {
+            "required": [
+              "tags"
+            ]
+          },
+          {
+            "required": [
+              "elapsed_ms"
+            ]
+          },
+          {
+            "required": [
+              "selected_answers"
+            ]
+          },
+          {
+            "required": [
+              "question_id"
+            ]
+          }
+        ]
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "single_select"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "select_count": {
+                "const": 1
+              },
+              "answers": {
+                "contains": {
+                  "properties": {
+                    "correct": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "correct"
+                  ]
+                },
+                "minContains": 1,
+                "maxContains": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "select_count": {
+                "minimum": 2
+              },
+              "answers": {
+                "contains": {
+                  "properties": {
+                    "correct": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "correct"
+                  ]
+                },
+                "minContains": 2
+              }
+            }
+          }
+        }
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "classification"
+          ]
+        },
+        {
+          "required": [
+            "source_classification"
+          ]
+        }
+      ]
+    }
+  }
+}
