@@ -26,6 +26,17 @@ export class ImportService {
     if (source && canonical(source.metadata) !== canonical(metadata)) {
       preview.metadataChange = { before: source.metadata, after: metadata };
     }
+    const incomingRefs = new Set(bank.questions.map(reference));
+    // Evaluate duplicates against the proposed final library, excluding replaced versions.
+    const others = this.repository.allQuestions().filter(q => q.sourceId !== source?.id || !incomingRefs.has(q.reference));
+    const incoming = bank.questions.map(q => ({ reference: reference(q), fingerprint: fingerprint(q), answerKey: answerKey(q) }));
+    incoming.forEach((q, index) => {
+      const matches = [...others, ...incoming.filter((_, otherIndex) => index !== otherIndex)]
+        .filter(other => other.fingerprint === q.fingerprint);
+      if (matches.length) preview.duplicateCount++;
+      if (matches.some(other => other.answerKey !== q.answerKey)) preview.conflicts.push(q.reference);
+    });
+    preview.unclassified = bank.questions.filter(q => !q.classification).map(reference);
     return preview;
   }
 
@@ -35,6 +46,9 @@ export class ImportService {
       if (token !== preview.token) throw new ApplicationError('The library or file changed. Preview again before importing.', 409);
       if ((preview.changed.length || preview.metadataChange) && !reviewed) {
         throw new ApplicationError('Review the changed questions and source metadata before importing.', 409);
+      }
+      if (preview.conflicts.length) {
+        throw new ApplicationError('Conflicting answer keys must be corrected in the file before importing.', 409, preview.conflicts);
       }
       const bank = validateBank(input);
       const { questions, ...metadata } = bank;

@@ -89,4 +89,11 @@ export class LibraryRepository {
       ON CONFLICT(source_id, reference) DO UPDATE SET data = excluded.data,
       fingerprint = excluded.fingerprint, answer_key = excluded.answer_key`).run(sourceId, reference, data, fingerprint, answerKey);
   }
+  deleteQuestion(id: number): boolean {
+    return this.db.prepare('DELETE FROM questions WHERE id = ?').run(id).changes === 1;
+  }
+  deleteSource(id: number): boolean {
+    return this.db.prepare('DELETE FROM sources WHERE id = ?').run(id).changes === 1;
+  }
+
 }

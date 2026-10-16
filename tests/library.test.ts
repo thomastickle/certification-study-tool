@@ -54,3 +54,39 @@ test('reimport skips unchanged records and requires review before changing conte
     assert.equal(repository.questions().items[0]!.data.classification!.topic, 'Reviewed topic');
   } finally { repository.close(); }
 });
+
+test('duplicates retain both sources; conflicting answer keys require correction before saving', () => {
+  const repository = new LibraryRepository(':memory:');
+  try {
+    const service = new ImportService(repository);
+    const first = bank('first');
+    service.confirm(first, service.preview(first).token, false);
+    const second = bank('second');
+    second.questions[0]!.question = '  WHICH option is a synthetic example!  ';
+    second.questions[0]!.answers.reverse();
+    const preview = service.preview(second);
+    assert.equal(preview.duplicateCount, 1);
+    assert.deepEqual(preview.conflicts, []);
+    service.confirm(second, preview.token, false);
+    assert.equal(repository.questions().total, 2);
+    const conflicting = bank('conflicting');
+    conflicting.questions[0]!.answers.forEach(a => { a.correct = !a.correct; });
+    const conflict = service.preview(conflicting);
+    assert.deepEqual(conflict.conflicts, ['1']);
+    assert.throws(() => service.confirm(conflicting, conflict.token, true), /conflict/i);
+    assert.equal(repository.sources().length, 2);
+  } finally { repository.close(); }
+});
+
+test('missing study classification is allowed and reported for later review', () => {
+  const repository = new LibraryRepository(':memory:');
+  try {
+    const service = new ImportService(repository);
+    const input = bank();
+    delete input.questions[0]!.classification;
+    input.questions[0]!.source_classification = { area: 'Original domain', topic: null };
+    assert.deepEqual(service.preview(input).unclassified, ['1']);
+    service.confirm(input, service.preview(input).token, false);
+    assert.equal(repository.questions().total, 1);
+  } finally { repository.close(); }
+});
