@@ -30,12 +30,18 @@ export class ImportService {
     // Evaluate duplicates against the proposed final library, excluding replaced versions.
     const others = this.repository.allQuestions().filter(q => q.sourceId !== source?.id || !incomingRefs.has(q.reference));
     const incoming = bank.questions.map(q => ({ reference: reference(q), fingerprint: fingerprint(q), answerKey: answerKey(q) }));
-    incoming.forEach((q, index) => {
-      const matches = [...others, ...incoming.filter((_, otherIndex) => index !== otherIndex)]
-        .filter(other => other.fingerprint === q.fingerprint);
-      if (matches.length) preview.duplicateCount++;
-      if (matches.some(other => other.answerKey !== q.answerKey)) preview.conflicts.push(q.reference);
-    });
+    const groups = new Map<string, { count: number; answerKeys: Set<string> }>();
+    for (const question of [...others, ...incoming]) {
+      const group = groups.get(question.fingerprint) ?? { count: 0, answerKeys: new Set<string>() };
+      group.count++;
+      group.answerKeys.add(question.answerKey);
+      groups.set(question.fingerprint, group);
+    }
+    for (const question of incoming) {
+      const group = groups.get(question.fingerprint)!;
+      if (group.count > 1) preview.duplicateCount++;
+      if (group.answerKeys.size > 1) preview.conflicts.push(question.reference);
+    }
     preview.unclassified = bank.questions.filter(q => !q.classification).map(reference);
     return preview;
   }
