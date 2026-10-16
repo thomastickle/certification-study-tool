@@ -1,14 +1,15 @@
 # Agreed behavior for future implementation
 
-These are recorded requirements, not implemented functionality.
+This records agreed requirements. Import, browsing, and deletion now exist;
+quiz, exam, and reporting behavior remains deferred.
 
 ## Importing
 
 - Keep all source occurrences and distinguish official and third-party sources.
   Future question selection should allow choosing either source category or mixing them.
 - Skip unchanged source questions; require review before accepting changed ones.
-  The precise definition of a changed question, including classification-only
-  edits, remains to be decided before implementation.
+  The initial implementation treats changes to any stored question field,
+  including classification-only edits, as requiring review.
 - Reject an invalid file as a whole and identify the failing questions and fields.
 - Show a validation preview and proposed changes before saving.
 - Import missing classifications without silently inventing trusted assignments.

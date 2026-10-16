@@ -1,7 +1,8 @@
 # Question-bank files
 
-This increment prepares local JSON data only. No application importer, database,
-quiz, exam, report, or frontend has been implemented.
+This document describes local JSON data preparation. The application now supports
+importing these files, browsing SQLite contents, and deleting by source or
+question. Quizzes, exams, and reports remain deferred.
 
 ## Files and privacy
 
@@ -30,9 +31,10 @@ not the future application's implementation or a Python runtime requirement.
   invented for official questions that lacked them.
 
 All four working banks use the existing version-2 representation documented in
-[question-bank.schema.json](question-bank.schema.json), copied from the original
-project. This schema is a compatibility reference for these prepared files, not
-an implemented importer contract. Every working question now has
+[question-bank.schema.json](question-bank.schema.json), adapted from the original
+project. It also permits questions with neither classification field so the app
+can import and flag unclassified content for later curation. Every prepared
+working question now has
 `classification.area` and `classification.topic`.
 
 Existing official study classifications remain unchanged. Third-party
@@ -82,10 +84,12 @@ the Python project's existing virtual environment; nothing was installed.
 `aif-q329` was excluded from Cloud Practitioner by user decision and retained
 in `private/holding/unassigned-questions.json` with its actual certification
 unassigned and original provenance preserved. The holding file is not a bank.
-There are 1,197 active bank questions and three held questions. Kendra
+There are 1,195 active bank questions and five held questions. Kendra
 questions `q1067` and `q1068` were also set aside by user request; their
-source metadata is preserved in the holding file. Approved repairs to nine text fields across seven official
-questions have been applied to working copies only; originals remain unchanged. Schema validity does not establish content correctness or
+source metadata is preserved in the holding file. Snowmobile questions `q298`
+and `q678` were also set aside by user request. Approved repairs to nine text
+fields across seven official questions have been applied to working copies only;
+originals remain unchanged. Schema validity does not establish content correctness or
 classification accuracy. This preparation has not had independent review.
 
 ## Classification references

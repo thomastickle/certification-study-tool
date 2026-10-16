@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { JsonObject, Question, QuestionPage, Source, StoredQuestion } from '../../shared/contracts.ts';
 
-export type SourceRecord = Source & { metadata: JsonObject };
+export type SourceRecord = Omit<Source, 'questionCount'> & { metadata: JsonObject };
 export type QuestionRecord = StoredQuestion & { fingerprint: string; answerKey: string };
 
 /** SQLite access only. Application services own transactions. */
