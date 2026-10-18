@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import type { JsonObject, QuestionPage, Source, StoredQuestion } from '../../shared/contracts.ts'
 
 export type SourceRecord = Omit<Source, 'questionCount'> & { metadata: JsonObject }
+
 export type QuestionRecord = StoredQuestion & { fingerprint: string; answerKey: string }
 
 /** SQLite access only. Application services own transactions. */
@@ -57,9 +58,11 @@ export class LibraryRepository {
   close(): void {
     this.db.close()
   }
+
   revision(): number {
     return Number(this.db.prepare('SELECT revision FROM library_state').get()?.revision)
   }
+
   transaction<T>(work: () => T): T {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -71,6 +74,7 @@ export class LibraryRepository {
       throw error
     }
   }
+
   sources(): Source[] {
     return this.db
       .prepare(
@@ -81,6 +85,7 @@ export class LibraryRepository {
       )
       .all() as unknown as Source[]
   }
+
   source(provider: string, certification: string, key: string): SourceRecord | undefined {
     const row = this.db
       .prepare(
@@ -92,6 +97,7 @@ export class LibraryRepository {
     if (!row) return undefined
     return { ...row, metadata: JSON.parse(String(row.metadata)) } as unknown as SourceRecord
   }
+
   saveSource(
     provider: string,
     certification: string,
@@ -111,6 +117,7 @@ export class LibraryRepository {
       .run(provider, certification, certificationName, key, name, kind, metadata)
     return this.source(provider, certification, key)!.id
   }
+
   allQuestions(): QuestionRecord[] {
     const rows = this.db
       .prepare(
@@ -124,6 +131,7 @@ export class LibraryRepository {
       data: JSON.parse(String(row.data)),
     })) as unknown as QuestionRecord[]
   }
+
   questions(sourceId?: number, search = '', page = 1): QuestionPage {
     // This initial local library is small; filtering here keeps paging consistent with detail objects.
     const matching = this.allQuestions().filter(
@@ -143,6 +151,7 @@ export class LibraryRepository {
       pageSize: 25,
     }
   }
+
   saveQuestion(
     sourceId: number,
     reference: string,
@@ -158,9 +167,11 @@ export class LibraryRepository {
       )
       .run(sourceId, reference, data, fingerprint, answerKey)
   }
+
   deleteQuestion(id: number): boolean {
     return this.db.prepare('DELETE FROM questions WHERE id = ?').run(id).changes === 1
   }
+
   deleteSource(id: number): boolean {
     return this.db.prepare('DELETE FROM sources WHERE id = ?').run(id).changes === 1
   }

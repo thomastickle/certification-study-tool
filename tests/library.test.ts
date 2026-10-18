@@ -131,6 +131,7 @@ test('an import failure rolls back both source metadata and all questions', () =
       throw new Error('Synthetic storage failure')
     }
   }
+
   const repository = new FailingRepository(':memory:')
   try {
     const service = new ImportService(repository)

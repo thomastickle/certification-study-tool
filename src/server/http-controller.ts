@@ -18,6 +18,7 @@ export function checkLocalRequest(request: IncomingMessage): void {
     throw new ApplicationError('Cross-site requests are not allowed.', 403)
   }
 }
+
 function send(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, {
     'Content-Type': 'application/json',
@@ -26,6 +27,7 @@ function send(response: ServerResponse, status: number, value: unknown): void {
   })
   response.end(JSON.stringify(value))
 }
+
 async function body(request: IncomingMessage): Promise<Record<string, unknown>> {
   if (!request.headers['content-type']?.startsWith('application/json'))
     throw new ApplicationError('Expected application/json.', 415)
@@ -46,12 +48,14 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
     throw new ApplicationError('Invalid JSON request. Nothing was imported.')
   }
 }
+
 function positiveInteger(text: string | null, fallback?: number): number {
   if (text === null && fallback !== undefined) return fallback
   if (!text || !/^[1-9]\d*$/.test(text) || !Number.isSafeInteger(Number(text)))
     throw new ApplicationError('Expected a positive integer.')
   return Number(text)
 }
+
 export function apiController(repository: LibraryRepository) {
   const importer = new ImportService(repository)
   const library = new LibraryService(repository)
