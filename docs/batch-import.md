@@ -18,13 +18,13 @@ duplicate is a retained source occurrence, not an answer-key conflict.
 
 Only these files are loaded, in this order; `03_audit/` is never imported:
 
-| File under bundle directory | Occurrences | Source type |
-| --- | ---: | --- |
-| `01_official/aws-clf-c02-official-practice-exam-2026(2).json` | 65 | official |
-| `01_official/aws-clf-c02-official-practice-question-set-2026(2).json` | 20 | official |
-| `01_official/aws-clf-c02-official-pretest-2026(2).json` | 65 | official |
-| `02_screened/aws_screened_cloudcertprep_2026.json` | 942 | third_party |
-| `02_screened/aws_screened_github_additions_2026.json` | 41 | third_party |
+| File under bundle directory                                           | Occurrences | Source type |
+| --------------------------------------------------------------------- | ----------: | ----------- |
+| `01_official/aws-clf-c02-official-practice-exam-2026(2).json`         |          65 | official    |
+| `01_official/aws-clf-c02-official-practice-question-set-2026(2).json` |          20 | official    |
+| `01_official/aws-clf-c02-official-pretest-2026(2).json`               |          65 | official    |
+| `02_screened/aws_screened_cloudcertprep_2026.json`                    |         942 | third_party |
+| `02_screened/aws_screened_github_additions_2026.json`                 |          41 | third_party |
 
 The command checks certification, expected per-file counts, source types, and
 unverified status for both third-party sources. It calls the real `validateBank`,
