@@ -79,3 +79,22 @@ Tests use synthetic data and temporary or in-memory databases. Private study
 banks, databases, logs, and generated build assets are excluded from Git.
 See [architecture](docs/architecture.md) and the
 [bank format](docs/question-bank.schema.json).
+
+## Code hygiene
+
+Use the project-local tools so editors and command-line checks follow the same
+rules: two spaces, single quotes, a 100-column print width, and no trailing
+statement semicolons. Prettier retains leading semicolons where needed to avoid
+automatic-semicolon-insertion hazards. ESLint applies the recommended JavaScript
+and TypeScript rules; formatting is handled by Prettier. An underscore prefix
+marks an intentionally unused parameter or discarded value.
+
+```sh
+npm run format        # Apply formatting
+npm run format:check  # Check formatting without changing files
+npm run lint          # Check application, tests, and tooling configuration
+npm run check         # Formatting, lint, tests, typecheck, and production build
+```
+
+`npm run build` includes typechecking. Private banks/databases, editor settings,
+and generated output are excluded from formatting; linting is scoped to code.
