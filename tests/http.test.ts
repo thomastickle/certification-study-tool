@@ -73,3 +73,60 @@ test('HTTP supports preview, confirm, browse and scoped deletion while denying c
     repository.close()
   }
 })
+
+test('quiz HTTP saves confidence, scores results and rejects cross-site mutations', async () => {
+  const { populate } = await import('./quiz-fixtures.ts')
+  const repository = new LibraryRepository(':memory:')
+  populate(repository)
+  const server = createServer(apiController(repository))
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string')
+  const base = `http://127.0.0.1:${address.port}`
+
+  const post = (path: string, data: unknown, method = 'POST', origin = base) =>
+    fetch(base + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', Origin: origin },
+      body: JSON.stringify(data),
+    })
+
+  try {
+    assert.equal(
+      (
+        await post(
+          '/api/quizzes',
+          { sourceFilter: 'mixed', questionType: 'mixed' },
+          'POST',
+          'https://untrusted.example',
+        )
+      ).status,
+      403,
+    )
+    const response = await post('/api/quizzes', { sourceFilter: 'mixed', questionType: 'mixed' })
+    assert.equal(response.status, 201)
+    const quiz = await response.json()
+    assert.equal(quiz.questions.length, 20)
+    assert.equal('keys' in quiz, false)
+    const answers = quiz.questions.map((q: { questionId: number }) => ({
+      questionId: q.questionId,
+      selected: [],
+      confidence: 'Unsure',
+      flagged: true,
+    }))
+    assert.equal((await post(`/api/quizzes/${quiz.id}/answers`, { answers }, 'PUT')).status, 200)
+    const result = await (await post(`/api/quizzes/${quiz.id}/submit`, { answers })).json()
+    assert.equal(result.correctCount, 0)
+    assert.equal(result.questions[0].confidence, 'Unsure')
+    assert.ok(result.questions[0].correctAnswerIds)
+    const history = await (await fetch(base + '/api/quizzes')).json()
+    assert.equal(history.length, 1)
+    const saved = await (await fetch(base + `/api/quizzes/${quiz.id}`)).json()
+    assert.equal(saved.status, 'completed')
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    )
+    repository.close()
+  }
+})

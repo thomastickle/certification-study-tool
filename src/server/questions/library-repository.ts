@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
+import { migrateQuizzes, QuizRepository } from '../quizzes/quiz-repository.ts'
 import type { JsonObject, QuestionPage, Source, StoredQuestion } from '../../shared/contracts.ts'
 
 export type SourceRecord = Omit<Source, 'questionCount'> & { metadata: JsonObject }
@@ -27,7 +28,7 @@ export class LibraryRepository {
       this.db.close()
       throw new Error('Unrecognized database. Use a separate application database.')
     }
-    if (version !== 0 && version !== 1) {
+    if (version !== 0 && version !== 1 && version !== 2) {
       this.db.close()
       throw new Error('Unsupported database version. Use a separate application database.')
     }
@@ -54,6 +55,11 @@ export class LibraryRepository {
       PRAGMA user_version = 1;
       COMMIT;
     `)
+    migrateQuizzes(this.db)
+  }
+
+  quizStore(): QuizRepository {
+    return new QuizRepository(this.db)
   }
 
   close(): void {
