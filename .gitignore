@@ -13,3 +13,8 @@
 *.tsbuildinfo
 .env
 .env.*
+
+# Common IDE files.
+
+.idea/
+*.iml
