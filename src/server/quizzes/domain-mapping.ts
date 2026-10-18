@@ -6,6 +6,7 @@ export const domainNames = [
   'Cloud Technology and Services',
   'Billing, Pricing, and Support',
 ] as const
+
 // Largest-remainder rounding of AWS's 24/30/34/12 weights for 20 questions.
 export const domainQuotas = [5, 6, 7, 2] as const
 

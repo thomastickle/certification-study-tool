@@ -3,6 +3,7 @@ import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'reports' | 'importer'
+
 const links: { id: Page; label: string }[] = [
   { id: 'quiz', label: 'Quiz' },
   { id: 'exam', label: 'Exam' },
@@ -13,10 +14,12 @@ const links: { id: Page; label: string }[] = [
 export function App() {
   const [page, setPage] = useState<Page>('home')
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
+
   async function navigate(next: Page) {
     if (page === 'quiz' && next !== 'quiz' && !(await leaveQuiz.current())) return
     setPage(next)
   }
+
   return (
     <div className="app-shell">
       <header className="masthead">

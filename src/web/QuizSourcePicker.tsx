@@ -14,6 +14,7 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
   function close() {
     dialog.current?.close()
   }
+
   useEffect(() => {
     const panel = dialog.current
     if (!panel || !open) return
@@ -23,20 +24,24 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
       document.body.style.overflow = 'hidden'
       panel.showModal()
     } else panel.show()
+
     const outside = (event: Event) => {
       if (event.target instanceof Node && !root.current?.contains(event.target)) {
         restoreFocus.current = false
         panel.close()
       }
     }
+
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
         panel.close()
       }
     }
+
     // Reopen from the trigger after switching between desktop and mobile modes.
     const resize = () => panel.close()
+
     document.addEventListener('pointerdown', outside)
     document.addEventListener('focusin', outside)
     document.addEventListener('keydown', escape)

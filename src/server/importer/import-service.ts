@@ -7,6 +7,7 @@ import { answerKey, canonical, digest, fingerprint, reference } from './bank-too
 /** File import use cases; no HTTP, UI or filesystem ownership. */
 export class ImportService {
   private repository: LibraryRepository
+
   constructor(repository: LibraryRepository) {
     this.repository = repository
   }
