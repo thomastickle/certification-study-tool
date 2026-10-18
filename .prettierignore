@@ -1,0 +1,16 @@
+# Local content must never be rewritten by development tooling.
+private/
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+.env
+.env.*
+
+# Generated output and dependency-manager files.
+node_modules/
+dist/
+coverage/
+package-lock.json

@@ -3,12 +3,7 @@
   "title": "aws-study curated question bank v2",
   "$comment": "Study classifications may be absent and are reported for later curation. Application validation additionally checks normalized answer uniqueness, source-reference uniqueness, and exact correct-answer counts.",
   "type": "object",
-  "required": [
-    "schema_version",
-    "certification",
-    "source",
-    "questions"
-  ],
+  "required": ["schema_version", "certification", "source", "questions"],
   "properties": {
     "schema_version": {
       "type": "integer",
@@ -16,11 +11,7 @@
     },
     "certification": {
       "type": "object",
-      "required": [
-        "provider",
-        "code",
-        "name"
-      ],
+      "required": ["provider", "code", "name"],
       "properties": {
         "provider": {
           "type": "string",
@@ -38,12 +29,7 @@
     },
     "source": {
       "type": "object",
-      "required": [
-        "key",
-        "name",
-        "type",
-        "verification_status"
-      ],
+      "required": ["key", "name", "type", "verification_status"],
       "properties": {
         "key": {
           "type": "string",
@@ -58,18 +44,12 @@
           "pattern": "\\S"
         },
         "observed_year": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": ["integer", "null"],
           "minimum": 1,
           "maximum": 9999
         },
         "verified_year": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": ["integer", "null"],
           "minimum": 1,
           "maximum": 9999
         },
@@ -84,16 +64,10 @@
           ]
         },
         "metadata": {
-          "type": [
-            "object",
-            "null"
-          ]
+          "type": ["object", "null"]
         },
         "snapshot_family": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "pattern": "\\S"
         }
       }
@@ -112,10 +86,7 @@
   "$defs": {
     "answer": {
       "type": "object",
-      "required": [
-        "text",
-        "correct"
-      ],
+      "required": ["text", "correct"],
       "properties": {
         "text": {
           "type": "string",
@@ -125,40 +96,26 @@
           "type": "boolean"
         },
         "rationale": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         }
       },
       "not": {
         "anyOf": [
           {
-            "required": [
-              "selected"
-            ]
+            "required": ["selected"]
           },
           {
-            "required": [
-              "id"
-            ]
+            "required": ["id"]
           },
           {
-            "required": [
-              "content_hash"
-            ]
+            "required": ["content_hash"]
           }
         ]
       }
     },
     "question": {
       "type": "object",
-      "required": [
-        "question",
-        "type",
-        "select_count",
-        "answers"
-      ],
+      "required": ["question", "type", "select_count", "answers"],
       "properties": {
         "source_ref": {
           "anyOf": [
@@ -176,10 +133,7 @@
           "pattern": "\\S"
         },
         "type": {
-          "enum": [
-            "single_select",
-            "multi_select"
-          ]
+          "enum": ["single_select", "multi_select"]
         },
         "select_count": {
           "type": "integer",
@@ -198,10 +152,7 @@
         },
         "classification": {
           "type": "object",
-          "required": [
-            "area",
-            "topic"
-          ],
+          "required": ["area", "topic"],
           "properties": {
             "area": {
               "type": "string",
@@ -222,40 +173,26 @@
         },
         "source_classification": {
           "type": "object",
-          "required": [
-            "area"
-          ],
+          "required": ["area"],
           "properties": {
             "area": {
               "type": "string",
               "pattern": "\\S"
             },
             "topic": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": ["string", "null"],
               "pattern": "\\S"
             }
           }
         },
         "source_metadata": {
-          "type": [
-            "object",
-            "null"
-          ]
+          "type": ["object", "null"]
         },
         "explanation": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "verified_at": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
           "format": "date"
         },
@@ -274,89 +211,55 @@
       "not": {
         "anyOf": [
           {
-            "required": [
-              "status"
-            ]
+            "required": ["status"]
           },
           {
-            "required": [
-              "selected"
-            ]
+            "required": ["selected"]
           },
           {
-            "required": [
-              "confidence"
-            ]
+            "required": ["confidence"]
           },
           {
-            "required": [
-              "original_confidence"
-            ]
+            "required": ["original_confidence"]
           },
           {
-            "required": [
-              "time_to_answer_seconds"
-            ]
+            "required": ["time_to_answer_seconds"]
           },
           {
-            "required": [
-              "id"
-            ]
+            "required": ["id"]
           },
           {
-            "required": [
-              "dedup_role"
-            ]
+            "required": ["dedup_role"]
           },
           {
-            "required": [
-              "dedup_group"
-            ]
+            "required": ["dedup_group"]
           },
           {
-            "required": [
-              "variant_group"
-            ]
+            "required": ["variant_group"]
           },
           {
-            "required": [
-              "content_hash"
-            ]
+            "required": ["content_hash"]
           },
           {
-            "required": [
-              "content_fingerprint"
-            ]
+            "required": ["content_fingerprint"]
           },
           {
-            "required": [
-              "answer_key_fingerprint"
-            ]
+            "required": ["answer_key_fingerprint"]
           },
           {
-            "required": [
-              "fingerprint_version"
-            ]
+            "required": ["fingerprint_version"]
           },
           {
-            "required": [
-              "tags"
-            ]
+            "required": ["tags"]
           },
           {
-            "required": [
-              "elapsed_ms"
-            ]
+            "required": ["elapsed_ms"]
           },
           {
-            "required": [
-              "selected_answers"
-            ]
+            "required": ["selected_answers"]
           },
           {
-            "required": [
-              "question_id"
-            ]
+            "required": ["question_id"]
           }
         ]
       },
@@ -381,9 +284,7 @@
                       "const": true
                     }
                   },
-                  "required": [
-                    "correct"
-                  ]
+                  "required": ["correct"]
                 },
                 "minContains": 1,
                 "maxContains": 1
@@ -402,9 +303,7 @@
                       "const": true
                     }
                   },
-                  "required": [
-                    "correct"
-                  ]
+                  "required": ["correct"]
                 },
                 "minContains": 2
               }
