@@ -15,11 +15,13 @@ test('selection excludes duplicates, unmapped records and other exams; source/ty
   const options={sourceFilter:'mixed' as const,questionType:'mixed' as const};
   const selected=selectQuestions(repository.allQuestions(),repository.sources(),options,new Set(),()=>0.3);
   assert.equal(new Set(selected.map(q=>q.record.fingerprint)).size,20);assert.ok(selected.every(q=>q.record.sourceName==='Official'));
-  const singles=selectQuestions(repository.allQuestions(),repository.sources(),{...options,questionType:'single_select'},new Set());
-  assert.ok(singles.every(q=>q.record.data.type==='single_select'));
- }catch(error){
-  // Six single-select questions per domain cannot fill Technology's seven slots.
-  assert.match(String(error),/Domain 3 needs 7/);
+  assert.throws(()=>selectQuestions(repository.allQuestions(),repository.sources(),{...options,questionType:'single_select'},new Set()),/Domain 3 needs 7/);
+  const onlyThird = selectQuestions(repository.allQuestions(),repository.sources(),{...options,sourceFilter:'third_party'},new Set());
+  assert.ok(onlyThird.every(q=>q.record.sourceName === 'quiz-synthetic'));
+  const foreign = repository.sources().map(source=>({...source,certification:'OTHER'}));
+  assert.throws(()=>selectQuestions(repository.allQuestions(),foreign,options,new Set()),/only 0/);
+  const unmapped = repository.allQuestions().map(q=>({...q,data:{...q.data,classification:undefined,source_metadata:null}}));
+  assert.throws(()=>selectQuestions(unmapped,repository.sources(),options,new Set()),/only 0/);
  }finally{repository.close();}
  const question=bank().questions[0]!;
  assert.equal(examDomain(question),null);

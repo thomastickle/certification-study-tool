@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Confidence, QuizAnswer, QuizOptions, QuizQuestion, QuizSummary, QuizView } from '../shared/quiz-contracts.ts';
 import { api } from './api.ts';
+import { quizReport } from '../shared/quiz-report.ts';
 import { meetsPracticeTarget, reviewQuestionIds, warningThreshold } from './quiz-state.ts';
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned';
@@ -24,13 +25,18 @@ export function QuizPage({ onRegisterLeave }: Props) {
   const deadlineOffset = useRef(0);
   const noticesShown = useRef(new Set<string>());
   const timerSubmit = useRef(false);
+  const pendingAnswers = useRef(false);
 
-  const updateView = useCallback((next: QuizView) => { viewRef.current = next; setView(next); deadlineOffset.current = next.serverNow - Date.now(); }, []);
+  const updateView = useCallback((next: QuizView) => {
+    viewRef.current = next; setView(next); deadlineOffset.current = next.serverNow - Date.now();
+    if (next.status === 'completed') setStage('completed');
+    if (next.status === 'abandoned') setStage('abandoned');
+  }, []);
   const saveAnswers = useCallback(async (answers: QuizAnswer[]) => {
     const current = viewRef.current;
     if (!current || current.status !== 'active' || busyRef.current) return;
     busyRef.current = true; setBusy(true); setError(''); setMutationError(false);
-    try { const next = await api<QuizView>(`/quizzes/${current.id}/answers`, { method: 'PUT', body: JSON.stringify({ answers }) }); updateView(next); }
+    try { const next = await api<QuizView>(`/quizzes/${current.id}/answers`, { method: 'PUT', body: JSON.stringify({ answers }) }); pendingAnswers.current = false; updateView(next); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save answers.'); setMutationError(true); }
     finally { busyRef.current = false; setBusy(false); }
   }, [updateView]);
@@ -47,6 +53,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
   }, [updateView]);
 
   async function start() {
+    pendingAnswers.current = false; setMutationError(false); setAutoSubmitFailed(false);
     setStage('loading'); setError(''); setNotice(''); noticesShown.current.clear(); timerSubmit.current = false;
     try { const next = await api<QuizView>('/quizzes', { method: 'POST', body: JSON.stringify(options) }); updateView(next); setStage(next.status === 'completed' ? 'completed' : 'question'); setQuestionIndex(0); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not start a quiz.'); setStage('setup'); }
@@ -95,7 +102,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
       if (busyRef.current) return;
       try {
         const next = await api<QuizView>(`/quizzes/${view.id}`);
-        if (cancelled || busyRef.current) return;
+        if (cancelled || busyRef.current || (pendingAnswers.current && next.status === 'active')) return;
         updateView(next);
         if (next.status !== 'active') setStage(next.status === 'completed' ? 'completed' : 'abandoned');
       } catch (reason) { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not refresh quiz status.'); }
@@ -116,19 +123,22 @@ export function QuizPage({ onRegisterLeave }: Props) {
     if (!view || busy || secondsLeft === 0 || view.status !== 'active') return;
     const updatedQuestions = view.questions.map(item => item.questionId === question.questionId ? { ...item, ...patch } : item);
     const next = { ...view, questions: updatedQuestions };
-    updateView(next); void saveAnswers(updatedQuestions.map(answerPayload));
+    pendingAnswers.current = true; viewRef.current = next; setView(next); void saveAnswers(updatedQuestions.map(answerPayload));
   }
   const reviewIds = reviewQuestionIds(questions);
 
   return <main className="quiz-page">
-    <div className="page-heading"><div><p className="eyebrow">TIMED STUDY SESSION</p><h1>{stage === 'completed' ? 'Quiz results' : stage === 'review' ? 'Review your answers' : 'Quiz'}</h1><p className="intro">20 questions · 20 minutes · No pass or fail threshold</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">TIMED STUDY SESSION</p><h1>{stage === 'completed' ? 'Quiz results' : stage === 'review' ? 'Review your answers' : 'Quiz'}</h1><p className="intro">20 questions · 20 minutes · 80% practice target</p></div></div>
     {error && <div className="message error" role="alert"><strong>Couldn’t complete that action</strong><pre>{error}</pre>{(mutationError || autoSubmitFailed) && <button onClick={() => autoSubmitFailed ? void submit(true) : view && void saveAnswers(view.questions.map(answerPayload))}>{autoSubmitFailed ? 'Retry submission' : 'Retry answer save'}</button>}</div>}
+    {(stage === 'question' || stage === 'review') && view && <>
+      <div className="quiz-status"><span>{stage === 'review' ? 'Review before submitting' : `Question ${questionIndex + 1} of ${questions.length}`}</span><strong className={secondsLeft <= 120 ? 'timer urgent' : 'timer'} aria-label="Time remaining">{formatTime(secondsLeft)}</strong>{stage === 'question' && <button onClick={() => setStage('review')}>Review answers</button>}</div>
+      {notice && <div className="message warning" role="status" aria-live="polite">{notice}</div>}
+      {pendingAnswers.current && mutationError && <p role="alert">Your last changes are not saved. Retry before the timer expires; automatic scoring uses saved answers.</p>}
+    </>}
     {stage === 'setup' && <><section className="quiz-panel"><h2>Set up your quiz</h2><p>Choose what to include. Questions and answers are selected by the quiz service.</p><div className="option-grid"><label>Question sources<select value={options.sourceFilter} onChange={e => setOptions({ ...options, sourceFilter: e.target.value as QuizOptions['sourceFilter'] })}><option value="mixed">Mixed sources</option><option value="official">Official only</option><option value="third_party">Third-party only</option></select></label><label>Question format<select value={options.questionType} onChange={e => setOptions({ ...options, questionType: e.target.value as QuizOptions['questionType'] })}><option value="mixed">Mixed formats</option><option value="single_select">Single answer</option><option value="multi_select">Multiple answers</option></select></label></div><button className="primary" onClick={() => void start()}>Start 20-question quiz</button></section>
       <section className="quiz-panel"><div className="section-heading"><h2>Completed quizzes</h2><button onClick={() => { void api<QuizSummary[]>('/quizzes').then(setSummaries).catch(reason => setError(String(reason.message))); }}>Refresh results</button></div>{summaries.length === 0 ? <p className="muted">Load your completed quiz history.</p> : <ul className="history-list">{summaries.filter(item => item.status === 'completed').map(item => <li key={item.id}><span>{new Date(item.finishedAt ?? item.startedAt).toLocaleString()} · {item.correctCount ?? 0}/{item.total}</span><button onClick={() => void loadCompleted(item.id)}>Review results</button></li>)}</ul>}</section></>}
     {stage === 'loading' && <div className="empty-state" role="status">Loading quiz…</div>}
     {stage === 'question' && view && currentQuestion && <>
-      <div className="quiz-status"><span>Question {questionIndex + 1} of {questions.length}</span><strong className={secondsLeft < 120 ? 'timer urgent' : ''} aria-label="Time remaining">{formatTime(secondsLeft)}</strong><button onClick={() => setStage('review')}>Review answers</button></div>
-      {notice && <div className="message warning" role="status" aria-live="polite">{notice}</div>}
       {view.status !== 'active' && <div className="message warning" role="alert">This quiz is no longer active.</div>}
       <QuestionEditor question={currentQuestion} disabled={busy || secondsLeft === 0 || view.status !== 'active'} onChange={patch => changeAnswer(currentQuestion, patch)} />
       {busy && <p className="muted" role="status">Saving answer…</p>}
@@ -158,6 +168,16 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   const correct = view.questions.filter(question => question.correct).length;
   const percent = view.questions.length ? Math.round(correct / view.questions.length * 100) : 0;
   const passed = meetsPracticeTarget(percent);
-  const review = view.questions.filter(question => !question.correct || question.confidence !== 'Confident');
-  return <><section className="quiz-panel result-score"><p className="eyebrow">QUIZ COMPLETE</p><h2>{correct} of {view.questions.length}</h2><p>{percent}% correct</p><p className={passed ? 'correct-text' : 'incorrect-text'}><strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong></p><p>This is a practice target, not an AWS scaled score.</p><button onClick={onBack}>Back to quiz history</button></section><section className="quiz-panel"><h2>Review answers</h2>{review.length === 0 && <p>All answers are correct and marked confident.</p>}{review.map(question => <article className="result-question" key={question.questionId}><h3>{question.question}</h3><p className={question.correct ? 'correct-text' : 'incorrect-text'}>{question.correct ? 'Correct' : 'Incorrect'} · {question.confidence ?? 'Confidence not recorded'}{question.confidence !== 'Confident' ? ' · Review' : ''}</p><p className="muted">{question.sourceName} · {question.reference} · Domain {question.domain}{question.area ? ` · ${question.area}` : ''}{question.topic ? ` · ${question.topic}` : ''}</p><ul>{question.answers.map(answer => { const selected = question.selected.includes(answer.id); const isCorrect = question.correctAnswerIds?.includes(answer.id); return <li key={answer.id} className={isCorrect ? 'result-correct' : selected ? 'result-selected' : ''}>{answer.text}{selected ? ' · Your choice' : ''}{isCorrect ? ' · Correct answer' : ''}</li>; })}</ul></article>)}</section></>;
+  const review = view.questions;
+  const [copyNotice, setCopyNotice] = useState('');
+  function downloadReport() {
+    const url = URL.createObjectURL(new Blob([quizReport(view)], { type: 'text/markdown;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = `quiz-${view.id}.md`; link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function copyReport() {
+    try { await navigator.clipboard.writeText(quizReport(view)); setCopyNotice('Report copied.'); }
+    catch { setCopyNotice('Copy unavailable. Download the report instead.'); }
+  }
+  return <><section className="quiz-panel result-score"><p className="eyebrow">QUIZ COMPLETE</p><h2>{correct} of {view.questions.length}</h2><p>{percent}% correct</p><p className={passed ? 'correct-text' : 'incorrect-text'}><strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong></p><p>This is a practice target, not an AWS scaled score.</p><div className="quiz-actions"><button onClick={onBack}>Back to quiz history</button><button onClick={() => void copyReport()}>Copy discussion report</button><button onClick={downloadReport}>Download report</button></div><p role="status">{copyNotice}</p></section><section className="quiz-panel"><h2>All answers and confidence</h2>{review.length === 0 && <p>All answers are correct and marked confident.</p>}{review.map(question => <article className="result-question" key={question.questionId}><h3>{question.question}</h3><p className={question.correct ? 'correct-text' : 'incorrect-text'}>{question.correct ? 'Correct' : 'Incorrect'} · {question.confidence ?? 'Confidence not recorded'}{question.confidence !== 'Confident' ? ' · Review' : ''}{question.flagged ? ' · Marked for return' : ''}</p><p className="muted">{question.sourceName} · {question.reference} · Domain {question.domain}{question.area ? ` · ${question.area}` : ''}{question.topic ? ` · ${question.topic}` : ''}</p><ul>{question.answers.map(answer => { const selected = question.selected.includes(answer.id); const isCorrect = question.correctAnswerIds?.includes(answer.id); return <li key={answer.id} className={isCorrect ? 'result-correct' : selected ? 'result-selected' : ''}>{answer.text}{selected ? ' · Your choice' : ''}{isCorrect ? ' · Correct answer' : ''}</li>; })}</ul></article>)}</section></>;
 }

@@ -1,8 +1,8 @@
 import type { QuizQuestion } from '../shared/quiz-contracts.ts';
 
 export function warningThreshold(remainingMs: number): '10-minute' | '2-minute' | null {
-  if (remainingMs < 2 * 60_000) return '2-minute';
-  if (remainingMs < 10 * 60_000) return '10-minute';
+  if (remainingMs <= 2 * 60_000) return '2-minute';
+  if (remainingMs <= 10 * 60_000) return '10-minute';
   return null;
 }
 

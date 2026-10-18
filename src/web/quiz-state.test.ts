@@ -7,7 +7,9 @@ test('warning threshold follows server deadline, including crossed thresholds', 
   assert.equal(warningThreshold(10 * 60_000 - 1), '10-minute');
   assert.equal(warningThreshold(2 * 60_000 - 1), '2-minute');
   assert.equal(warningThreshold(0), '2-minute');
-  assert.equal(warningThreshold(10 * 60_000), null);
+  assert.equal(warningThreshold(10 * 60_000), '10-minute');
+  assert.equal(warningThreshold(2 * 60_000), '2-minute');
+  assert.equal(warningThreshold(10 * 60_000 + 1), null);
 });
 
 test('review list includes unanswered, flagged, low confidence, and unrecorded confidence', () => {
