@@ -55,22 +55,22 @@ appear twice in one quiz.
 bank files or classifications. Explicit `source_metadata.domain_id` values 1–4
 are used first. Otherwise these documented study categories map as follows:
 
-| Study area or topic | Domain |
-| --- | --- |
-| Cloud Concepts | 1 |
-| Security & Compliance; Identity & security | 2 |
-| Cloud Technology & Services; service-specific Compute, Storage, Networking, AI/ML, Database, Application areas | 3 |
-| Billing, Pricing & Support; Billing & support | 4 |
-| Cloud fundamentals | 1, except infrastructure/Regions/AZs/content delivery → 3 |
-| Compute: EC2 purchasing options | 4 |
-| Management: CAF and Well-Architected | 1 |
-| Management: Control Tower | 2 |
-| Management: Trusted Advisor checks | 4 |
-| Migration: strategies and assessment | 1 |
-| Migration: AWS Partner Network | 4 |
-| Migration: DMS, MGN, Storage Gateway | 3 |
-| Operations: CloudTrail, Config, secure Session Manager access | 2 |
-| Operations: CloudWatch metrics/log analytics | 3 |
+| Study area or topic                                                                                            | Domain                                                    |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Cloud Concepts                                                                                                 | 1                                                         |
+| Security & Compliance; Identity & security                                                                     | 2                                                         |
+| Cloud Technology & Services; service-specific Compute, Storage, Networking, AI/ML, Database, Application areas | 3                                                         |
+| Billing, Pricing & Support; Billing & support                                                                  | 4                                                         |
+| Cloud fundamentals                                                                                             | 1, except infrastructure/Regions/AZs/content delivery → 3 |
+| Compute: EC2 purchasing options                                                                                | 4                                                         |
+| Management: CAF and Well-Architected                                                                           | 1                                                         |
+| Management: Control Tower                                                                                      | 2                                                         |
+| Management: Trusted Advisor checks                                                                             | 4                                                         |
+| Migration: strategies and assessment                                                                           | 1                                                         |
+| Migration: AWS Partner Network                                                                                 | 4                                                         |
+| Migration: DMS, MGN, Storage Gateway                                                                           | 3                                                         |
+| Operations: CloudTrail, Config, secure Session Manager access                                                  | 2                                                         |
+| Operations: CloudWatch metrics/log analytics                                                                   | 3                                                         |
 
 These are our study-selection interpretations, not official question labels or
 accuracy verification. Cross-cutting services can appear in multiple official
