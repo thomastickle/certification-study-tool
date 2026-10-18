@@ -92,8 +92,8 @@ Leaving through app navigation asks before abandoning; abandoned attempts cannot
 be resumed and do not affect mastery. Browser reload/close warns but cannot
 reliably send abandonment. An orphaned attempt remains saved until its deadline
 (then scores saved answers), or is abandoned when another quiz starts before
-that deadline. There is no active-attempt resume UI. Completed results remain
-available; the initial history list shows the most recent 20. The Reports page
+that deadline. There is no active-attempt resume UI. All completed results remain
+available through the quiz history list. The Reports page
 and charts are intentionally deferred.
 
 Development verification uses a separate `private/app/quiz-preview.sqlite3`

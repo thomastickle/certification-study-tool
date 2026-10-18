@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { meetsPracticeTarget, reviewQuestionIds, warningThreshold } from './quiz-state.ts';
-import type { QuizQuestion } from '../shared/quiz-contracts.ts';
+import type { QuizQuestion, QuizView } from '../shared/quiz-contracts.ts';
 
 test('warning threshold follows server deadline, including crossed thresholds', () => {
   assert.equal(warningThreshold(10 * 60_000 - 1), '10-minute');
@@ -27,4 +27,23 @@ test('80 percent practice target passes at the boundary only', () => {
   assert.equal(meetsPracticeTarget(79), false);
   assert.equal(meetsPracticeTarget(80), true);
   assert.equal(meetsPracticeTarget(100), true);
+});
+
+test('a delayed poll cannot erase a newer saved answer or a pending failed save', async () => {
+  const { mergeQuizPoll } = await import('./quiz-state.ts');
+  const base: QuizView = {id:'quiz',status:'active',serverNow:1000,startedAt:1000,deadline:1201000,finishedAt:null,correctCount:null,total:1,
+    options:{sourceFilter:'mixed',questionType:'mixed'},
+    questions:[{questionId:0,question:'Synthetic question?',type:'single_select',selectCount:1,answers:[{id:0,text:'Example'}],domain:1,
+      sourceName:'Synthetic',sourceKind:'third_party',reference:'1',area:null,topic:null,selected:[],confidence:null,flagged:false}]};
+  let resolvePoll!: (view: typeof base) => void;
+  const delayed = new Promise<typeof base>(resolve=>{resolvePoll=resolve;});
+  const saved = {...base,serverNow:2000,questions:[{...base.questions[0]!,selected:[0],confidence:'Unsure' as const,flagged:true}]};
+  resolvePoll(structuredClone(base));
+  const reconciled=mergeQuizPoll(saved,await delayed);
+  assert.deepEqual(reconciled.questions[0]!.selected,[0]);
+  assert.equal(reconciled.questions[0]!.flagged,true);
+  assert.equal(reconciled.serverNow,2000);
+  const complete={...saved,status:'completed' as const,correctCount:1};
+  assert.equal(mergeQuizPoll(saved,complete).status,'completed');
+  assert.equal(mergeQuizPoll(complete,base).status,'completed');
 });

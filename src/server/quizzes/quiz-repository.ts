@@ -31,11 +31,12 @@ export class QuizRepository {
       .run(quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz));
   }
   recent(): QuizSummary[] {
-    return this.db.prepare("SELECT data FROM quiz_sessions WHERE status = 'completed' ORDER BY started_at DESC, id DESC LIMIT 20").all().map(row => {
-      const { id, status, startedAt, deadline, finishedAt, correctCount, total } = JSON.parse(String(row.data)) as StoredQuiz;
-      return { id, status, startedAt, deadline, finishedAt, correctCount, total };
-    });
+    return this.db.prepare(`SELECT id, status, started_at AS startedAt,
+      json_extract(data,'$.deadline') AS deadline, json_extract(data,'$.finishedAt') AS finishedAt,
+      json_extract(data,'$.correctCount') AS correctCount, json_extract(data,'$.total') AS total
+      FROM quiz_sessions WHERE status = 'completed' ORDER BY started_at DESC, id DESC`).all() as unknown as QuizSummary[];
   }
+
   active(): StoredQuiz[] {
     return this.db.prepare("SELECT data FROM quiz_sessions WHERE status='active'").all().map(row=>JSON.parse(String(row.data)));
   }

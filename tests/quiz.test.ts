@@ -74,3 +74,15 @@ test('missed fingerprints retain boost until three consecutive correct appearanc
   store.record('example',true);assert.equal(store.boosts().has('example'),false);
  }finally{repository.close();}
 });
+
+test('all completed results remain reachable after more than twenty quizzes', () => {
+ const repository=new LibraryRepository(':memory:');
+ try{
+  populate(repository);let now=1000;const service=new QuizService(repository,()=>now);let first='';
+  for(let i=0;i<21;i++){
+   const quiz=service.start(options);if(i===0)first=quiz.id;
+   service.submit(quiz.id,{answers:quiz.questions.map(q=>({questionId:q.questionId,selected:[],confidence:null,flagged:false}))});now++;
+  }
+  const history=service.recent();assert.equal(history.length,21);assert.ok(history.some(q=>q.id===first));
+ }finally{repository.close();}
+});

@@ -1,4 +1,4 @@
-import type { QuizQuestion } from '../shared/quiz-contracts.ts';
+import type { QuizQuestion, QuizView } from '../shared/quiz-contracts.ts';
 
 export function warningThreshold(remainingMs: number): '10-minute' | '2-minute' | null {
   if (remainingMs <= 2 * 60_000) return '2-minute';
@@ -12,4 +12,12 @@ export function reviewQuestionIds(questions: QuizQuestion[]): number[] {
 
 export function meetsPracticeTarget(percent: number): boolean {
   return percent >= 80;
+}
+
+/** Poll responses update status/clock; answer saves own the active answer state. */
+export function mergeQuizPoll(current: QuizView, incoming: QuizView): QuizView {
+  if (current.id !== incoming.id) return current;
+  if (incoming.status !== 'active') return incoming;
+  if (current.status !== 'active' || incoming.serverNow <= current.serverNow) return current;
+  return { ...current, serverNow: incoming.serverNow };
 }

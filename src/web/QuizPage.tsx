@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Confidence, QuizAnswer, QuizOptions, QuizQuestion, QuizSummary, QuizView } from '../shared/quiz-contracts.ts';
 import { api } from './api.ts';
 import { quizReport } from '../shared/quiz-report.ts';
-import { meetsPracticeTarget, reviewQuestionIds, warningThreshold } from './quiz-state.ts';
+import { meetsPracticeTarget, mergeQuizPoll, reviewQuestionIds, warningThreshold } from './quiz-state.ts';
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned';
 type Props = { onRegisterLeave: (leave: () => Promise<boolean>) => void };
@@ -103,7 +103,9 @@ export function QuizPage({ onRegisterLeave }: Props) {
       try {
         const next = await api<QuizView>(`/quizzes/${view.id}`);
         if (cancelled || busyRef.current || (pendingAnswers.current && next.status === 'active')) return;
-        updateView(next);
+        const current = viewRef.current;
+        const merged = current ? mergeQuizPoll(current, next) : next;
+        if (merged !== current) updateView(merged);
         if (next.status !== 'active') setStage(next.status === 'completed' ? 'completed' : 'abandoned');
       } catch (reason) { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not refresh quiz status.'); }
     };
