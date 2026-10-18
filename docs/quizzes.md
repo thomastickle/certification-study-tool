@@ -35,8 +35,11 @@ Pricing, and Support. Largest-remainder rounding gives **5 / 6 / 7 / 2** questio
 for a 20-question practice quiz. This is approximate practice allocation, not an
 attempt to reproduce AWS unscored items or scaled scoring.
 
-Quiz setup lists each available CLF-C02 bank with a checkbox and its total
-question count, grouped as Official or Third-party. All banks start checked;
+Quiz setup uses a compact multi-select dropdown on desktop and a modal bottom
+popup on phones. The collapsed control shows the selected-bank count. Inside,
+each available CLF-C02 bank has a checkbox and its total question count, grouped
+as Official or Third-party. Done or Escape closes the picker; desktop outside
+clicks also dismiss it. Choices apply immediately and survive dismissal. All banks start checked;
 Select all and Clear provide bulk controls. At least one bank must be checked.
 Selected banks contribute to the eligible pool; random draws do not guarantee
 that every checked bank appears. Format filters remain single, multiple, or mixed.

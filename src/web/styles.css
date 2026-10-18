@@ -166,3 +166,14 @@ select { font: inherit; padding: 10px; border: 1px solid #cdd5cc; border-radius:
 .source-picker-option input { margin-top: 4px; accent-color: #315b43; }
 .source-picker-option span { flex: 1; overflow-wrap: anywhere; }
 .source-picker-option small { color: #657561; white-space: nowrap; }
+
+.quiz-source-picker { position: relative; max-width: 560px; }
+.source-picker-trigger { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-top: 7px; text-align: left; font-weight: 400; }
+.source-picker-popover { position: absolute; inset: auto; top: 100%; left: 0; margin: 6px 0 0; width: 100%; max-width: none; max-height: min(65vh, 560px); overflow: auto; overscroll-behavior: contain; padding: 18px; border-radius: 9px; z-index: 20; box-shadow: 0 8px 28px #20301926; }
+.source-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.source-picker-heading h2 { font-size: 16px; }
+.source-picker-heading button { padding: 5px 10px; font-size: 12px; }
+@media(max-width: 600px) {
+  .source-picker-popover { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-width: none; max-height: 85dvh; margin: 0; padding: 20px 20px max(20px, env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; }
+  .source-picker-popover::backdrop { background: #17291866; }
+}

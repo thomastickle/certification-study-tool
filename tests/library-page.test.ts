@@ -46,6 +46,11 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
     assert.equal((html.match(/ checked=""/g)??[]).length,1);
     assert.match(html,/Official sample/);assert.match(html,/Third-party sample/);
     assert.match(html,/65 questions/);assert.match(html,/41 questions/);
-    assert.match(html,/Select all/);assert.match(html,/>Clear</);assert.match(html,/1 selected/);
+    assert.match(html,/Select all/);assert.match(html,/>Clear</);
+    assert.match(html,/aria-haspopup="dialog"/);
+    assert.match(html,/1 bank selected/);
+    assert.match(html,/aria-expanded="false"/);
+    assert.match(html,/<dialog\b/);
+    assert.doesNotMatch(html,/<dialog[^>]*\sopen(?:=|\s|>)/);
   } finally {hooks.deregister();}
 });
