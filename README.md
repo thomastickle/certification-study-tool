@@ -97,6 +97,13 @@ automatic-semicolon-insertion hazards. ESLint applies the recommended JavaScript
 and TypeScript rules; formatting is handled by Prettier. An underscore prefix
 marks an intentionally unused parameter or discarded value.
 
+ESLint Stylistic requires a blank line after the import block, around function,
+class, and type declarations, and between class methods (including constructors
+and accessors). Related imports, class fields, and overload signatures can stay
+together. Keep JSDoc comments and decorators immediately above their declaration;
+the separating blank line goes before them. `npm run format` applies these spacing
+fixes before Prettier formats the files.
+
 ```sh
 npm run format        # Apply formatting
 npm run format:check  # Check formatting without changing files

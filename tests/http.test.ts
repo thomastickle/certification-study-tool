@@ -12,12 +12,14 @@ test('HTTP supports preview, confirm, browse and scoped deletion while denying c
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
   const base = `http://127.0.0.1:${address.port}`
+
   const post = (path: string, data: unknown, origin = base) =>
     fetch(base + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: origin },
       body: JSON.stringify(data),
     })
+
   try {
     const input = bank()
     assert.equal(
@@ -81,12 +83,14 @@ test('quiz HTTP saves confidence, scores results and rejects cross-site mutation
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
   const base = `http://127.0.0.1:${address.port}`
+
   const post = (path: string, data: unknown, method = 'POST', origin = base) =>
     fetch(base + path, {
       method,
       headers: { 'Content-Type': 'application/json', Origin: origin },
       body: JSON.stringify(data),
     })
+
   try {
     assert.equal(
       (

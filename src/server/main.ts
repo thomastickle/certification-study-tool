@@ -42,7 +42,9 @@ const server = createServer((request, response) => {
   }
   webHandler(request, response)
 })
+
 let closeWeb = async () => {}
+
 if (!production) {
   const { createServer: createViteServer } = await import('vite')
   const vite = await createViteServer({
@@ -89,6 +91,7 @@ if (!production) {
   }
 }
 server.listen(port, '127.0.0.1', () => console.log(`Study library: http://127.0.0.1:${port}`))
+
 async function shutdown() {
   clearInterval(expiryTimer)
   // Vite owns upgraded HMR sockets; close those before awaiting HTTP shutdown.
@@ -99,5 +102,6 @@ async function shutdown() {
   })
   server.closeAllConnections()
 }
+
 process.once('SIGINT', shutdown)
 process.once('SIGTERM', shutdown)

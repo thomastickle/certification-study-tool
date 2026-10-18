@@ -15,9 +15,11 @@ export function migrateQuizzes(db: DatabaseSync): void {
 /** Snapshot storage has no cascading source/question FKs: old results survive library deletion. */
 export class QuizRepository {
   private db: DatabaseSync
+
   constructor(db: DatabaseSync) {
     this.db = db
   }
+
   transaction<T>(work: () => T): T {
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -29,10 +31,12 @@ export class QuizRepository {
       throw error
     }
   }
+
   find(id: string): StoredQuiz | undefined {
     const row = this.db.prepare('SELECT data FROM quiz_sessions WHERE id = ?').get(id)
     return row ? JSON.parse(String(row.data)) : undefined
   }
+
   save(quiz: StoredQuiz): void {
     this.db
       .prepare(
@@ -41,6 +45,7 @@ export class QuizRepository {
       )
       .run(quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
   }
+
   recent(): QuizSummary[] {
     return this.db
       .prepare(
@@ -58,6 +63,7 @@ export class QuizRepository {
       .all()
       .map((row) => JSON.parse(String(row.data)))
   }
+
   boosts(): Set<string> {
     return new Set(
       this.db
@@ -66,6 +72,7 @@ export class QuizRepository {
         .map((row) => String(row.fingerprint)),
     )
   }
+
   record(fingerprint: string, correct: boolean): void {
     const previous = this.db
       .prepare('SELECT boosted, correct_streak FROM quiz_mastery WHERE fingerprint = ?')
