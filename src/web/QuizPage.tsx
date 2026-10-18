@@ -382,7 +382,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
         <>
           <section className="quiz-panel">
             <h2>Set up your quiz</h2>
-            <p>Choose the question banks and answer format for this quiz.</p>
+            <p>Choose the question banks for this quiz.</p>
             {sourcesLoading ? (
               <p role="status">Loading question banks…</p>
             ) : (
@@ -392,24 +392,6 @@ export function QuizPage({ onRegisterLeave }: Props) {
                 onChange={(sourceIds) => setOptions((current) => ({ ...current, sourceIds }))}
               />
             )}
-            <div className="option-grid">
-              <label>
-                Question format
-                <select
-                  value={options.questionType}
-                  onChange={(e) =>
-                    setOptions({
-                      ...options,
-                      questionType: e.target.value as QuizOptions['questionType'],
-                    })
-                  }
-                >
-                  <option value="mixed">Mixed formats</option>
-                  <option value="single_select">Single answer</option>
-                  <option value="multi_select">Multiple answers</option>
-                </select>
-              </label>
-            </div>
             <button
               className="primary"
               disabled={sourcesLoading || !options.sourceIds?.length}
