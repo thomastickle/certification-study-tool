@@ -11,12 +11,15 @@ export function canonical(value: unknown): string {
       .join(',')}}`
   return JSON.stringify(value) ?? 'null'
 }
+
 export function digest(value: unknown): string {
   return createHash('sha256').update(canonical(value)).digest('hex')
 }
+
 export function matchText(text: string): string {
   return text.normalize('NFKC').toLowerCase().replace(/\p{P}/gu, ' ').replace(/\s+/gu, ' ').trim()
 }
+
 export function fingerprint(question: Question): string {
   return digest([
     matchText(question.question),
@@ -24,6 +27,7 @@ export function fingerprint(question: Question): string {
     question.type,
   ])
 }
+
 export function answerKey(question: Question): string {
   return digest([
     question.answers
@@ -33,6 +37,7 @@ export function answerKey(question: Question): string {
     question.select_count,
   ])
 }
+
 export function reference(question: Question): string {
   return question.source_ref ?? `content:${fingerprint(question)}`
 }

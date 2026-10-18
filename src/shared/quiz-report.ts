@@ -19,6 +19,7 @@ export function quizReport(quiz: QuizView): string {
   for (const [index, question] of quiz.questions.entries()) {
     const letters = (ids: number[]) =>
       ids.length ? ids.map((id) => String.fromCharCode(65 + id)).join(', ') : 'None'
+
     lines.push(
       `## Question ${index + 1} — ${question.correct ? 'Correct' : 'Incorrect'}`,
       '',

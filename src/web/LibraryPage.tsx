@@ -10,6 +10,7 @@ import type {
 import { api } from './api.ts'
 
 type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?: number }
+
 const emptyPage: QuestionPage = { items: [], total: 0, page: 1, pageSize: 25 }
 
 export function LibraryPage() {
@@ -71,6 +72,7 @@ export function LibraryPage() {
       setBusy(false)
     }
   }
+
   async function chooseFile(file: File | undefined) {
     if (!file) return
     setFileName(file.name)
@@ -93,6 +95,7 @@ export function LibraryPage() {
       setPreview(next)
     })
   }
+
   async function confirmImport() {
     if (!preview) return
     await run(async () => {
@@ -111,6 +114,7 @@ export function LibraryPage() {
       setPage(1)
     })
   }
+
   async function confirmRemoval() {
     if (!removal) return
     await run(async () => {
@@ -125,6 +129,7 @@ export function LibraryPage() {
       setPage(1)
     })
   }
+
   const selectedSource = sources.find((s) => s.id === sourceId)
   const total = sources.reduce((sum, source) => sum + source.questionCount, 0)
   const needsReview = Boolean(preview?.changed.length || preview?.metadataChange)
@@ -512,6 +517,7 @@ function Comparison({ before, after }: { before: JsonObject; after: JsonObject }
     </div>
   )
 }
+
 function QuestionCard({
   question,
   disabled,

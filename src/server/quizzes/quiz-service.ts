@@ -9,11 +9,13 @@ export class QuizService {
   private repository: LibraryRepository
   private now: () => number
   private random: () => number
+
   constructor(repository: LibraryRepository, now = Date.now, random = Math.random) {
     this.repository = repository
     this.now = now
     this.random = random
   }
+
   start(input: unknown): QuizView {
     const options = this.options(input)
     return this.repository.quizStore().transaction(() => {
@@ -75,9 +77,11 @@ export class QuizService {
       return this.view(quiz)
     })
   }
+
   get(id: string): QuizView {
     return this.repository.quizStore().transaction(() => this.view(this.load(id)))
   }
+
   expireDue(): void {
     if (
       !this.repository
@@ -91,6 +95,7 @@ export class QuizService {
         if (quiz.deadline <= this.now()) this.finish(quiz)
     })
   }
+
   recent(): QuizSummary[] {
     return this.repository.quizStore().transaction(() => {
       for (const quiz of this.repository.quizStore().active())
@@ -98,12 +103,15 @@ export class QuizService {
       return this.repository.quizStore().recent()
     })
   }
+
   save(id: string, input: unknown): QuizView {
     return this.change(id, input, 'save')
   }
+
   submit(id: string, input: unknown): QuizView {
     return this.change(id, input, 'submit')
   }
+
   abandon(id: string): QuizView {
     return this.repository.quizStore().transaction(() => {
       const quiz = this.load(id)
@@ -115,6 +123,7 @@ export class QuizService {
       return this.view(quiz)
     })
   }
+
   private change(id: string, input: unknown, action: 'save' | 'submit'): QuizView {
     return this.repository.quizStore().transaction(() => {
       const quiz = this.load(id)
@@ -164,12 +173,14 @@ export class QuizService {
       return this.view(quiz)
     })
   }
+
   private load(id: string): StoredQuiz {
     const quiz = this.repository.quizStore().find(id)
     if (!quiz) throw new ApplicationError('Quiz not found.', 404)
     if (quiz.status === 'active' && quiz.deadline <= this.now()) this.finish(quiz)
     return quiz
   }
+
   private finish(quiz: StoredQuiz): void {
     if (quiz.status !== 'active') return
     quiz.status = 'completed'
@@ -187,11 +198,13 @@ export class QuizService {
     })
     this.repository.quizStore().save(quiz)
   }
+
   private view(quiz: StoredQuiz): QuizView {
     const { keys: _keys, ...view } = structuredClone(quiz)
     view.serverNow = this.now()
     return view
   }
+
   private options(input: unknown): QuizOptions {
     if (!input || typeof input !== 'object')
       throw new ApplicationError('Quiz options are required.')
