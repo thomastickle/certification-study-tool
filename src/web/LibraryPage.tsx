@@ -78,14 +78,10 @@ export function LibraryPage() {
   const needsReview = Boolean(preview?.changed.length || preview?.metadataChange);
   const hasChanges = Boolean(preview && (preview.added || preview.changed.length || preview.metadataChange));
 
-  return <div className="app-shell">
-    <header className="masthead">
-      <div className="brand"><span className="brand-mark" aria-hidden="true">S</span><span>Study Library</span></div>
-      <span className="local-badge"><span aria-hidden="true" /> Local workspace</span>
-    </header>
-    <main>
+  return <>
+    <main className="library-page">
       <div className="page-heading">
-        <div><p className="eyebrow">YOUR QUESTION BANK</p><h1>A place to build your knowledge.</h1><p className="intro">Bring your study questions together. Keep their sources in view.</p></div>
+        <div><h1>Question library</h1><p className="intro">Browse sources and import question banks.</p></div>
         <button className="primary" onClick={() => setImportOpen(open => !open)} aria-expanded={importOpen}>{importOpen ? 'Close import' : '+ Import a bank'}</button>
       </div>
       {error && <div className="message error" role="alert"><strong>Couldn’t complete that action</strong><pre>{error}</pre><button onClick={() => setError('')}>Dismiss</button></div>}
@@ -130,7 +126,7 @@ export function LibraryPage() {
       <p>{removal?.kind === 'sources' ? `This removes the source and its ${removal.count} questions from this database.` : 'This removes only this source’s copy of the question.'} Your original JSON files stay untouched. This cannot be undone here.</p>
       <div className="dialog-actions"><button disabled={busy} onClick={() => setRemoval(undefined)} autoFocus>Cancel</button><button className="danger" disabled={busy} onClick={() => { void confirmRemoval(); }}>Delete {removal?.kind === 'sources' ? 'source' : 'question'}</button></div>
     </dialog>
-  </div>;
+  </>;
 }
 
 function Comparison({ before, after }: { before: JsonObject; after: JsonObject }) {
