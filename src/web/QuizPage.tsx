@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Confidence, QuizAnswer, QuizOptions, QuizQuestion, QuizSummary, QuizView } from '../shared/quiz-contracts.ts';
+import type { Source } from '../shared/contracts.ts';
+import { QuizSourcePicker } from './QuizSourcePicker.tsx';
 import { api } from './api.ts';
 import { quizReport } from '../shared/quiz-report.ts';
 import { meetsPracticeTarget, mergeQuizPoll, reviewQuestionIds, warningThreshold } from './quiz-state.ts';
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned';
 type Props = { onRegisterLeave: (leave: () => Promise<boolean>) => void };
-const initialOptions: QuizOptions = { sourceFilter: 'mixed', questionType: 'mixed' };
+const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' };
 
 export function QuizPage({ onRegisterLeave }: Props) {
   const [stage, setStage] = useState<Stage>('setup');
   const [options, setOptions] = useState(initialOptions);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
   const [view, setView] = useState<QuizView>();
   const [summaries, setSummaries] = useState<QuizSummary[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -76,6 +80,17 @@ export function QuizPage({ onRegisterLeave }: Props) {
   useEffect(() => { onRegisterLeave(leave); return () => onRegisterLeave(async () => true); }, [leave, onRegisterLeave]);
 
   useEffect(() => {
+    let cancelled = false;
+    api<Source[]>('/sources').then(items => {
+      if (cancelled) return;
+      const eligible = items.filter(source => source.provider === 'AWS' && source.certification === 'CLF-C02' && ['official','third_party'].includes(source.kind) && source.questionCount > 0);
+      setSources(eligible); setOptions(current => ({ ...current, sourceIds: eligible.map(source => source.id) }));
+    }).catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load question banks.'); })
+      .finally(() => { if (!cancelled) setSourcesLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     if (stage !== 'setup') return;
     let cancelled = false;
     api<QuizSummary[]>('/quizzes').then(items => { if (!cancelled) setSummaries(items.filter(item => item.status === 'completed')); })
@@ -137,7 +152,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
       {notice && <div className="message warning" role="status" aria-live="polite">{notice}</div>}
       {pendingAnswers.current && mutationError && <p role="alert">Your last changes are not saved. Retry before the timer expires; automatic scoring uses saved answers.</p>}
     </>}
-    {stage === 'setup' && <><section className="quiz-panel"><h2>Set up your quiz</h2><p>Choose what to include. Questions and answers are selected by the quiz service.</p><div className="option-grid"><label>Question sources<select value={options.sourceFilter} onChange={e => setOptions({ ...options, sourceFilter: e.target.value as QuizOptions['sourceFilter'] })}><option value="mixed">Mixed sources</option><option value="official">Official only</option><option value="third_party">Third-party only</option></select></label><label>Question format<select value={options.questionType} onChange={e => setOptions({ ...options, questionType: e.target.value as QuizOptions['questionType'] })}><option value="mixed">Mixed formats</option><option value="single_select">Single answer</option><option value="multi_select">Multiple answers</option></select></label></div><button className="primary" onClick={() => void start()}>Start 20-question quiz</button></section>
+    {stage === 'setup' && <><section className="quiz-panel"><h2>Set up your quiz</h2><p>Choose what to include. Questions and answers are selected by the quiz service.</p>{sourcesLoading ? <p role="status">Loading question banks…</p> : <QuizSourcePicker sources={sources} selected={options.sourceIds ?? []} onChange={sourceIds => setOptions(current => ({ ...current, sourceIds }))} />}<div className="option-grid"><label>Question format<select value={options.questionType} onChange={e => setOptions({ ...options, questionType: e.target.value as QuizOptions['questionType'] })}><option value="mixed">Mixed formats</option><option value="single_select">Single answer</option><option value="multi_select">Multiple answers</option></select></label></div><button className="primary" disabled={sourcesLoading || !options.sourceIds?.length} onClick={() => void start()}>Start 20-question quiz</button></section>
       <section className="quiz-panel"><div className="section-heading"><h2>Completed quizzes</h2><button onClick={() => { void api<QuizSummary[]>('/quizzes').then(setSummaries).catch(reason => setError(String(reason.message))); }}>Refresh results</button></div>{summaries.length === 0 ? <p className="muted">Load your completed quiz history.</p> : <ul className="history-list">{summaries.filter(item => item.status === 'completed').map(item => <li key={item.id}><span>{new Date(item.finishedAt ?? item.startedAt).toLocaleString()} · {item.correctCount ?? 0}/{item.total}</span><button onClick={() => void loadCompleted(item.id)}>Review results</button></li>)}</ul>}</section></>}
     {stage === 'loading' && <div className="empty-state" role="status">Loading quiz…</div>}
     {stage === 'question' && view && currentQuestion && <>

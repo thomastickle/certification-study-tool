@@ -111,6 +111,13 @@ export class QuizService {
     if (!input || typeof input!=='object') throw new ApplicationError('Quiz options are required.');
     const o=input as QuizOptions;
     if (!['mixed','official','third_party'].includes(o.sourceFilter)||!['mixed','single_select','multi_select'].includes(o.questionType)) throw new ApplicationError('Choose valid source and question-type filters.');
-    return {sourceFilter:o.sourceFilter,questionType:o.questionType};
+    if (o.sourceIds !== undefined) {
+      const eligible = new Set(this.repository.sources().filter(s => s.provider === 'AWS' && s.certification === 'CLF-C02' && ['official','third_party'].includes(s.kind)).map(s => s.id));
+      if (!Array.isArray(o.sourceIds) || !o.sourceIds.length || new Set(o.sourceIds).size !== o.sourceIds.length ||
+        o.sourceIds.some(id => !Number.isSafeInteger(id) || id < 1 || !eligible.has(id))) {
+        throw new ApplicationError('Select at least one available CLF-C02 source; source IDs must be unique positive integers.');
+      }
+    }
+    return {sourceFilter:o.sourceFilter,questionType:o.questionType,...(o.sourceIds === undefined ? {} : {sourceIds:[...o.sourceIds]})};
   }
 }

@@ -27,3 +27,25 @@ test('importer renders page content without duplicating the application header',
     assert.doesNotMatch(html, /A place to build your knowledge/);
   } finally { hooks.deregister(); }
 });
+
+test('quiz bank picker renders individual checked banks, source groups, counts and bulk controls', async () => {
+  const hooks = registerHooks({ load(url, context, nextLoad) {
+    if (!url.startsWith('file:') || !url.endsWith('.tsx')) return nextLoad(url, context);
+    return { format: 'module', shortCircuit: true, source: ts.transpileModule(readFileSync(fileURLToPath(url), 'utf8'), {
+      compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext },
+    }).outputText };
+  } });
+  try {
+    const { QuizSourcePicker } = await import('../src/web/QuizSourcePicker.tsx');
+    const base = {provider:'AWS',certification:'CLF-C02',certificationName:'Synthetic exam'};
+    const html = renderToStaticMarkup(createElement(QuizSourcePicker, { sources:[
+      {...base,id:1,key:'official',name:'Official sample',kind:'official',questionCount:65},
+      {...base,id:2,key:'third',name:'Third-party sample',kind:'third_party',questionCount:41},
+    ],selected:[2],onChange:()=>{} }));
+    assert.equal((html.match(/type="checkbox"/g)??[]).length,2);
+    assert.equal((html.match(/ checked=""/g)??[]).length,1);
+    assert.match(html,/Official sample/);assert.match(html,/Third-party sample/);
+    assert.match(html,/65 questions/);assert.match(html,/41 questions/);
+    assert.match(html,/Select all/);assert.match(html,/>Clear</);assert.match(html,/1 selected/);
+  } finally {hooks.deregister();}
+});

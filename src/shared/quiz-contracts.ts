@@ -1,5 +1,5 @@
 export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure';
-export type QuizOptions = { sourceFilter: 'mixed' | 'official' | 'third_party'; questionType: 'mixed' | 'single_select' | 'multi_select' };
+export type QuizOptions = { sourceFilter: 'mixed' | 'official' | 'third_party'; sourceIds?: number[]; questionType: 'mixed' | 'single_select' | 'multi_select' };
 export type QuizAnswer = { questionId: number; selected: number[]; confidence: Confidence | null; flagged: boolean };
 export type QuizQuestion = QuizAnswer & {
   question: string; type: 'single_select' | 'multi_select'; selectCount: number;

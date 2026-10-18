@@ -35,8 +35,17 @@ Pricing, and Support. Largest-remainder rounding gives **5 / 6 / 7 / 2** questio
 for a 20-question practice quiz. This is approximate practice allocation, not an
 attempt to reproduce AWS unscored items or scaled scoring.
 
-Source filters are official, third-party, or mixed; format filters are single,
-multiple, or mixed. Exact normalized duplicate fingerprints appear at most once
+Quiz setup lists each available CLF-C02 bank with a checkbox and its total
+question count, grouped as Official or Third-party. All banks start checked;
+Select all and Clear provide bulk controls. At least one bank must be checked.
+Selected banks contribute to the eligible pool; random draws do not guarantee
+that every checked bank appears. Format filters remain single, multiple, or mixed.
+
+The API persists explicit `sourceIds` with each new quiz and rejects empty,
+repeated, unavailable, or unrelated-exam IDs. Existing requests/saved attempts
+using the older official/third-party/mixed `sourceFilter` remain supported. When
+both are supplied, eligibility is their intersection; the GUI sends mixed plus
+the checked IDs. Exact normalized duplicate fingerprints appear at most once
 per quiz, with official attribution preferred in a mixed pool. Conflicting keys
 block selection. Both question and answer order are shuffled. Insufficient
 mapped questions in any domain cause an actionable error rather than silently
