@@ -79,3 +79,10 @@ Tests use synthetic data and temporary or in-memory databases. Private study
 banks, databases, logs, and generated build assets are excluded from Git.
 See [architecture](docs/architecture.md) and the
 [bank format](docs/question-bank.schema.json).
+
+## Curated CLF-C02 batch import
+
+For the five-file curated bundle, use the repeatable local command documented in
+[batch importing](docs/batch-import.md). It previews without writing to the
+selected database; `--apply` explicitly imports. Both source and database paths
+are required, so it never implicitly selects your default library.
