@@ -8,9 +8,9 @@ const declarations = [
   'function',
   'function-overload',
   { selector: 'ClassDeclaration' },
-  'interface',
-  'type',
-  'enum',
+  { selector: 'TSInterfaceDeclaration' },
+  { selector: 'TSTypeAliasDeclaration' },
+  { selector: 'TSEnumDeclaration' },
   'export',
   {
     selector:
