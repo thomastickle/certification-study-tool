@@ -52,5 +52,8 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
     assert.match(html,/aria-expanded="false"/);
     assert.match(html,/<dialog\b/);
     assert.doesNotMatch(html,/<dialog[^>]*\sopen(?:=|\s|>)/);
+    const { QuizPage } = await import('../src/web/QuizPage.tsx');
+    const setup = renderToStaticMarkup(createElement(QuizPage, { onRegisterLeave: () => {} }));
+    assert.doesNotMatch(setup, /Question format|<select\b/);
   } finally {hooks.deregister();}
 });

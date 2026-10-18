@@ -42,7 +42,7 @@ as Official or Third-party. Done or Escape closes the picker; desktop outside
 clicks also dismiss it. Choices apply immediately and survive dismissal. All banks start checked;
 Select all and Clear provide bulk controls. At least one bank must be checked.
 Selected banks contribute to the eligible pool; random draws do not guarantee
-that every checked bank appears. Format filters remain single, multiple, or mixed.
+that every checked bank appears. Quiz setup always mixes single-answer and multiple-answer questions.
 
 The API persists explicit `sourceIds` with each new quiz and rejects empty,
 repeated, unavailable, or unrelated-exam IDs. Existing requests/saved attempts
