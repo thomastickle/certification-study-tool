@@ -13,3 +13,35 @@
 *.tsbuildinfo
 .env
 .env.*
+
+# JetBrains IDEs (IntelliJ IDEA, WebStorm, and Fleet).
+.idea/
+.fleet/
+*.iml
+*.ipr
+*.iws
+
+# VS Code, Atom, Zed, and Sublime Text project/workspace settings.
+.vscode/
+.vscode-test/
+.atom/
+.zed/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# Eclipse and private NetBeans settings.
+.settings/
+.metadata/
+.project
+.classpath
+nbproject/private/
+
+# Vim/Neovim swap files and Emacs/other editor backups and locks.
+*.swp
+*.swo
+*.swn
+*~
+.#*
+\#*#
+.netrwhist
