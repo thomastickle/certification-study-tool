@@ -138,26 +138,12 @@ export function LibraryPage() {
   )
 
   return (
-    <div className="app-shell">
-      <header className="masthead">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            S
-          </span>
-          <span>Study Library</span>
-        </div>
-        <span className="local-badge">
-          <span aria-hidden="true" /> Local workspace
-        </span>
-      </header>
-      <main>
+    <>
+      <main className="library-page">
         <div className="page-heading">
           <div>
-            <p className="eyebrow">YOUR QUESTION BANK</p>
-            <h1>A place to build your knowledge.</h1>
-            <p className="intro">
-              Bring your study questions together. Keep their sources in view.
-            </p>
+            <h1>Question library</h1>
+            <p className="intro">Browse sources and import question banks.</p>
           </div>
           <button
             className="primary"
@@ -499,7 +485,7 @@ export function LibraryPage() {
           </button>
         </div>
       </dialog>
-    </div>
+    </>
   )
 }
 
