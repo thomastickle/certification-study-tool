@@ -8,6 +8,7 @@ export type QuestionRecord = StoredQuestion & { fingerprint: string; answerKey: 
 /** SQLite access only. Application services own transactions. */
 export class LibraryRepository {
   private db: DatabaseSync
+  private transactionDepth = 0
 
   constructor(path: string) {
     this.db = new DatabaseSync(path, { timeout: 5000 })
@@ -64,14 +65,21 @@ export class LibraryRepository {
   }
 
   transaction<T>(work: () => T): T {
-    this.db.exec('BEGIN IMMEDIATE')
+    const depth = this.transactionDepth++
+    const savepoint = `library_${depth}`
     try {
-      const result = work()
-      this.db.exec('UPDATE library_state SET revision = revision + 1; COMMIT')
-      return result
-    } catch (error) {
-      this.db.exec('ROLLBACK')
-      throw error
+      this.db.exec(depth === 0 ? 'BEGIN IMMEDIATE' : `SAVEPOINT ${savepoint}`)
+      try {
+        const result = work()
+        if (depth === 0) this.db.exec('UPDATE library_state SET revision = revision + 1; COMMIT')
+        else this.db.exec(`RELEASE ${savepoint}`)
+        return result
+      } catch (error) {
+        this.db.exec(depth === 0 ? 'ROLLBACK' : `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}`)
+        throw error
+      }
+    } finally {
+      this.transactionDepth--
     }
   }
 

@@ -23,7 +23,21 @@ export function validateBank(input: unknown): Bank {
       ...new Set(
         (validate.errors ?? []).map((error) => {
           const match = error.instancePath.match(/^\/questions\/(\d+)/)
-          const label = match ? `Question ${Number(match[1]) + 1}` : 'Bank'
+          const questions =
+            input &&
+            typeof input === 'object' &&
+            'questions' in input &&
+            Array.isArray(input.questions)
+              ? input.questions
+              : []
+          const question = match ? questions[Number(match[1])] : undefined
+          const ref =
+            question && typeof question === 'object' && 'source_ref' in question
+              ? question.source_ref
+              : undefined
+          const label = match
+            ? `Question ${Number(match[1]) + 1} (${typeof ref === 'string' ? ref : 'no source reference'})`
+            : 'Bank'
           return `${label} ${error.instancePath || '/'}: ${error.message}`
         }),
       ),
