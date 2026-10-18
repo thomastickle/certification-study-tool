@@ -960,3 +960,51 @@ select {
   font-weight: 650;
   letter-spacing: -0.4px;
 }
+
+.quiz-source-picker {
+  border: 0;
+  padding: 0;
+  margin: 20px 0;
+  min-width: 0;
+}
+.quiz-source-picker legend {
+  font-size: 14px;
+  font-weight: 650;
+}
+.source-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.source-picker-actions button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.source-picker-group h3 {
+  font-size: 12px;
+  margin: 17px 0 7px;
+}
+.source-picker-option {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0e8;
+  font-size: 13px;
+  cursor: pointer;
+}
+.source-picker-option input {
+  margin-top: 4px;
+  accent-color: #315b43;
+}
+.source-picker-option span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.source-picker-option small {
+  color: #657561;
+  white-space: nowrap;
+}

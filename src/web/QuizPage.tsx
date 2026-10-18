@@ -7,6 +7,8 @@ import type {
   QuizSummary,
   QuizView,
 } from '../shared/quiz-contracts.ts'
+import type { Source } from '../shared/contracts.ts'
+import { QuizSourcePicker } from './QuizSourcePicker.tsx'
 import { api } from './api.ts'
 import { quizReport } from '../shared/quiz-report.ts'
 import {
@@ -20,11 +22,13 @@ type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abando
 
 type Props = { onRegisterLeave: (leave: () => Promise<boolean>) => void }
 
-const initialOptions: QuizOptions = { sourceFilter: 'mixed', questionType: 'mixed' }
+const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' }
 
 export function QuizPage({ onRegisterLeave }: Props) {
   const [stage, setStage] = useState<Stage>('setup')
   const [options, setOptions] = useState(initialOptions)
+  const [sources, setSources] = useState<Source[]>([])
+  const [sourcesLoading, setSourcesLoading] = useState(true)
   const [view, setView] = useState<QuizView>()
   const [summaries, setSummaries] = useState<QuizSummary[]>([])
   const [questionIndex, setQuestionIndex] = useState(0)
@@ -179,6 +183,33 @@ export function QuizPage({ onRegisterLeave }: Props) {
     onRegisterLeave(leave)
     return () => onRegisterLeave(async () => true)
   }, [leave, onRegisterLeave])
+
+  useEffect(() => {
+    let cancelled = false
+    api<Source[]>('/sources')
+      .then((items) => {
+        if (cancelled) return
+        const eligible = items.filter(
+          (source) =>
+            source.provider === 'AWS' &&
+            source.certification === 'CLF-C02' &&
+            ['official', 'third_party'].includes(source.kind) &&
+            source.questionCount > 0,
+        )
+        setSources(eligible)
+        setOptions((current) => ({ ...current, sourceIds: eligible.map((source) => source.id) }))
+      })
+      .catch((reason) => {
+        if (!cancelled)
+          setError(reason instanceof Error ? reason.message : 'Could not load question banks.')
+      })
+      .finally(() => {
+        if (!cancelled) setSourcesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (stage !== 'setup') return
@@ -351,24 +382,17 @@ export function QuizPage({ onRegisterLeave }: Props) {
         <>
           <section className="quiz-panel">
             <h2>Set up your quiz</h2>
-            <p>Choose what to include. Questions and answers are selected by the quiz service.</p>
+            <p>Choose the question banks and answer format for this quiz.</p>
+            {sourcesLoading ? (
+              <p role="status">Loading question banks…</p>
+            ) : (
+              <QuizSourcePicker
+                sources={sources}
+                selected={options.sourceIds ?? []}
+                onChange={(sourceIds) => setOptions((current) => ({ ...current, sourceIds }))}
+              />
+            )}
             <div className="option-grid">
-              <label>
-                Question sources
-                <select
-                  value={options.sourceFilter}
-                  onChange={(e) =>
-                    setOptions({
-                      ...options,
-                      sourceFilter: e.target.value as QuizOptions['sourceFilter'],
-                    })
-                  }
-                >
-                  <option value="mixed">Mixed sources</option>
-                  <option value="official">Official only</option>
-                  <option value="third_party">Third-party only</option>
-                </select>
-              </label>
               <label>
                 Question format
                 <select
@@ -386,7 +410,11 @@ export function QuizPage({ onRegisterLeave }: Props) {
                 </select>
               </label>
             </div>
-            <button className="primary" onClick={() => void start()}>
+            <button
+              className="primary"
+              disabled={sourcesLoading || !options.sourceIds?.length}
+              onClick={() => void start()}
+            >
               Start 20-question quiz
             </button>
           </section>

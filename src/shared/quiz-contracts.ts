@@ -2,6 +2,7 @@ export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure'
 
 export type QuizOptions = {
   sourceFilter: 'mixed' | 'official' | 'third_party'
+  sourceIds?: number[]
   questionType: 'mixed' | 'single_select' | 'multi_select'
 }
 

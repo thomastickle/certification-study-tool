@@ -25,6 +25,7 @@ export function selectQuestions(
   for (const record of questions) {
     const source = sourceMap.get(record.sourceId)
     if (!source || source.provider !== 'AWS' || source.certification !== 'CLF-C02') continue
+    if (options.sourceIds && !options.sourceIds.includes(source.id)) continue
     if (options.sourceFilter !== 'mixed' && source.kind !== options.sourceFilter) continue
     if (options.questionType !== 'mixed' && record.data.type !== options.questionType) continue
     const domain = examDomain(record.data)
