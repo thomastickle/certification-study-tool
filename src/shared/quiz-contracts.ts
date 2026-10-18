@@ -1,15 +1,18 @@
 export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure'
+
 export type QuizOptions = {
   sourceFilter: 'mixed' | 'official' | 'third_party'
   sourceIds?: number[]
   questionType: 'mixed' | 'single_select' | 'multi_select'
 }
+
 export type QuizAnswer = {
   questionId: number
   selected: number[]
   confidence: Confidence | null
   flagged: boolean
 }
+
 export type QuizQuestion = QuizAnswer & {
   question: string
   type: 'single_select' | 'multi_select'
@@ -24,6 +27,7 @@ export type QuizQuestion = QuizAnswer & {
   correctAnswerIds?: number[]
   correct?: boolean
 }
+
 export type QuizSummary = {
   id: string
   status: 'active' | 'completed' | 'abandoned'
@@ -33,6 +37,7 @@ export type QuizSummary = {
   correctCount: number | null
   total: number
 }
+
 export type QuizView = QuizSummary & {
   serverNow: number
   questions: QuizQuestion[]

@@ -19,7 +19,9 @@ import {
 } from './quiz-state.ts'
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned'
+
 type Props = { onRegisterLeave: (leave: () => Promise<boolean>) => void }
+
 const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' }
 
 export function QuizPage({ onRegisterLeave }: Props) {
@@ -130,6 +132,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
       setStage('setup')
     }
   }
+
   async function loadCompleted(id: string) {
     setStage('loading')
     setError('')
@@ -148,6 +151,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
       setStage('setup')
     }
   }
+
   const leave = useCallback(async () => {
     const current = viewRef.current
     if (!current || current.status !== 'active') return true
@@ -225,6 +229,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
 
   useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || !view || view.status !== 'active') return
+
     const tick = () => {
       const remain = Math.max(
         0,
@@ -245,6 +250,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
         void submit(true)
       }
     }
+
     tick()
     const interval = window.setInterval(tick, 1000)
     return () => window.clearInterval(interval)
@@ -253,6 +259,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
   useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || !view || view.status !== 'active') return
     let cancelled = false
+
     const poll = async () => {
       if (busyRef.current) return
       try {
@@ -269,6 +276,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
           setError(reason instanceof Error ? reason.message : 'Could not refresh quiz status.')
       }
     }
+
     const interval = window.setInterval(() => {
       void poll()
     }, 5000)
@@ -280,16 +288,19 @@ export function QuizPage({ onRegisterLeave }: Props) {
 
   useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || view?.status !== 'active') return
+
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault()
       event.returnValue = ''
     }
+
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [stage, view?.status])
 
   const questions = view?.questions ?? []
   const currentQuestion = questions[questionIndex]
+
   function changeAnswer(question: QuizQuestion, patch: Partial<QuizAnswer>) {
     if (!view || busy || secondsLeft === 0 || view.status !== 'active') return
     const updatedQuestions = view.questions.map((item) =>
@@ -301,6 +312,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
     setView(next)
     void saveAnswers(updatedQuestions.map(answerPayload))
   }
+
   const reviewIds = reviewQuestionIds(questions)
 
   return (
@@ -566,11 +578,13 @@ function answerPayload(question: QuizQuestion): QuizAnswer {
     flagged: question.flagged,
   }
 }
+
 function formatTime(seconds: number) {
   return `${Math.floor(seconds / 60)
     .toString()
     .padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
 }
+
 function QuestionEditor({
   question,
   disabled,
@@ -581,6 +595,7 @@ function QuestionEditor({
   onChange: (patch: Partial<QuizAnswer>) => void
 }) {
   const multiple = question.type === 'multi_select'
+
   function toggle(id: number) {
     let selected: number[]
     if (question.selected.includes(id)) selected = question.selected.filter((value) => value !== id)
@@ -589,6 +604,7 @@ function QuestionEditor({
     else return
     onChange({ selected })
   }
+
   return (
     <article className="quiz-panel quiz-question">
       <div className="question-meta">
@@ -651,12 +667,14 @@ function QuestionEditor({
     </article>
   )
 }
+
 function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   const correct = view.questions.filter((question) => question.correct).length
   const percent = view.questions.length ? Math.round((correct / view.questions.length) * 100) : 0
   const passed = meetsPracticeTarget(percent)
   const review = view.questions
   const [copyNotice, setCopyNotice] = useState('')
+
   function downloadReport() {
     const url = URL.createObjectURL(
       new Blob([quizReport(view)], { type: 'text/markdown;charset=utf-8' }),
@@ -667,6 +685,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
+
   async function copyReport() {
     try {
       await navigator.clipboard.writeText(quizReport(view))
@@ -675,6 +694,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
       setCopyNotice('Copy unavailable. Download the report instead.')
     }
   }
+
   return (
     <>
       <section className="quiz-panel result-score">
