@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { mkdirSync, chmodSync, existsSync, statSync, createReadStream } from 'node:fs';
 import { resolve, dirname, extname, sep } from 'node:path';
+import { QuizService } from './quizzes/quiz-service.ts';
 import { apiController, checkLocalRequest } from './http-controller.ts';
 import { LibraryRepository } from './questions/library-repository.ts';
 
@@ -11,6 +12,12 @@ mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 });
 const repository = new LibraryRepository(databasePath);
 chmodSync(databasePath, 0o600);
 const api = apiController(repository);
+const quizzes = new QuizService(repository);
+quizzes.expireDue();
+const expiryTimer = setInterval(() => {
+  try { quizzes.expireDue(); } catch { console.error('Could not score an expired quiz; it will be retried.'); }
+}, 1000);
+expiryTimer.unref();
 const production = process.env.NODE_ENV === 'production';
 let webHandler: (request: import('node:http').IncomingMessage, response: import('node:http').ServerResponse) => void;
 const server = createServer((request, response) => {
@@ -44,6 +51,7 @@ if (!production) {
 }
 server.listen(port, '127.0.0.1', () => console.log(`Study library: http://127.0.0.1:${port}`));
 async function shutdown() {
+  clearInterval(expiryTimer);
   // Vite owns upgraded HMR sockets; close those before awaiting HTTP shutdown.
   await closeWeb();
   server.close(() => { repository.close(); process.exit(0); });

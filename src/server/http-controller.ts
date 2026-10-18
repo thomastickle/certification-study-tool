@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { QuizService } from './quizzes/quiz-service.ts';
 import { ApplicationError } from './errors.ts';
 import { ImportService } from './importer/import-service.ts';
 import { LibraryRepository } from './questions/library-repository.ts';
@@ -40,12 +41,25 @@ function positiveInteger(text: string | null, fallback?: number): number {
   return Number(text);
 }
 export function apiController(repository: LibraryRepository) {
+  const quizzes = new QuizService(repository);
   const importer = new ImportService(repository);
   const library = new LibraryService(repository);
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
       checkLocalRequest(request);
       const url = new URL(request.url ?? '/', 'http://localhost');
+      if (url.pathname === '/api/quizzes') {
+        if (request.method === 'GET') return send(response, 200, quizzes.recent());
+        if (request.method === 'POST') return send(response, 201, quizzes.start(await body(request)));
+      }
+      const quizRoute = url.pathname.match(/^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon))?$/);
+      if (quizRoute) {
+        const id = quizRoute[1]!;
+        if (request.method === 'GET' && !quizRoute[2]) return send(response, 200, quizzes.get(id));
+        if (request.method === 'PUT' && quizRoute[2] === 'answers') return send(response, 200, quizzes.save(id, await body(request)));
+        if (request.method === 'POST' && quizRoute[2] === 'submit') return send(response, 200, quizzes.submit(id, await body(request)));
+        if (request.method === 'POST' && quizRoute[2] === 'abandon') return send(response, 200, quizzes.abandon(id));
+      }
       if (request.method === 'GET' && url.pathname === '/api/sources') return send(response, 200, repository.sources());
       if (request.method === 'GET' && url.pathname === '/api/questions') {
         const source = url.searchParams.get('sourceId');
