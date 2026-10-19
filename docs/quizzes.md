@@ -1,10 +1,12 @@
-# First quiz flow
+# Quiz and exam flow
 
-The start page links to Quiz, Exam, Reports, and Importer. Only Quiz and the
-existing library/importer are implemented. Completed results and the local
-Markdown discussion report live within Quiz; charts and exam mode are deferred.
+The start page links to Quiz, Exam, Reports, and Importer. Quiz, Exam, and the library/importer are implemented. Completed results and
+local Markdown discussion reports live within their respective practice mode;
+the Reports page and charts are deferred.
 
-A CLF-C02 quiz has 20 questions and a server-owned 20-minute deadline. Warnings
+A CLF-C02 quiz has 20 questions and a server-owned 20-minute deadline. An exam
+has **65 questions and a 90-minute deadline**. Both modes share the same bank
+picker, answer controls, timing, review, grading, and report flow. Warnings
 appear at 10 and 2 minutes remaining, including on the pre-submit review screen.
 Answers are saved after each change. At expiry the server scores the saved
 choices; unanswered questions and incomplete/incorrect multi-select sets are
@@ -32,7 +34,7 @@ Treat third-party answer keys as source claims during discussion.
 The official CLF-C02 guide weights scored content 24% Cloud Concepts, 30%
 Security and Compliance, 34% Cloud Technology and Services, and 12% Billing,
 Pricing, and Support. Largest-remainder rounding gives **5 / 6 / 7 / 2** questions
-for a 20-question practice quiz. This is approximate practice allocation, not an
+for a 20-question practice quiz and **16 / 19 / 22 / 8** for a 65-question exam. This is approximate practice allocation, not an
 attempt to reproduce AWS unscored items or scaled scoring.
 
 Quiz setup uses a compact multi-select dropdown on desktop and a modal bottom
@@ -44,7 +46,10 @@ Select all and Clear provide bulk controls. At least one bank must be checked.
 Selected banks contribute to the eligible pool; random draws do not guarantee
 that every checked bank appears. Quiz setup always mixes single-answer and multiple-answer questions.
 
-The API persists explicit `sourceIds` with each new quiz and rejects empty,
+The shared `/api/quizzes` API accepts `mode: "quiz" | "exam"` and persists it
+with each attempt; omitted mode means quiz for backwards compatibility. History
+summaries identify the mode, and each screen shows only its own completed results.
+The API persists explicit `sourceIds` with each new attempt and rejects empty,
 repeated, unavailable, or unrelated-exam IDs. Existing requests/saved attempts
 using the older official/third-party/mixed `sourceFilter` remain supported. When
 both are supplied, eligibility is their intersection; the GUI sends mixed plus
@@ -98,14 +103,14 @@ Schema version 2 adds quiz snapshots and fingerprint mastery alongside the
 existing library. The version-1 upgrade is additive and transactional; it does
 not delete or replace library rows. Quiz snapshots have no cascading foreign
 keys to sources, so later deletion/import changes cannot rewrite past results.
-Only completed quizzes update mastery. Repeated submission is idempotent.
+Only completed attempts update shared mastery across quizzes and exams. Repeated submission is idempotent.
 
 Leaving through app navigation asks before abandoning; abandoned attempts cannot
 be resumed and do not affect mastery. Browser reload/close warns but cannot
 reliably send abandonment. An orphaned attempt remains saved until its deadline
-(then scores saved answers), or is abandoned when another quiz starts before
+(then scores saved answers), or is abandoned when another quiz or exam starts before
 that deadline. There is no active-attempt resume UI. All completed results remain
-available through the quiz history list. The Reports page
+available through the history list for their mode. The Reports page
 and charts are intentionally deferred.
 
 Development verification uses a separate `private/app/quiz-preview.sqlite3`

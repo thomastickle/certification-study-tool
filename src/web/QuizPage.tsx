@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Confidence,
+  PracticeMode,
   QuizAnswer,
   QuizOptions,
   QuizQuestion,
@@ -20,11 +21,15 @@ import {
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned'
 
-type Props = { onRegisterLeave: (leave: () => Promise<boolean>) => void }
+type Props = { mode?: PracticeMode; onRegisterLeave: (leave: () => Promise<boolean>) => void }
 
 const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' }
 
-export function QuizPage({ onRegisterLeave }: Props) {
+export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
+  const title = mode === 'exam' ? 'Exam' : 'Quiz'
+  const plural = mode === 'exam' ? 'exams' : 'quizzes'
+  const count = mode === 'exam' ? 65 : 20
+  const minutes = mode === 'exam' ? 90 : 20
   const [stage, setStage] = useState<Stage>('setup')
   const [options, setOptions] = useState(initialOptions)
   const [sources, setSources] = useState<Source[]>([])
@@ -75,7 +80,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
         setBusy(false)
       }
     },
-    [updateView],
+    [updateView, mode],
   )
 
   const submit = useCallback(
@@ -100,14 +105,14 @@ export function QuizPage({ onRegisterLeave }: Props) {
               : 'question',
         )
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Could not submit the quiz.')
+        setError(reason instanceof Error ? reason.message : `Could not submit the ${mode}.`)
         if (automatic) setAutoSubmitFailed(true)
       } finally {
         busyRef.current = false
         setBusy(false)
       }
     },
-    [updateView],
+    [updateView, mode],
   )
 
   async function start() {
@@ -122,13 +127,13 @@ export function QuizPage({ onRegisterLeave }: Props) {
     try {
       const next = await api<QuizView>('/quizzes', {
         method: 'POST',
-        body: JSON.stringify(options),
+        body: JSON.stringify({ ...options, mode }),
       })
       updateView(next)
       setStage(next.status === 'completed' ? 'completed' : 'question')
       setQuestionIndex(0)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not start a quiz.')
+      setError(reason instanceof Error ? reason.message : `Could not start a ${mode}.`)
       setStage('setup')
     }
   }
@@ -155,7 +160,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
   const leave = useCallback(async () => {
     const current = viewRef.current
     if (!current || current.status !== 'active') return true
-    if (!window.confirm('Leave this active quiz? It will be abandoned and cannot be resumed.'))
+    if (!window.confirm(`Leave this active ${mode}? It will be abandoned and cannot be resumed.`))
       return false
     if (busyRef.current) {
       window.alert('Please wait for the current answer save to finish, then try leaving again.')
@@ -172,13 +177,13 @@ export function QuizPage({ onRegisterLeave }: Props) {
       setStage('abandoned')
       return true
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not abandon the quiz.')
+      setError(reason instanceof Error ? reason.message : `Could not abandon the ${mode}.`)
       return false
     } finally {
       busyRef.current = false
       setBusy(false)
     }
-  }, [updateView])
+  }, [updateView, mode])
   useEffect(() => {
     onRegisterLeave(leave)
     return () => onRegisterLeave(async () => true)
@@ -220,12 +225,12 @@ export function QuizPage({ onRegisterLeave }: Props) {
       })
       .catch((reason) => {
         if (!cancelled)
-          setError(reason instanceof Error ? reason.message : 'Could not load completed quizzes.')
+          setError(reason instanceof Error ? reason.message : `Could not load completed ${plural}.`)
       })
     return () => {
       cancelled = true
     }
-  }, [stage])
+  }, [stage, plural])
 
   useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || !view || view.status !== 'active') return
@@ -273,7 +278,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
           setStage(next.status === 'completed' ? 'completed' : 'abandoned')
       } catch (reason) {
         if (!cancelled)
-          setError(reason instanceof Error ? reason.message : 'Could not refresh quiz status.')
+          setError(reason instanceof Error ? reason.message : `Could not refresh ${mode} status.`)
       }
     }
 
@@ -284,7 +289,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [stage, view?.id, view?.status, updateView])
+  }, [stage, view?.id, view?.status, updateView, mode])
 
   useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || view?.status !== 'active') return
@@ -322,12 +327,14 @@ export function QuizPage({ onRegisterLeave }: Props) {
           <p className="eyebrow">TIMED STUDY SESSION</p>
           <h1>
             {stage === 'completed'
-              ? 'Quiz results'
+              ? `${title} results`
               : stage === 'review'
                 ? 'Review your answers'
-                : 'Quiz'}
+                : title}
           </h1>
-          <p className="intro">20 questions · 20 minutes · 80% practice target</p>
+          <p className="intro">
+            {count} questions · {minutes} minutes · 80% practice target
+          </p>
         </div>
       </div>
       {error && (
@@ -381,8 +388,8 @@ export function QuizPage({ onRegisterLeave }: Props) {
       {stage === 'setup' && (
         <>
           <section className="quiz-panel">
-            <h2>Set up your quiz</h2>
-            <p>Choose the question banks for this quiz.</p>
+            <h2>Set up your {mode}</h2>
+            <p>Choose the question banks for this {mode}.</p>
             {sourcesLoading ? (
               <p role="status">Loading question banks…</p>
             ) : (
@@ -397,12 +404,12 @@ export function QuizPage({ onRegisterLeave }: Props) {
               disabled={sourcesLoading || !options.sourceIds?.length}
               onClick={() => void start()}
             >
-              Start 20-question quiz
+              Start {count}-question {mode}
             </button>
           </section>
           <section className="quiz-panel">
             <div className="section-heading">
-              <h2>Completed quizzes</h2>
+              <h2>Completed {plural}</h2>
               <button
                 onClick={() => {
                   void api<QuizSummary[]>('/quizzes')
@@ -413,12 +420,14 @@ export function QuizPage({ onRegisterLeave }: Props) {
                 Refresh results
               </button>
             </div>
-            {summaries.length === 0 ? (
-              <p className="muted">Load your completed quiz history.</p>
+            {!summaries.some(
+              (item) => item.status === 'completed' && (item.mode ?? 'quiz') === mode,
+            ) ? (
+              <p className="muted">No completed {plural} yet.</p>
             ) : (
               <ul className="history-list">
                 {summaries
-                  .filter((item) => item.status === 'completed')
+                  .filter((item) => item.status === 'completed' && (item.mode ?? 'quiz') === mode)
                   .map((item) => (
                     <li key={item.id}>
                       <span>
@@ -435,14 +444,14 @@ export function QuizPage({ onRegisterLeave }: Props) {
       )}
       {stage === 'loading' && (
         <div className="empty-state" role="status">
-          Loading quiz…
+          Loading {mode}…
         </div>
       )}
       {stage === 'question' && view && currentQuestion && (
         <>
           {view.status !== 'active' && (
             <div className="message warning" role="alert">
-              This quiz is no longer active.
+              This {mode} is no longer active.
             </div>
           )}
           <QuestionEditor
@@ -466,7 +475,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
               Next question
             </button>
             <button className="danger" disabled={busy} onClick={() => void leave()}>
-              Abandon quiz
+              Abandon {mode}
             </button>
           </div>
         </>
@@ -506,7 +515,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
                   setStage('question')
                 }}
               >
-                Return to quiz
+                Return to {mode}
               </button>
               <button
                 className="primary"
@@ -516,7 +525,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
                 Submit and score
               </button>
               <button className="danger" disabled={busy} onClick={() => void leave()}>
-                Abandon quiz
+                Abandon {mode}
               </button>
             </div>
           </section>
@@ -534,7 +543,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
       )}
       {stage === 'abandoned' && (
         <section className="quiz-panel">
-          <h2>Quiz abandoned</h2>
+          <h2>{title} abandoned</h2>
           <p>This attempt is closed and cannot be resumed.</p>
           <button
             className="primary"
@@ -544,7 +553,7 @@ export function QuizPage({ onRegisterLeave }: Props) {
               setStage('setup')
             }}
           >
-            Back to quiz setup
+            Back to {mode} setup
           </button>
         </section>
       )}
@@ -651,6 +660,7 @@ function QuestionEditor({
 }
 
 function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
+  const mode = view.options.mode ?? 'quiz'
   const correct = view.questions.filter((question) => question.correct).length
   const percent = view.questions.length ? Math.round((correct / view.questions.length) * 100) : 0
   const passed = meetsPracticeTarget(percent)
@@ -663,7 +673,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
     )
     const link = document.createElement('a')
     link.href = url
-    link.download = `quiz-${view.id}.md`
+    link.download = `${mode}-${view.id}.md`
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
@@ -680,7 +690,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   return (
     <>
       <section className="quiz-panel result-score">
-        <p className="eyebrow">QUIZ COMPLETE</p>
+        <p className="eyebrow">{mode === 'exam' ? 'EXAM COMPLETE' : 'QUIZ COMPLETE'}</p>
         <h2>
           {correct} of {view.questions.length}
         </h2>
@@ -690,7 +700,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
         </p>
         <p>This is a practice target, not an AWS scaled score.</p>
         <div className="quiz-actions">
-          <button onClick={onBack}>Back to quiz history</button>
+          <button onClick={onBack}>Back to {mode} history</button>
           <button onClick={() => void copyReport()}>Copy discussion report</button>
           <button onClick={downloadReport}>Download report</button>
         </div>

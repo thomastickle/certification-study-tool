@@ -4,11 +4,13 @@ import type { QuizView } from './quiz-contracts.ts'
 export function quizReport(quiz: QuizView): string {
   if (quiz.status !== 'completed' || quiz.correctCount === null)
     throw new Error('Submit and score the quiz before exporting its report.')
+  const mode = quiz.options.mode ?? 'quiz'
+  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const percent = (quiz.correctCount / quiz.total) * 100
   const lines = [
-    '# CLF-C02 practice quiz report',
+    `# CLF-C02 practice ${mode} report`,
     '',
-    `Quiz: ${quiz.id}`,
+    `${title}: ${quiz.id}`,
     `Started: ${new Date(quiz.startedAt).toISOString()}`,
     `Finished: ${new Date(quiz.finishedAt!).toISOString()}`,
     `Result: ${percent >= 80 ? 'Pass' : 'Fail'} — ${quiz.correctCount}/${quiz.total} (${percent.toFixed(0)}%). Practice target: 80%.`,

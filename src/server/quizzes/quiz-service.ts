@@ -41,10 +41,10 @@ export class QuizService {
         id: randomUUID(),
         status: 'active',
         startedAt: time,
-        deadline: time + 20 * 60 * 1000,
+        deadline: time + (options.mode === 'exam' ? 90 : 20) * 60 * 1000,
         finishedAt: null,
         correctCount: null,
-        total: 20,
+        total: picked.length,
         serverNow: time,
         options,
         questions: [],
@@ -209,6 +209,9 @@ export class QuizService {
     if (!input || typeof input !== 'object')
       throw new ApplicationError('Quiz options are required.')
     const o = input as QuizOptions
+    if (o.mode !== undefined && !['quiz', 'exam'].includes(o.mode)) {
+      throw new ApplicationError('Choose a valid practice mode: quiz or exam.')
+    }
     if (
       !['mixed', 'official', 'third_party'].includes(o.sourceFilter) ||
       !['mixed', 'single_select', 'multi_select'].includes(o.questionType)
@@ -238,6 +241,7 @@ export class QuizService {
       }
     }
     return {
+      ...(o.mode === undefined ? {} : { mode: o.mode }),
       sourceFilter: o.sourceFilter,
       questionType: o.questionType,
       ...(o.sourceIds === undefined ? {} : { sourceIds: [...o.sourceIds] }),

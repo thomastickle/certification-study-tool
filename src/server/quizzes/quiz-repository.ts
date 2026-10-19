@@ -50,6 +50,7 @@ export class QuizRepository {
     return this.db
       .prepare(
         `SELECT id, status, started_at AS startedAt,
+      COALESCE(json_extract(data,'$.options.mode'), 'quiz') AS mode,
       json_extract(data,'$.deadline') AS deadline, json_extract(data,'$.finishedAt') AS finishedAt,
       json_extract(data,'$.correctCount') AS correctCount, json_extract(data,'$.total') AS total
       FROM quiz_sessions WHERE status = 'completed' ORDER BY started_at DESC, id DESC`,

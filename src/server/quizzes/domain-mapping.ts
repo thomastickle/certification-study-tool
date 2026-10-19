@@ -10,6 +10,9 @@ export const domainNames = [
 // Largest-remainder rounding of AWS's 24/30/34/12 weights for 20 questions.
 export const domainQuotas = [5, 6, 7, 2] as const
 
+// Largest-remainder rounding of the same weights for 65 questions.
+export const examDomainQuotas = [16, 19, 22, 8] as const
+
 /** Selection metadata only: never rewrite bank classifications or claim AWS verification. */
 export function examDomain(question: Question): number | null {
   const metadata = question.source_metadata
