@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { ReportService } from './reports/report-service.ts'
 import { QuizService } from './quizzes/quiz-service.ts'
 import { ApplicationError } from './errors.ts'
 import { ImportService } from './importer/import-service.ts'
@@ -59,12 +60,25 @@ function positiveInteger(text: string | null, fallback?: number): number {
 
 export function apiController(repository: LibraryRepository) {
   const quizzes = new QuizService(repository)
+  const reports = new ReportService(repository)
   const importer = new ImportService(repository)
   const library = new LibraryService(repository)
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
       checkLocalRequest(request)
       const url = new URL(request.url ?? '/', 'http://localhost')
+      if (request.method === 'GET' && url.pathname === '/api/reports') {
+        quizzes.expireDue()
+        return send(
+          response,
+          200,
+          reports.get({
+            mode: url.searchParams.get('mode'),
+            days: url.searchParams.get('days'),
+            certification: url.searchParams.get('certification'),
+          }),
+        )
+      }
       if (url.pathname === '/api/quizzes') {
         if (request.method === 'GET') return send(response, 200, quizzes.recent())
         if (request.method === 'POST')

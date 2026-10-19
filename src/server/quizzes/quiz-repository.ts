@@ -57,6 +57,16 @@ export class QuizRepository {
       .all() as unknown as QuizSummary[]
   }
 
+  /** Completed snapshots alone are eligible for aggregate reporting. */
+  completed(): StoredQuiz[] {
+    return this.db
+      .prepare(
+        "SELECT data FROM quiz_sessions WHERE status='completed' ORDER BY started_at DESC, id DESC",
+      )
+      .all()
+      .map((row) => JSON.parse(String(row.data)))
+  }
+
   active(): StoredQuiz[] {
     return this.db
       .prepare("SELECT data FROM quiz_sessions WHERE status='active'")

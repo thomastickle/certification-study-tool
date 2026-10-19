@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
+import { ReportsPage } from './ReportsPage.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'reports' | 'importer'
 
@@ -10,6 +11,13 @@ const links: { id: Page; label: string }[] = [
   { id: 'reports', label: 'Reports' },
   { id: 'importer', label: 'Importer' },
 ]
+
+const descriptions: Partial<Record<Page, string>> = {
+  quiz: 'Start a timed quiz and review your answers.',
+  exam: 'Exam tools are coming soon.',
+  reports: 'Explore your progress, domain strengths, and every attempt.',
+  importer: 'Manage your question library and sources.',
+}
 
 export function App() {
   const [page, setPage] = useState<Page>('home')
@@ -72,15 +80,9 @@ export function App() {
               >
                 <span className="eyebrow">STUDY WORKSPACE</span>
                 <strong>{link.label}</strong>
-                <span>
-                  {link.id === 'quiz'
-                    ? 'Start a timed quiz and review your answers.'
-                    : link.id === 'importer'
-                      ? 'Manage your question library and sources.'
-                      : `${link.label} tools are coming soon.`}
-                </span>
+                <span>{descriptions[link.id]}</span>
                 <span className="home-card-action">
-                  {link.id === 'exam' || link.id === 'reports' ? 'Coming soon' : 'Open →'}
+                  {link.id === 'exam' ? 'Coming soon' : 'Open →'}
                 </span>
               </button>
             ))}
@@ -94,12 +96,13 @@ export function App() {
           }}
         />
       )}
-      {(page === 'exam' || page === 'reports') && (
+      {page === 'reports' && <ReportsPage />}
+      {page === 'exam' && (
         <main>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STUDY WORKSPACE</p>
-              <h1>{page === 'exam' ? 'Exam' : 'Reports'}</h1>
+              <h1>Exam</h1>
               <p className="intro">This section is coming soon.</p>
             </div>
             <button
@@ -111,19 +114,15 @@ export function App() {
             </button>
           </div>
           <section className="placeholder-panel">
-            <h2>
-              {page === 'exam'
-                ? 'Exam mode is not available yet.'
-                : 'Reports are not available yet.'}
-            </h2>
+            <h2>Exam mode is not available yet.</h2>
             <p>For now, you can take a quiz or manage your question library.</p>
             <button
               className="primary"
               onClick={() => {
-                void navigate(page === 'exam' ? 'quiz' : 'importer')
+                void navigate('quiz')
               }}
             >
-              Go to {page === 'exam' ? 'Quiz' : 'Importer'}
+              Go to Quiz
             </button>
           </section>
         </main>

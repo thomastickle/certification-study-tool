@@ -110,3 +110,38 @@ and charts are intentionally deferred.
 
 Development verification uses a separate `private/app/quiz-preview.sqlite3`
 copy, leaving the original library and curated import preview untouched.
+
+## Reports
+
+Open **Reports** for a master view, or select **Quizzes** / **Exams** to filter
+saved results by practice mode. All time, 7-day, 30-day and 90-day views use the
+attempt's completion time; daily chart dates are UTC. CLF-C02 is the currently
+supported certification. The exam feature supplies new exam attempts separately;
+reports recognize its `mode` field and treat legacy snapshots as quizzes.
+
+- **Correct answers** counts every correct question appearance across the
+  selected completed attempts. Repeat questions count each time; this is study
+  activity rather than a count of unique mastered questions.
+- **Answer accuracy** divides correct answers by answered questions. Incorrect
+  partial multi-select answers are answered and incorrect. Skipped questions are
+  reported separately. No answered questions means no accuracy measurement.
+- **Raw attempt score** divides correct answers by all questions, including
+  skipped ones. An attempt meets the existing practice target at 80% or higher,
+  using the unrounded fraction. These are not AWS scaled scores or predictions
+  of exam readiness.
+- **Domain summary** shows answered-question accuracy with the practice target.
+  **Study details** shows correct, incorrect and skipped outcomes by domain,
+  saved study area and topic. Missing classifications remain unclassified.
+- **Study journal** opens any completed attempt with domain results and saved
+  answer review. Filter questions by domain, incorrect, skipped or flagged;
+  expand a question for choices, selections, correct answers, confidence and
+  provenance. The answer keys are the stored source keys, not independently
+  verified explanations.
+- **Export report** downloads the current filtered master report as Markdown.
+  Individual attempt reports include question-level answer evidence.
+
+Reports use saved session snapshots and survive bank changes or deletion.
+Active and abandoned attempts do not contribute; expired attempts are scored
+before reports are read. The report API returns aggregate evidence and attempt
+summaries without internal mastery fingerprints or question answer keys. All
+report generation and downloads remain local.
