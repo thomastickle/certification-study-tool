@@ -29,3 +29,10 @@ export function mergeQuizPoll(current: QuizView, incoming: QuizView): QuizView {
   if (current.status !== 'active' || incoming.serverNow <= current.serverNow) return current
   return { ...current, serverNow: incoming.serverNow }
 }
+
+/** Keep the clock's units unambiguous for both quizzes and longer exams. */
+export function formatTime(seconds: number): string {
+  return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60]
+    .map((value) => value.toString().padStart(2, '0'))
+    .join(':')
+}

@@ -15,6 +15,14 @@ after a server restart it also scores overdue attempts. If a save fails, the UI
 shows that the latest changes are unsaved and offers retry. The deadline does
 not pause during failures, navigation, or browser sleep.
 
+During an attempt the compact toolbar shows question progress, save status, an
+**HH:MM:SS** clock, Pause, and an Actions dropdown. The dropdown offers Review
+answers, Submit and score, and Abandon; the question footer contains only Previous
+and Next. Answers, confidence, and flags save immediately, without a lock-in step.
+The question screen omits the redundant mode heading, question count, and duration
+intro. Long content can still scroll naturally; question panels have no nested
+scroll containers. The review grid labels answered/unanswered questions and flags.
+
 Each question supports its original single/multiple selection count, optional
 confidence (Confident, Educated Guess, Unsure), and a mark for return. The review
 screen lists all questions and highlights unanswered, marked, low-confidence,
@@ -105,13 +113,37 @@ not delete or replace library rows. Quiz snapshots have no cascading foreign
 keys to sources, so later deletion/import changes cannot rewrite past results.
 Only completed attempts update shared mastery across quizzes and exams. Repeated submission is idempotent.
 
-Leaving through app navigation asks before abandoning; abandoned attempts cannot
-be resumed and do not affect mastery. Browser reload/close warns but cannot
-reliably send abandonment. An orphaned attempt remains saved until its deadline
-(then scores saved answers), or is abandoned when another quiz or exam starts before
-that deadline. There is no active-attempt resume UI. All completed results remain
-available through the history list for their mode. The Reports page
-and charts are intentionally deferred.
+**Pause** saves current answers first, then freezes the server-owned remaining
+time. A failed save or pause shows an error and leaves the attempt running. A
+paused attempt cannot expire, accept edits, or be submitted until resumed; pause
+and resume do not grade answers or update mastery. Resume restores exactly the
+remaining time, even after a browser or server restart. Repeated pause/resume
+requests are idempotent. A pause arriving at or after the deadline does not undo
+normal scoring.
+
+Paused attempts can be left safely. On returning to Quiz or Exam, the setup screen
+shows a Continue button for that mode's paused or active attempt. Reopening a
+paused attempt keeps its clock stopped until Resume is pressed. Recovery returns
+to the first incomplete answer. Another mode can be started without discarding a
+paused attempt; a second attempt in the same mode is blocked until the paused one
+is resumed or abandoned.
+
+Leaving an active attempt through app navigation asks before abandoning; Cancel
+lets you pause first. Abandoning never changes mastery. Browser reload/close warns
+while starting or active, and saved active attempts can be reopened, but their
+time keeps running unless explicitly paused. Active overdue attempts still score
+normally. All completed results remain available through the history list for
+their mode. The Reports page and charts remain deferred.
 
 Development verification uses a separate `private/app/quiz-preview.sqlite3`
 copy, leaving the original library and curated import preview untouched.
+
+## Browser regression checks
+
+`tests/quiz-navigation.browser.ts` checks delayed start followed by leave, cancel,
+and failure for both modes. `tests/practice-controls.browser.ts` checks autosave,
+Previous/Next, review metadata, pause, recovery, resume, and menu abandonment.
+These browser-only checks are separate from `npm test`. Run against a disposable
+populated database: transpile each exported function with TypeScript's ESNext
+module target, evaluate it in the app page, and call it with each documented mode
+and outcome. Vite intentionally does not serve the tests directory.

@@ -80,3 +80,11 @@ test('a delayed poll cannot erase a newer saved answer or a pending failed save'
   assert.equal(mergeQuizPoll(saved, complete).status, 'completed')
   assert.equal(mergeQuizPoll(complete, base).status, 'completed')
 })
+
+test('practice clock uses hours, minutes and seconds for both session lengths', async () => {
+  const { formatTime } = await import('./quiz-state.ts')
+  assert.equal(formatTime(5400), '01:30:00')
+  assert.equal(formatTime(1200), '00:20:00')
+  assert.equal(formatTime(59), '00:00:59')
+  assert.equal(formatTime(0), '00:00:00')
+})

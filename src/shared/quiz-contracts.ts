@@ -34,7 +34,7 @@ export type QuizQuestion = QuizAnswer & {
 export type QuizSummary = {
   mode?: PracticeMode
   id: string
-  status: 'active' | 'completed' | 'abandoned'
+  status: 'active' | 'paused' | 'completed' | 'abandoned'
   startedAt: number
   deadline: number
   finishedAt: number | null
@@ -43,6 +43,7 @@ export type QuizSummary = {
 }
 
 export type QuizView = QuizSummary & {
+  pausedAt?: number | null
   serverNow: number
   questions: QuizQuestion[]
   options: QuizOptions

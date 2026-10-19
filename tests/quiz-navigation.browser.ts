@@ -79,7 +79,7 @@ export async function delayedStartNavigationTest(
     if (outcome === 'cancel') {
       await until(() => confirmations === 1, 'Leave confirmation was not shown')
       assert(
-        document.querySelector('h1')?.textContent === title,
+        document.querySelector('[aria-current=page]')?.textContent === title,
         'Canceled navigation left the attempt',
       )
       window.confirm = () => true
