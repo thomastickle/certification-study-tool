@@ -47,6 +47,11 @@ export class QuizRepository {
       .run(quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
   }
 
+  /** Discard an unfinished snapshot without recording a result or changing mastery. */
+  remove(id: string): void {
+    this.db.prepare('DELETE FROM quiz_sessions WHERE id = ?').run(id)
+  }
+
   recent(): QuizSummary[] {
     return this.db
       .prepare(

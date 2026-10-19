@@ -41,11 +41,7 @@ export class QuizService {
       // Starting again abandons only active attempts; explicitly paused work is preserved.
       for (const old of store.active()) {
         if (old.deadline <= this.now()) this.finish(old)
-        else {
-          old.status = 'abandoned'
-          old.finishedAt = this.now()
-          store.save(old)
-        }
+        else store.remove(old.id)
       }
       const picked = selectQuestions(
         this.repository.allQuestions(),
@@ -171,11 +167,14 @@ export class QuizService {
 
   abandon(id: string): QuizView {
     return this.repository.quizStore().transaction(() => {
-      const quiz = this.load(id)
-      if (quiz.status === 'active' || quiz.status === 'paused') {
+      const store = this.repository.quizStore()
+      // Abandonment must not trigger expiry/grading as a side effect of loading.
+      const quiz = store.find(id)
+      if (!quiz) throw new ApplicationError('Quiz not found.', 404)
+      if (quiz.status !== 'completed') {
+        store.remove(id)
         quiz.status = 'abandoned'
         quiz.finishedAt = this.now()
-        this.repository.quizStore().save(quiz)
       }
       return this.view(quiz)
     })

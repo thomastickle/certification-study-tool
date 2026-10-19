@@ -129,7 +129,9 @@ paused attempt; a second attempt in the same mode is blocked until the paused on
 is resumed or abandoned.
 
 Leaving an active attempt through app navigation asks before abandoning; Cancel
-lets you pause first. Abandoning never changes mastery. Browser reload/close warns
+lets you pause first. Abandoning discards the unfinished snapshot entirely: no saved result, history entry,
+or mastery change. Requests for a discarded attempt return 404. Completed results
+remain unchanged. Browser reload/close warns
 while starting or active, and saved active attempts can be reopened, but their
 time keeps running unless explicitly paused. Active overdue attempts still score
 normally. All completed results remain available through the history list for
