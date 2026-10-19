@@ -201,6 +201,7 @@ export class QuizService {
 
   private view(quiz: StoredQuiz): QuizView {
     const { keys: _keys, ...view } = structuredClone(quiz)
+    view.mode = quiz.options.mode ?? 'quiz'
     view.serverNow = this.now()
     return view
   }

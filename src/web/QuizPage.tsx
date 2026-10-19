@@ -49,6 +49,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const noticesShown = useRef(new Set<string>())
   const timerSubmit = useRef(false)
   const pendingAnswers = useRef(false)
+  const pendingStart = useRef<Promise<void> | null>(null)
 
   const updateView = useCallback((next: QuizView) => {
     viewRef.current = next
@@ -115,7 +116,8 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     [updateView, mode],
   )
 
-  async function start() {
+  function start() {
+    if (pendingStart.current) return
     pendingAnswers.current = false
     setMutationError(false)
     setAutoSubmitFailed(false)
@@ -124,18 +126,22 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     setNotice('')
     noticesShown.current.clear()
     timerSubmit.current = false
-    try {
-      const next = await api<QuizView>('/quizzes', {
-        method: 'POST',
-        body: JSON.stringify({ ...options, mode }),
+    pendingStart.current = api<QuizView>('/quizzes', {
+      method: 'POST',
+      body: JSON.stringify({ ...options, mode }),
+    })
+      .then((next) => {
+        updateView(next)
+        setStage(next.status === 'completed' ? 'completed' : 'question')
+        setQuestionIndex(0)
       })
-      updateView(next)
-      setStage(next.status === 'completed' ? 'completed' : 'question')
-      setQuestionIndex(0)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : `Could not start a ${mode}.`)
-      setStage('setup')
-    }
+      .catch((reason) => {
+        setError(reason instanceof Error ? reason.message : `Could not start a ${mode}.`)
+        setStage('setup')
+      })
+      .finally(() => {
+        pendingStart.current = null
+      })
   }
 
   async function loadCompleted(id: string) {
@@ -158,6 +164,8 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   }
 
   const leave = useCallback(async () => {
+    // A start response must establish the attempt before navigation can abandon it.
+    await pendingStart.current
     const current = viewRef.current
     if (!current || current.status !== 'active') return true
     if (!window.confirm(`Leave this active ${mode}? It will be abandoned and cannot be resumed.`))
@@ -292,7 +300,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   }, [stage, view?.id, view?.status, updateView, mode])
 
   useEffect(() => {
-    if ((stage !== 'question' && stage !== 'review') || view?.status !== 'active') return
+    if (!pendingStart.current && view?.status !== 'active') return
 
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault()

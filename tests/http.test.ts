@@ -114,6 +114,7 @@ for (const mode of ['quiz', 'exam'] as const) {
       assert.equal(quiz.questions.length, mode === 'exam' ? 65 : 20)
       assert.equal(quiz.deadline - quiz.startedAt, (mode === 'exam' ? 90 : 20) * 60_000)
       assert.equal('keys' in quiz, false)
+      assert.equal(quiz.mode, mode)
       const answers = quiz.questions.map((q: { questionId: number }) => ({
         questionId: q.questionId,
         selected: [],
@@ -122,6 +123,7 @@ for (const mode of ['quiz', 'exam'] as const) {
       }))
       assert.equal((await post(`/api/quizzes/${quiz.id}/answers`, { answers }, 'PUT')).status, 200)
       const result = await (await post(`/api/quizzes/${quiz.id}/submit`, { answers })).json()
+      assert.equal(result.mode, mode)
       assert.equal(result.correctCount, 0)
       assert.equal(result.questions[0].confidence, 'Unsure')
       assert.ok(result.questions[0].correctAnswerIds)
@@ -129,6 +131,7 @@ for (const mode of ['quiz', 'exam'] as const) {
       assert.equal(history.length, 1)
       assert.equal(history[0].mode, mode)
       const saved = await (await fetch(base + `/api/quizzes/${quiz.id}`)).json()
+      assert.equal(saved.mode, mode)
       assert.equal(saved.status, 'completed')
     } finally {
       await new Promise<void>((resolve, reject) =>
