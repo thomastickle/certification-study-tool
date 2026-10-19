@@ -189,9 +189,11 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     busyRef.current = true
     setBusy(true)
     try {
-      updateView(
-        await api<QuizView>(`/quizzes/${current.id}/abandon`, { method: 'POST', body: '{}' }),
-      )
+      const next = await api<QuizView | null>(`/quizzes/${current.id}/abandon`, {
+        method: 'POST',
+        body: '{}',
+      })
+      updateView(next ?? { ...current, status: 'abandoned', finishedAt: null })
       return true
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `Could not abandon the ${mode}.`)
@@ -216,12 +218,12 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     busyRef.current = true
     setBusy(true)
     try {
-      updateView(
-        await api<QuizView>(`/quizzes/${viewRef.current.id}/abandon`, {
-          method: 'POST',
-          body: '{}',
-        }),
-      )
+      const current = viewRef.current
+      const next = await api<QuizView | null>(`/quizzes/${current.id}/abandon`, {
+        method: 'POST',
+        body: '{}',
+      })
+      updateView(next ?? { ...current, status: 'abandoned', finishedAt: null })
       return true
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `Could not abandon the ${mode}.`)

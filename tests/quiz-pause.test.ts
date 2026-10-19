@@ -67,7 +67,7 @@ test('paused answers stay frozen, another mode does not erase them, and abandon 
     assert.deepEqual(paused.questions[0]!.selected, answers[0]!.selected)
     assert.equal(paused.questions[0]!.flagged, true)
     assert.equal(service.current('exam')?.id, exam.id)
-    assert.equal(service.abandon(exam.id).status, 'abandoned')
+    assert.equal(service.abandon(exam.id)?.status, 'abandoned')
     assert.equal(service.current('exam'), null)
     assert.equal(repository.quizStore().boosts().size, 0)
   } finally {

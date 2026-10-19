@@ -165,6 +165,24 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
       'Resume did not restore question',
     )
     assert((await current()).id === paused.id, 'Resume created a new attempt')
+    let lostAbandonResponse = false
+    window.fetch = async (input, init) => {
+      const response = await originalFetch(input, init)
+      if (typeof input === 'string' && input.endsWith('/abandon') && !lostAbandonResponse) {
+        lostAbandonResponse = true
+        throw new TypeError('Synthetic lost abandonment response')
+      }
+      return response
+    }
+    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    button(`Abandon ${mode}`).click()
+    await until(
+      () =>
+        document
+          .querySelector('.message.error')
+          ?.textContent?.includes('Synthetic lost abandonment response') === true,
+      'Lost response was not reported',
+    )
     document.querySelector<HTMLElement>('.practice-menu summary')!.click()
     button(`Abandon ${mode}`).click()
     await until(

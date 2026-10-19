@@ -23,10 +23,11 @@ for (const mode of ['quiz', 'exam'] as const) {
         })
         if (paused) service.pause(attempt.id)
         const result = service.abandon(attempt.id)
-        assert.equal(result.status, 'abandoned')
-        assert.equal(result.correctCount, null)
+        assert.equal(result?.status, 'abandoned')
+        assert.equal(result?.correctCount, null)
         assert.equal(repository.quizStore().find(attempt.id), undefined)
         assert.equal(service.current(mode), null)
+        assert.equal(service.abandon(attempt.id), null)
         now = attempt.deadline + 1
         service.expireDue()
         assert.deepEqual(service.recent(), [])
@@ -64,7 +65,7 @@ test('explicit abandonment cannot trigger expiry scoring; completed results stay
     const options = { sourceFilter: 'mixed', questionType: 'mixed' }
     const unfinished = service.start(options)
     now = unfinished.deadline + 1
-    assert.equal(service.abandon(unfinished.id).status, 'abandoned')
+    assert.equal(service.abandon(unfinished.id)?.status, 'abandoned')
     assert.equal(repository.quizStore().find(unfinished.id), undefined)
     assert.equal(service.recent().length, 0)
     assert.equal(repository.quizStore().boosts().size, 0)

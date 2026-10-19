@@ -150,6 +150,7 @@ for (const mode of ['quiz', 'exam'] as const) {
       const abandoned = await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json()
       assert.equal(abandoned.status, 'abandoned')
       assert.equal(abandoned.correctCount, null)
+      assert.equal(await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json(), null)
       assert.equal((await fetch(`${base}/api/quizzes/${discarded.id}`)).status, 404)
       assert.equal(await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json(), null)
       assert.equal((await (await fetch(`${base}/api/quizzes`)).json()).length, 1)

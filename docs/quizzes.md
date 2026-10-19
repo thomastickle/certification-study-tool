@@ -130,7 +130,8 @@ is resumed or abandoned.
 
 Leaving an active attempt through app navigation asks before abandoning; Cancel
 lets you pause first. Abandoning discards the unfinished snapshot entirely: no saved result, history entry,
-or mastery change. Requests for a discarded attempt return 404. Completed results
+or mastery change. Reads and answer submissions for a discarded attempt return 404; repeated
+abandon requests succeed with `null`, so a lost response does not block leaving. Completed results
 remain unchanged. Browser reload/close warns
 while starting or active, and saved active attempts can be reopened, but their
 time keeps running unless explicitly paused. Active overdue attempts still score

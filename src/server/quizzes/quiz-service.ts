@@ -165,12 +165,12 @@ export class QuizService {
     return this.change(id, input, 'submit')
   }
 
-  abandon(id: string): QuizView {
+  abandon(id: string): QuizView | null {
     return this.repository.quizStore().transaction(() => {
       const store = this.repository.quizStore()
       // Abandonment must not trigger expiry/grading as a side effect of loading.
       const quiz = store.find(id)
-      if (!quiz) throw new ApplicationError('Quiz not found.', 404)
+      if (!quiz) return null
       if (quiz.status !== 'completed') {
         store.remove(id)
         quiz.status = 'abandoned'
