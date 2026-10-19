@@ -3,7 +3,8 @@
 A local study-question library with a React interface, TypeScript application
 services, and SQLite storage. This first slice imports version-2 JSON banks,
 shows their contents, and deletes individual source occurrences or whole sources.
-It does not implement quizzes, exams, or reports.
+It now includes timed CLF-C02 quizzes with saved results and local discussion reports.
+Exam mode and aggregate reports/charts are not implemented. See [quiz behavior](docs/quizzes.md).
 
 ## Run
 
@@ -27,7 +28,7 @@ NODE_ENV=production npm start
 The database defaults to `private/app/library.sqlite3`. `STUDY_DB_PATH` selects a
 separate database path and `STUDY_PORT` selects a port. Do not point this app at
 the original Python app's database; existing unrelated databases are refused.
-The initial schema is version 1 and uses an application identifier to recognize
+The current schema is version 2 and uses an application identifier to recognize
 its own databases. No legacy database migration is implemented.
 
 ## Import and review

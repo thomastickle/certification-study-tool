@@ -44,6 +44,16 @@ The initial library query loads the local collection to filter and paginate
 25 records at a time. This is suitable for the current small banks; SQL-side
 search and pagination can follow if measured size or latency requires them.
 
+## Quiz services
+
+`src/server/quizzes/` owns domain mapping, weighted selection, timed quiz use
+cases, and quiz persistence. The library repository owns the shared SQLite
+connection and exposes a quiz store; quiz writes use separate transactions
+without invalidating library import revisions. Schema version 2 adds quiz and
+mastery tables transactionally. Snapshots preserve completed results across
+source edits/deletions. React and HTTP use public DTOs without answer keys until
+completion. See [quiz rules](quizzes.md).
+
 ## Terms
 
 - **GUI:** React web frontend.
