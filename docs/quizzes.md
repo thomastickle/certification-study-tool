@@ -1,7 +1,13 @@
 # Quiz and exam flow
 
-The start page links to Practice, Due Review, Reports, and Importer. Practice
-provides Quiz and Exam presets in one setup workflow. Switching presets keeps
+The start page identifies AWS Cloud Practitioner (CLF-C02) and opens Practice,
+Due Review, and the question library. The collapsible sidebar keeps Reports as
+its own final destination. On desktop, drag the boundary to resize navigation or
+use its chevron button to collapse to an icon rail. The expanded width and collapse
+preference are remembered. The boundary also accepts Left/Right arrows (Shift for
+larger steps), Home to collapse, End for maximum width, and Enter to toggle.
+Mobile keeps the compact labeled navigation. Practice provides Quiz and Exam presets
+in one setup workflow. Switching presets keeps
 the chosen question banks and uses the same save-and-pause guard as navigation.
 Each preset retains its own saved attempt and completed history; presets cannot
 change an attempt that is already open. Due Review remains separate. Completed results
