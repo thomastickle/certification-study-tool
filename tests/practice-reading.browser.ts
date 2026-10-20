@@ -5,6 +5,14 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
   const originalConfirm = window.confirm
   const originalNow = Date.now
   const originalFetch = window.fetch
+  const originalSetTimeout = window.setTimeout
+  const warningDismissals: (() => void)[] = []
+  window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+    if (delay === 30_000 && typeof handler === 'function') {
+      warningDismissals.push(() => handler(...args))
+    }
+    return originalSetTimeout(handler, delay, ...args)
+  }) as typeof window.setTimeout
   let attemptId: string | undefined
   window.confirm = () => true
 
@@ -96,7 +104,14 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
           ?.textContent?.includes(`Question ${total} of ${total}`) === true,
       'Last question did not open',
     )
-    click('Review / submit')
+    const finalButton = document.querySelectorAll<HTMLButtonElement>(
+      '.question-navigation button',
+    )[1]!
+    assert(
+      finalButton.textContent?.trim() === 'Review answers',
+      'Final question action is mislabeled',
+    )
+    finalButton.click()
     await until(() => !!document.querySelector('.review-list'), 'Final button did not open review')
     const attention = document.querySelector('.review-list li.needs-review')
     assert(
@@ -107,7 +122,11 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
     const confidence = document.querySelector('.confidence-row fieldset')!.getBoundingClientRect()
     const flag = document.querySelector('.flag-control')!.getBoundingClientRect()
-    assert(flag.top >= confidence.bottom, 'Return mark is not under Confidence')
+    assert(flag.top >= confidence.bottom, 'Review mark is not under Confidence')
+    assert(
+      document.querySelector('.flag-control')?.textContent?.includes('Mark for Review'),
+      'Review mark label is outdated',
+    )
     assert(document.querySelector('.selection-instruction strong'), 'Selection count is not bold')
     const navigation = document.querySelector('.question-navigation')!.getBoundingClientRect()
     const buttons = document.querySelectorAll('.question-navigation button')
@@ -142,6 +161,18 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       ) < 1,
       'Warning shifted the question',
     )
+    assert(warningDismissals.length === 1, 'Warning did not schedule a 30-second dismissal')
+    warningDismissals[0]!()
+    await until(
+      () => document.querySelector('.timer-warning')?.classList.contains('pending') === true,
+      'Warning did not disappear after dismissal',
+    )
+    assert(
+      Math.abs(
+        document.querySelector('.quiz-question')!.getBoundingClientRect().top - questionTop,
+      ) < 1,
+      'Dismissing warning shifted question',
+    )
     clockNow = initialNow + (attempt.deadline - attempt.serverNow) - 119_000
     await until(
       () =>
@@ -156,9 +187,16 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       ) < 1,
       'Urgent warning shifted the question',
     )
+    assert(warningDismissals[1], 'Final warning did not schedule its own dismissal')
+    warningDismissals[1]!()
+    await until(
+      () => document.querySelector('.timer-warning')?.classList.contains('pending') === true,
+      'Final warning did not disappear',
+    )
     return `${mode}: reading layout, final-question review, yellow attention, and stable warnings passed`
   } finally {
     Date.now = originalNow
+    window.setTimeout = originalSetTimeout
     if (attemptId) {
       await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
       click('Reports')

@@ -9,7 +9,8 @@ has **65 questions and a 90-minute deadline**. Both modes share the same bank
 picker, answer controls, timing, review, grading, and report flow. Warnings
 appear inline in the toolbar at 10 and 2 minutes remaining, including on the
 pre-submit review screen. Their reserved slot keeps the question from shifting;
-the 10-minute warning is yellow and the final warning is red.
+the 10-minute warning is yellow and the final warning is red. Each message
+disappears after 30 seconds; its toolbar space stays reserved.
 Answers are saved after each change. At expiry the server scores the saved
 choices; unanswered questions and incomplete/incorrect multi-select sets are
 misses. Late changes are ignored. A running server checks deadlines every second;
@@ -21,7 +22,7 @@ During an attempt the compact toolbar shows question progress, save status, an
 **HH:MM:SS** clock, Pause, and an Actions dropdown. The dropdown offers Review
 answers, Submit and score, and Abandon. The footer has compact, equal-width
 Previous and Next buttons at opposite edges. On the final question, Next becomes
-Review / submit and opens answer review. Answers, confidence, and flags save
+Review answers and opens answer review. Answers, confidence, and flags save
 immediately, without a lock-in step.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
@@ -31,7 +32,7 @@ answers, return flags, and missing or low confidence. Confident complete answers
 without flags are unhighlighted.
 
 Each question supports its original single/multiple selection count, optional
-confidence (Confident, Educated Guess, Unsure), and a mark for return. The review
+confidence (Confident, Educated Guess, Unsure), and a Mark for Review checkbox. The review
 screen lists all questions and highlights unanswered, marked, low-confidence,
 and unrecorded-confidence items. Submit and score ends the attempt. The result
 shows correct count, raw percentage, and an **80% practice target**: green Pass
@@ -159,3 +160,15 @@ These browser-only checks are separate from `npm test`. Run against a disposable
 populated database: transpile each exported function with TypeScript's ESNext
 module target, evaluate it in the app page, and call it with each documented mode
 and outcome. Vite intentionally does not serve the tests directory.
+
+The question card has no outer border. The answer-choice group reserves room for
+six single-line choices so Confidence and Mark for Review stay aligned when moving
+between four, five, and six choices. Longer wrapping choices can grow naturally;
+there is no nested scrollbar or clipped answer text. Confidence's Clear action is
+compact and resets only the confidence choice.
+
+Scored reports use dark neutral answer text, darker green status text, and a dark
+green accent on correct choices. `tests/practice-spacing.browser.ts` checks the
+four/five/six-choice layout, compact Clear action, review wording, and scored-answer
+contrast. The reading regression also verifies each warning's 30-second dismissal
+without changing the reserved toolbar layout.

@@ -317,6 +317,12 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   }, [stage, plural, mode])
 
   useEffect(() => {
+    if (!notice) return
+    const timeout = window.setTimeout(() => setNotice(''), 30_000)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
+
+  useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || !view || view.status !== 'active') return
 
     const tick = () => {
@@ -590,7 +596,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                 }
               }}
             >
-              {questionIndex === questions.length - 1 ? 'Review / submit' : 'Next question'}
+              {questionIndex === questions.length - 1 ? 'Review answers' : 'Next question'}
             </button>
           </div>
         </>
@@ -740,7 +746,7 @@ function QuestionEditor({
       <p className="selection-instruction">
         <strong>{multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}</strong>
       </p>
-      <fieldset disabled={disabled}>
+      <fieldset className="answer-choices" disabled={disabled}>
         <legend className="sr-only">Answer choices</legend>
         {question.answers.map((answer, index) => (
           <label className="choice" key={answer.id}>
@@ -770,6 +776,7 @@ function QuestionEditor({
             </label>
           ))}
           <button
+            className="confidence-clear"
             type="button"
             disabled={disabled || question.confidence === null}
             onClick={() => onChange({ confidence: null })}
@@ -784,7 +791,7 @@ function QuestionEditor({
             checked={question.flagged}
             onChange={(event) => onChange({ flagged: event.target.checked })}
           />{' '}
-          Mark for return
+          Mark for Review
         </label>
       </div>
     </article>
@@ -848,7 +855,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
               {question.correct ? 'Correct' : 'Incorrect'} ·{' '}
               {question.confidence ?? 'Confidence not recorded'}
               {question.confidence !== 'Confident' ? ' · Review' : ''}
-              {question.flagged ? ' · Marked for return' : ''}
+              {question.flagged ? ' · Marked for review' : ''}
             </p>
             <p className="muted">
               {question.sourceName} · {question.reference} · Domain {question.domain}

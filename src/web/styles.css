@@ -843,7 +843,7 @@ select {
 }
 .result-score > p:nth-of-type(2) {
   font-size: 22px;
-  color: #466b4c;
+  color: #172019;
 }
 .result-question {
   border-top: 1px solid #e8ece3;
@@ -856,7 +856,7 @@ select {
 .result-question ul {
   list-style: none;
   padding: 0;
-  font-size: 13px;
+  font-size: 16px;
 }
 .result-question li {
   padding: 9px;
@@ -864,14 +864,15 @@ select {
 }
 .result-question li.result-correct {
   background: #edf5e8;
-  color: #426435;
+  color: #172019;
+  border-left: 4px solid #235b31;
 }
 .result-question li.result-selected:not(.result-correct) {
   background: #fff0e9;
   color: #8c4635;
 }
 .correct-text {
-  color: #4c713c;
+  color: #1e5029;
 }
 .incorrect-text {
   color: #9f3b36;
@@ -1264,4 +1265,24 @@ select {
   .practice-menu {
     grid-area: actions;
   }
+}
+
+.practice-session .quiz-question {
+  border: 0;
+}
+.practice-session .answer-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 16px;
+  /* Keep room for six single-line choices without shifting the confidence controls. */
+  min-block-size: calc(6 * (1.55em + 20px) + 5 * 6px);
+}
+.practice-session .answer-choices .choice {
+  margin: 0;
+}
+.confidence-clear {
+  font-size: 14px;
+  line-height: 20px;
+  padding: 3px 8px;
 }

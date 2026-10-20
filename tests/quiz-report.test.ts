@@ -27,7 +27,7 @@ test('export report includes every question, raw score, selected/correct answers
     assert.match(report, /My answer: None/)
     assert.match(report, /Confidence: Educated Guess/)
     assert.match(report, /Confidence: Not recorded/)
-    assert.match(report, /Marked for return: Yes/)
+    assert.match(report, /Marked for review: Yes/)
     assert.match(report, /Source: quiz-synthetic \(third_party\)/)
     assert.match(report, /Incorrect/)
     assert.match(report, /Correct answer: [ABC]/)

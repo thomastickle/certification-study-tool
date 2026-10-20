@@ -33,7 +33,7 @@ export function quizReport(quiz: QuizView): string {
       `My answer: ${letters(question.selected)}`,
       `Correct answer: ${letters(question.correctAnswerIds ?? [])}`,
       `Confidence: ${question.confidence ?? 'Not recorded'}`,
-      `Marked for return: ${question.flagged ? 'Yes' : 'No'}`,
+      `Marked for review: ${question.flagged ? 'Yes' : 'No'}`,
       `Source: ${question.sourceName} (${question.sourceKind}); reference: ${question.reference}`,
       `Exam domain: ${question.domain}; study area: ${question.area ?? 'Unclassified'}; topic: ${question.topic ?? 'Unclassified'}`,
       '',
