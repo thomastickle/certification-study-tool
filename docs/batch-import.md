@@ -6,8 +6,8 @@ resolved from your current directory. The command does not use `STUDY_DB_PATH`.
 
 ```sh
 npm run import:curated -- \
-  --source /home/ttickle/Projects/aws-study-ts/private/aws_clf_c02_AWS_STUDY_TS_IMPORT_BUNDLE \
-  --db /home/ttickle/Projects/aws-study-ts/private/app/curated-preview.sqlite3 \
+  --source /home/ttickle/Projects/certification-study-tool/private/aws_clf_c02_AWS_STUDY_TS_IMPORT_BUNDLE \
+  --db /home/ttickle/Projects/certification-study-tool/private/app/curated-preview.sqlite3 \
   --dry-run
 ```
 
@@ -69,7 +69,7 @@ replacement is authorized by this workflow.
 To browse the imported preview library:
 
 ```sh
-STUDY_DB_PATH=/home/ttickle/Projects/aws-study-ts/private/app/curated-preview.sqlite3 npm run dev
+STUDY_DB_PATH=/home/ttickle/Projects/certification-study-tool/private/app/curated-preview.sqlite3 npm run dev
 ```
 
 Open http://127.0.0.1:3000. This app currently imports, browses, and deletes;

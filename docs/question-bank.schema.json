@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "aws-study curated question bank v2",
+  "title": "certification-study-tool curated question bank v2",
   "$comment": "Study classifications may be absent and are reported for later curation. Application validation additionally checks normalized answer uniqueness, source-reference uniqueness, and exact correct-answer counts.",
   "type": "object",
   "required": ["schema_version", "certification", "source", "questions"],
