@@ -16,7 +16,9 @@ export function App() {
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
 
   async function navigate(next: Page) {
-    if (page === 'quiz' && next !== 'quiz' && !(await leaveQuiz.current())) return
+    if ((page === 'quiz' || page === 'exam') && next !== page && !(await leaveQuiz.current())) {
+      return
+    }
     setPage(next)
   }
 
@@ -75,31 +77,35 @@ export function App() {
                 <span>
                   {link.id === 'quiz'
                     ? 'Start a timed quiz and review your answers.'
-                    : link.id === 'importer'
-                      ? 'Manage your question library and sources.'
-                      : `${link.label} tools are coming soon.`}
+                    : link.id === 'exam'
+                      ? 'Take a 65-question, 90-minute practice exam.'
+                      : link.id === 'importer'
+                        ? 'Manage your question library and sources.'
+                        : `${link.label} tools are coming soon.`}
                 </span>
                 <span className="home-card-action">
-                  {link.id === 'exam' || link.id === 'reports' ? 'Coming soon' : 'Open →'}
+                  {link.id === 'reports' ? 'Coming soon' : 'Open →'}
                 </span>
               </button>
             ))}
           </section>
         </main>
       )}
-      {page === 'quiz' && (
+      {(page === 'quiz' || page === 'exam') && (
         <QuizPage
+          key={page}
+          mode={page}
           onRegisterLeave={(fn) => {
             leaveQuiz.current = fn
           }}
         />
       )}
-      {(page === 'exam' || page === 'reports') && (
+      {page === 'reports' && (
         <main>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STUDY WORKSPACE</p>
-              <h1>{page === 'exam' ? 'Exam' : 'Reports'}</h1>
+              <h1>Reports</h1>
               <p className="intro">This section is coming soon.</p>
             </div>
             <button
@@ -111,19 +117,15 @@ export function App() {
             </button>
           </div>
           <section className="placeholder-panel">
-            <h2>
-              {page === 'exam'
-                ? 'Exam mode is not available yet.'
-                : 'Reports are not available yet.'}
-            </h2>
+            <h2>Reports are not available yet.</h2>
             <p>For now, you can take a quiz or manage your question library.</p>
             <button
               className="primary"
               onClick={() => {
-                void navigate(page === 'exam' ? 'quiz' : 'importer')
+                void navigate('importer')
               }}
             >
-              Go to {page === 'exam' ? 'Quiz' : 'Importer'}
+              Go to Importer
             </button>
           </section>
         </main>

@@ -74,59 +74,91 @@ test('HTTP supports preview, confirm, browse and scoped deletion while denying c
   }
 })
 
-test('quiz HTTP saves confidence, scores results and rejects cross-site mutations', async () => {
-  const { populate } = await import('./quiz-fixtures.ts')
-  const repository = new LibraryRepository(':memory:')
-  populate(repository)
-  const server = createServer(apiController(repository))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}`
+for (const mode of ['quiz', 'exam'] as const) {
+  test(`${mode} HTTP saves confidence, scores results and rejects cross-site mutations`, async () => {
+    const { populate } = await import('./quiz-fixtures.ts')
+    const repository = new LibraryRepository(':memory:')
+    populate(repository, 24)
+    const server = createServer(apiController(repository))
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    assert.ok(address && typeof address !== 'string')
+    const base = `http://127.0.0.1:${address.port}`
 
-  const post = (path: string, data: unknown, method = 'POST', origin = base) =>
-    fetch(base + path, {
-      method,
-      headers: { 'Content-Type': 'application/json', Origin: origin },
-      body: JSON.stringify(data),
-    })
+    const post = (path: string, data: unknown, method = 'POST', origin = base) =>
+      fetch(base + path, {
+        method,
+        headers: { 'Content-Type': 'application/json', Origin: origin },
+        body: JSON.stringify(data),
+      })
 
-  try {
-    assert.equal(
-      (
-        await post(
-          '/api/quizzes',
-          { sourceFilter: 'mixed', questionType: 'mixed' },
-          'POST',
-          'https://untrusted.example',
-        )
-      ).status,
-      403,
-    )
-    const response = await post('/api/quizzes', { sourceFilter: 'mixed', questionType: 'mixed' })
-    assert.equal(response.status, 201)
-    const quiz = await response.json()
-    assert.equal(quiz.questions.length, 20)
-    assert.equal('keys' in quiz, false)
-    const answers = quiz.questions.map((q: { questionId: number }) => ({
-      questionId: q.questionId,
-      selected: [],
-      confidence: 'Unsure',
-      flagged: true,
-    }))
-    assert.equal((await post(`/api/quizzes/${quiz.id}/answers`, { answers }, 'PUT')).status, 200)
-    const result = await (await post(`/api/quizzes/${quiz.id}/submit`, { answers })).json()
-    assert.equal(result.correctCount, 0)
-    assert.equal(result.questions[0].confidence, 'Unsure')
-    assert.ok(result.questions[0].correctAnswerIds)
-    const history = await (await fetch(base + '/api/quizzes')).json()
-    assert.equal(history.length, 1)
-    const saved = await (await fetch(base + `/api/quizzes/${quiz.id}`)).json()
-    assert.equal(saved.status, 'completed')
-  } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    )
-    repository.close()
-  }
-})
+    try {
+      assert.equal(
+        (
+          await post(
+            '/api/quizzes',
+            { sourceFilter: 'mixed', questionType: 'mixed', mode },
+            'POST',
+            'https://untrusted.example',
+          )
+        ).status,
+        403,
+      )
+      const response = await post('/api/quizzes', {
+        sourceFilter: 'mixed',
+        questionType: 'mixed',
+        mode,
+      })
+      assert.equal(response.status, 201)
+      const quiz = await response.json()
+      assert.equal(quiz.questions.length, mode === 'exam' ? 65 : 20)
+      assert.equal(quiz.deadline - quiz.startedAt, (mode === 'exam' ? 90 : 20) * 60_000)
+      assert.equal('keys' in quiz, false)
+      assert.equal(quiz.mode, mode)
+      const answers = quiz.questions.map((q: { questionId: number }) => ({
+        questionId: q.questionId,
+        selected: [],
+        confidence: 'Unsure',
+        flagged: true,
+      }))
+      assert.equal((await post(`/api/quizzes/${quiz.id}/answers`, { answers }, 'PUT')).status, 200)
+      const paused = await (await post(`/api/quizzes/${quiz.id}/pause`, {})).json()
+      assert.equal(paused.status, 'paused')
+      assert.ok(paused.pausedAt >= quiz.startedAt)
+      const recovered = await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json()
+      assert.equal(recovered.id, quiz.id)
+      assert.equal(recovered.status, 'paused')
+      assert.equal('keys' in recovered, false)
+      assert.equal(recovered.questions[0].correctAnswerIds, undefined)
+      const resumed = await (await post(`/api/quizzes/${quiz.id}/resume`, {})).json()
+      assert.equal(resumed.status, 'active')
+      assert.equal(resumed.pausedAt, null)
+      const result = await (await post(`/api/quizzes/${quiz.id}/submit`, { answers })).json()
+      assert.equal(result.mode, mode)
+      assert.equal(result.correctCount, 0)
+      assert.equal(result.questions[0].confidence, 'Unsure')
+      assert.ok(result.questions[0].correctAnswerIds)
+      const history = await (await fetch(base + '/api/quizzes')).json()
+      assert.equal(history.length, 1)
+      assert.equal(history[0].mode, mode)
+      const saved = await (await fetch(base + `/api/quizzes/${quiz.id}`)).json()
+      assert.equal(saved.mode, mode)
+      assert.equal(saved.status, 'completed')
+      const discarded = await (
+        await post('/api/quizzes', { mode, sourceFilter: 'mixed', questionType: 'mixed' })
+      ).json()
+      const abandoned = await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json()
+      assert.equal(abandoned.status, 'abandoned')
+      assert.equal(abandoned.correctCount, null)
+      assert.equal(await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json(), null)
+      assert.equal((await fetch(`${base}/api/quizzes/${discarded.id}`)).status, 404)
+      assert.equal(await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json(), null)
+      assert.equal((await (await fetch(`${base}/api/quizzes`)).json()).length, 1)
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      )
+      repository.close()
+    }
+  })
+}

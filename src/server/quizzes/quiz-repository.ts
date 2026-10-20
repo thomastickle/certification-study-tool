@@ -40,19 +40,32 @@ export class QuizRepository {
   save(quiz: StoredQuiz): void {
     this.db
       .prepare(
-        `INSERT INTO quiz_sessions(id,status,started_at,data) VALUES (?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET status=excluded.status, data=excluded.data`,
+        `INSERT INTO quiz_sessions(id, status, started_at, data)
+         VALUES (?, ?, ?, ?) ON CONFLICT(id) DO
+        UPDATE SET status=excluded.status, data =excluded.data`,
       )
       .run(quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
+  }
+
+  /** Discard an unfinished snapshot without recording a result or changing mastery. */
+  remove(id: string): void {
+    this.db.prepare('DELETE FROM quiz_sessions WHERE id = ?').run(id)
   }
 
   recent(): QuizSummary[] {
     return this.db
       .prepare(
-        `SELECT id, status, started_at AS startedAt,
-      json_extract(data,'$.deadline') AS deadline, json_extract(data,'$.finishedAt') AS finishedAt,
-      json_extract(data,'$.correctCount') AS correctCount, json_extract(data,'$.total') AS total
-      FROM quiz_sessions WHERE status = 'completed' ORDER BY started_at DESC, id DESC`,
+        `SELECT id,
+                status,
+                started_at                                             AS startedAt,
+                COALESCE(json_extract(data, '$.options.mode'), 'quiz') AS mode,
+                json_extract(data, '$.deadline')                       AS deadline,
+                json_extract(data, '$.finishedAt')                     AS finishedAt,
+                json_extract(data, '$.correctCount')                   AS correctCount,
+                json_extract(data, '$.total')                          AS total
+         FROM quiz_sessions
+         WHERE status = 'completed'
+         ORDER BY started_at DESC, id DESC`,
       )
       .all() as unknown as QuizSummary[]
   }
@@ -60,6 +73,16 @@ export class QuizRepository {
   active(): StoredQuiz[] {
     return this.db
       .prepare("SELECT data FROM quiz_sessions WHERE status='active'")
+      .all()
+      .map((row) => JSON.parse(String(row.data)))
+  }
+
+  /** Active and paused snapshots are recoverable without touching mastery. */
+  unfinished(): StoredQuiz[] {
+    return this.db
+      .prepare(
+        "SELECT data FROM quiz_sessions WHERE status IN ('active', 'paused') ORDER BY started_at DESC, id DESC",
+      )
       .all()
       .map((row) => JSON.parse(String(row.data)))
   }
@@ -81,8 +104,9 @@ export class QuizRepository {
     const boosted = correct ? (previous?.boosted === 1 && streak < 3 ? 1 : 0) : 1
     this.db
       .prepare(
-        `INSERT INTO quiz_mastery(fingerprint,boosted,correct_streak) VALUES (?,?,?)
-      ON CONFLICT(fingerprint) DO UPDATE SET boosted=excluded.boosted, correct_streak=excluded.correct_streak`,
+        `INSERT INTO quiz_mastery(fingerprint, boosted, correct_streak)
+         VALUES (?, ?, ?) ON CONFLICT(fingerprint) DO
+        UPDATE SET boosted=excluded.boosted, correct_streak=excluded.correct_streak`,
       )
       .run(fingerprint, boosted, streak)
   }

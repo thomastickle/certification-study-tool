@@ -1,6 +1,9 @@
 export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure'
 
+export type PracticeMode = 'quiz' | 'exam'
+
 export type QuizOptions = {
+  mode?: PracticeMode
   sourceFilter: 'mixed' | 'official' | 'third_party'
   sourceIds?: number[]
   questionType: 'mixed' | 'single_select' | 'multi_select'
@@ -29,8 +32,9 @@ export type QuizQuestion = QuizAnswer & {
 }
 
 export type QuizSummary = {
+  mode?: PracticeMode
   id: string
-  status: 'active' | 'completed' | 'abandoned'
+  status: 'active' | 'paused' | 'completed' | 'abandoned'
   startedAt: number
   deadline: number
   finishedAt: number | null
@@ -39,6 +43,7 @@ export type QuizSummary = {
 }
 
 export type QuizView = QuizSummary & {
+  pausedAt?: number | null
   serverNow: number
   questions: QuizQuestion[]
   options: QuizOptions

@@ -2,7 +2,7 @@ import type { QuizOptions } from '../../shared/quiz-contracts.ts'
 import type { QuestionRecord } from '../questions/library-repository.ts'
 import type { Source } from '../../shared/contracts.ts'
 import { ApplicationError } from '../errors.ts'
-import { domainQuotas, examDomain } from './domain-mapping.ts'
+import { domainQuotas, examDomain, examDomainQuotas } from './domain-mapping.ts'
 
 export function shuffled<T>(values: readonly T[], random = Math.random): T[] {
   const result = [...values]
@@ -40,7 +40,8 @@ export function selectQuestions(
     if (!previous || source.kind === 'official') groups.set(record.fingerprint, { record, domain })
   }
   const selected: { record: QuestionRecord; domain: number }[] = []
-  domainQuotas.forEach((quota, index) => {
+  const quotas = options.mode === 'exam' ? examDomainQuotas : domainQuotas
+  quotas.forEach((quota, index) => {
     const pool = [...groups.values()].filter((q) => q.domain === index + 1)
     if (pool.length < quota)
       throw new ApplicationError(

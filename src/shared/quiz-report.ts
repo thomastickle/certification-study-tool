@@ -4,11 +4,13 @@ import type { QuizView } from './quiz-contracts.ts'
 export function quizReport(quiz: QuizView): string {
   if (quiz.status !== 'completed' || quiz.correctCount === null)
     throw new Error('Submit and score the quiz before exporting its report.')
+  const mode = quiz.options.mode ?? 'quiz'
+  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const percent = (quiz.correctCount / quiz.total) * 100
   const lines = [
-    '# CLF-C02 practice quiz report',
+    `# CLF-C02 practice ${mode} report`,
     '',
-    `Quiz: ${quiz.id}`,
+    `${title}: ${quiz.id}`,
     `Started: ${new Date(quiz.startedAt).toISOString()}`,
     `Finished: ${new Date(quiz.finishedAt!).toISOString()}`,
     `Result: ${percent >= 80 ? 'Pass' : 'Fail'} — ${quiz.correctCount}/${quiz.total} (${percent.toFixed(0)}%). Practice target: 80%.`,
@@ -31,7 +33,7 @@ export function quizReport(quiz: QuizView): string {
       `My answer: ${letters(question.selected)}`,
       `Correct answer: ${letters(question.correctAnswerIds ?? [])}`,
       `Confidence: ${question.confidence ?? 'Not recorded'}`,
-      `Marked for return: ${question.flagged ? 'Yes' : 'No'}`,
+      `Marked for review: ${question.flagged ? 'Yes' : 'No'}`,
       `Source: ${question.sourceName} (${question.sourceKind}); reference: ${question.reference}`,
       `Exam domain: ${question.domain}; study area: ${question.area ?? 'Unclassified'}; topic: ${question.topic ?? 'Unclassified'}`,
       '',
