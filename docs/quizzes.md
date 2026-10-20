@@ -1,7 +1,10 @@
 # Quiz and exam flow
 
-The start page links to Quiz, Exam, Reports, and Importer. Both practice modes,
-the library/importer, and the Reports dashboard are implemented. Completed results
+The start page links to Practice, Due Review, Reports, and Importer. Practice
+provides Quiz and Exam presets in one setup workflow. Switching presets keeps
+the chosen question banks and uses the same save-and-pause guard as navigation.
+Each preset retains its own saved attempt and completed history; presets cannot
+change an attempt that is already open. Due Review remains separate. Completed results
 and local Markdown discussion reports are available within each practice mode
 and through the Reports page.
 

@@ -1,7 +1,7 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 /** Browser-only checks split around an actual restart of the disposable app server. */
 export async function preparePauseRecovery(mode: 'quiz' | 'exam') {
-  const title = mode === 'exam' ? 'Exam' : 'Quiz'
-
   function click(text: string) {
     const button = [...document.querySelectorAll('button')].find(
       (b) => b.textContent?.trim() === text,
@@ -24,7 +24,7 @@ export async function preparePauseRecovery(mode: 'quiz' | 'exam') {
 
   click('Reports')
   await until(() => !!document.querySelector('.reports-page'))
-  click(title)
+  await openPracticePreset(mode)
   const start = `Start ${mode === 'exam' ? 65 : 20}-question ${mode}`
   await until(() =>
     [...document.querySelectorAll('button')].some(
@@ -54,8 +54,6 @@ export async function verifyPauseRecovery(saved: {
   remaining: number
   serverNow: number
 }) {
-  const title = saved.mode === 'exam' ? 'Exam' : 'Quiz'
-
   function click(text: string) {
     const button = [...document.querySelectorAll('button')].find(
       (b) => b.textContent?.trim() === text,
@@ -76,7 +74,7 @@ export async function verifyPauseRecovery(saved: {
     }
   }
 
-  click(title)
+  await openPracticePreset(saved.mode)
   await until(() => !!document.querySelector('.recovery-panel'))
   click(`Continue ${saved.mode}`)
   await until(() => !!document.querySelector('.paused-panel'))

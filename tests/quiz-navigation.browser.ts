@@ -1,3 +1,5 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
 export async function navigationCheck(
   mode: 'quiz' | 'exam',
@@ -136,7 +138,7 @@ export async function navigationCheck(
   try {
     click('Reports')
     await until(() => !!document.querySelector('.reports-page'), 'Could not leave previous screen')
-    click(title)
+    await openPracticePreset(mode)
     const startLabel = `Start ${mode === 'exam' ? 65 : 20}-question ${mode}`
     await until(
       () =>
@@ -152,7 +154,7 @@ export async function navigationCheck(
       click('Importer')
       await new Promise((resolve) => window.setTimeout(resolve, 50))
       assert(
-        document.querySelector('[aria-current=page]')?.textContent === title,
+        document.querySelector('[aria-current=page]')?.textContent === 'Practice',
         'Navigation orphaned pending start',
       )
       release()
@@ -162,14 +164,14 @@ export async function navigationCheck(
           'Lost start error missing',
         )
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === title,
+          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
           'Lost start navigated away',
         )
         if (outcome === 'recovery-failure') {
           click('Reports')
           await new Promise((resolve) => window.setTimeout(resolve, 50))
           assert(
-            document.querySelector('[aria-current=page]')?.textContent === title,
+            document.querySelector('[aria-current=page]')?.textContent === 'Practice',
             'Unknown start state was orphaned',
           )
         }
@@ -182,7 +184,7 @@ export async function navigationCheck(
           'Start failure missing',
         )
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === title,
+          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
           'Failed start navigated away',
         )
         fail = false
@@ -262,7 +264,7 @@ export async function navigationCheck(
       ) {
         await new Promise((resolve) => window.setTimeout(resolve, 50))
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === title,
+          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
           'Navigation did not wait for mutation',
         )
         release()
@@ -282,7 +284,7 @@ export async function navigationCheck(
         await until(() => document.body.innerText.includes(message), 'Navigation error missing')
         await new Promise((resolve) => window.setTimeout(resolve, 50))
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === title,
+          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
           'Failed suspension left attempt',
         )
         fail = false
@@ -319,7 +321,7 @@ export async function navigationCheck(
       !report.attempts.some((item: { id: string }) => item.id === attemptId),
       'Paused attempt entered report',
     )
-    click(title)
+    await openPracticePreset(mode)
     await until(() => document.body.innerText.includes(`Continue ${mode}`), 'Recovery missing')
     click(`Continue ${mode}`)
     await until(

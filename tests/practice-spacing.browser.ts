@@ -1,8 +1,9 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 /** Browser-only fixture checks for answer spacing and scored-report contrast. */
 export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string> {
   const originalFetch = window.fetch
   const originalConfirm = window.confirm
-  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const total = mode === 'exam' ? 65 : 20
   let attemptId: string | undefined
   window.confirm = () => true
@@ -65,7 +66,7 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     await until(() => !!document.querySelector('nav'), 'App did not mount')
     click('Reports')
     await until(() => document.querySelector('.reports-page') !== null, 'Navigation did not finish')
-    click(title)
+    await openPracticePreset(mode)
     await until(
       () =>
         [...document.querySelectorAll('button')].some(
@@ -119,7 +120,7 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
       () => document.querySelector('.reports-page') !== null,
       'Could not leave scored attempt',
     )
-    click(title)
+    await openPracticePreset(mode)
     await until(() => !!document.querySelector('.history-list'), 'Result history did not load')
     click('Review results')
     await until(() => !!document.querySelector('.result-correct'), 'Scored report did not load')
@@ -130,9 +131,9 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     return `${mode}: stable 4/5/6-choice spacing, compact Clear, review label and dark report text passed`
   } finally {
     window.fetch = originalFetch
-    if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
     click('Reports')
     await until(() => document.querySelector('.reports-page') !== null, 'Cleanup navigation failed')
+    if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
     window.confirm = originalConfirm
   }
 }

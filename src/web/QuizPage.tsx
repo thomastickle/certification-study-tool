@@ -12,6 +12,7 @@ import type {
 import type { Source } from '../shared/contracts.ts'
 import { DueReviewStatus } from './DueReviewStatus.tsx'
 import { PracticeActions } from './PracticeActions.tsx'
+import { PracticePresets } from './PracticePresets.tsx'
 import { QuizSourcePicker } from './QuizSourcePicker.tsx'
 import { api } from './api.ts'
 import { AttemptTiming } from './AttemptTiming.tsx'
@@ -26,11 +27,25 @@ import {
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned' | 'paused'
 
-type Props = { mode?: PracticeMode; onRegisterLeave: (leave: () => Promise<boolean>) => void }
+type Props = {
+  mode?: PracticeMode
+  onRegisterLeave: (leave: () => Promise<boolean>) => void
+  onPresetChange?: (mode: 'quiz' | 'exam') => void
+  initialSourceIds?: number[]
+  onSourceIdsChange?: (sourceIds: number[]) => void
+  focusPreset?: boolean
+}
 
 const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' }
 
-export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
+export function QuizPage({
+  mode = 'quiz',
+  onRegisterLeave,
+  onPresetChange,
+  initialSourceIds,
+  onSourceIdsChange,
+  focusPreset = false,
+}: Props) {
   let title = mode === 'exam' ? 'Exam' : 'Quiz'
   let plural = mode === 'exam' ? 'exams' : 'quizzes'
   if (mode === 'review') {
@@ -41,6 +56,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const minutes = mode === 'exam' ? 90 : 20
   const [stage, setStage] = useState<Stage>('setup')
   const [options, setOptions] = useState(initialOptions)
+  const sourceSelection = useRef(initialSourceIds)
   const [sources, setSources] = useState<Source[]>([])
   const [sourcesLoading, setSourcesLoading] = useState(true)
   const [recoverable, setRecoverable] = useState<QuizView | null>(null)
@@ -506,7 +522,10 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
             source.questionCount > 0,
         )
         setSources(eligible)
-        setOptions((current) => ({ ...current, sourceIds: eligible.map((source) => source.id) }))
+        const sourceIds = eligible
+          .filter((source) => sourceSelection.current?.includes(source.id) ?? true)
+          .map((source) => source.id)
+        setOptions((current) => ({ ...current, sourceIds }))
       })
       .catch((reason) => {
         if (!cancelled)
@@ -648,6 +667,9 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   }
 
   const reviewIds = reviewQuestionIds(questions)
+  let heading = title
+  if (stage === 'completed') heading = `${title} results`
+  else if (mode !== 'review' && onPresetChange) heading = 'Practice'
 
   return (
     <main
@@ -657,7 +679,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
         <div className="page-heading">
           <div>
             <p className="eyebrow">TIMED STUDY SESSION</p>
-            <h1>{stage === 'completed' ? `${title} results` : title}</h1>
+            <h1>{heading}</h1>
             <p className="intro">
               {mode === 'review'
                 ? 'Up to 20 due questions · 20 minutes · no quiz/exam pass target'
@@ -741,6 +763,14 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       )}
       {stage === 'setup' && (
         <>
+          {mode !== 'review' && onPresetChange && (
+            <PracticePresets
+              mode={mode}
+              disabled={busy}
+              onChange={onPresetChange}
+              autoFocus={focusPreset}
+            />
+          )}
           {recoverable && (
             <section className="quiz-panel recovery-panel">
               <h2>
@@ -772,7 +802,10 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                 <QuizSourcePicker
                   sources={sources}
                   selected={options.sourceIds ?? []}
-                  onChange={(sourceIds) => setOptions((current) => ({ ...current, sourceIds }))}
+                  onChange={(sourceIds) => {
+                    setOptions((current) => ({ ...current, sourceIds }))
+                    onSourceIdsChange?.(sourceIds)
+                  }}
                 />
               )}
               <button
