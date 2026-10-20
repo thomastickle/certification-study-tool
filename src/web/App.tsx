@@ -16,12 +16,33 @@ const links: { id: Page; label: string }[] = [
   { id: 'reports', label: 'Reports' },
 ]
 
+/** A blocked browser preference store should not prevent the workspace from opening. */
+function readSidebarCollapsed() {
+  try {
+    return localStorage.getItem('study-sidebar-collapsed') === 'true'
+  } catch {
+    return false
+  }
+}
+
 /** Keep every workspace destination behind the existing practice suspension guard. */
 export function App() {
   const [page, setPage] = useState<Page>('home')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed)
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
 
   const navigating = useRef(false)
+
+  /** Remember the visual preference without making browser storage a requirement. */
+  function toggleSidebar() {
+    const next = !sidebarCollapsed
+    setSidebarCollapsed(next)
+    try {
+      localStorage.setItem('study-sidebar-collapsed', String(next))
+    } catch {
+      // The current session still works when preferences cannot be persisted.
+    }
+  }
 
   /** Serialize page changes while practice work is being suspended. */
   async function navigate(next: Page) {
@@ -44,7 +65,7 @@ export function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <header className="workspace-header">
         <button
           className="brand-button"
@@ -68,12 +89,25 @@ export function App() {
         </span>
       </header>
       <aside className="workspace-sidebar">
-        <nav className="app-nav" aria-label="Main navigation">
+        <button
+          className="sidebar-toggle"
+          aria-label={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          title={sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          aria-expanded={!sidebarCollapsed}
+          aria-controls="main-navigation"
+          onClick={toggleSidebar}
+        >
+          <StudyIcon name="sidebar" />
+          <span>Collapse</span>
+        </button>
+        <nav id="main-navigation" className="app-nav" aria-label="Main navigation">
           {links.map((link) => (
             <button
               key={link.id}
               className={page === link.id ? 'active' : ''}
               aria-current={page === link.id ? 'page' : undefined}
+              aria-label={link.label}
+              title={sidebarCollapsed ? link.label : undefined}
               onClick={() => {
                 void navigate(link.id)
               }}

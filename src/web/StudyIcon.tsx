@@ -7,6 +7,7 @@ const paths = {
   reports: 'M4 3v18h17M9 16v-4m5 4V8m5 8V5',
   cloud: 'M7 18a5 5 0 1 1 .6-10A6 6 0 0 1 19 10a4 4 0 0 1-1 8H7',
   arrow: 'M5 12h14m-5-5 5 5-5 5',
+  sidebar: 'M3 4h18v16H3zM9 4v16m7-11-3 3 3 3',
 } as const
 
 export type StudyIconName = keyof typeof paths

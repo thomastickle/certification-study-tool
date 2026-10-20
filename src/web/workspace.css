@@ -106,6 +106,17 @@
   flex-direction: column;
   gap: 6px;
 }
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 8px 16px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+}
 .app-nav button {
   display: flex;
   align-items: center;
@@ -411,6 +422,9 @@
   }
 }
 @media (max-width: 760px) {
+  .sidebar-toggle {
+    display: none;
+  }
   .app-shell {
     display: block;
   }
@@ -537,5 +551,27 @@
   .timer-warning {
     inline-size: 100px;
     font-size: 11px;
+  }
+}
+
+@media (min-width: 761px) {
+  .sidebar-collapsed {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .sidebar-collapsed .workspace-sidebar {
+    padding-inline: 10px;
+  }
+  .sidebar-collapsed .app-nav button,
+  .sidebar-collapsed .sidebar-toggle {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .sidebar-collapsed .app-nav button > span,
+  .sidebar-collapsed .sidebar-toggle > span,
+  .sidebar-collapsed .sidebar-note {
+    display: none;
+  }
+  .sidebar-collapsed .sidebar-toggle .study-icon {
+    transform: rotate(180deg);
   }
 }
