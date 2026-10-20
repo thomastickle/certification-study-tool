@@ -193,6 +193,15 @@ recorded intervals can still be displayed, with unknown historical causes left
 unknown; newly recorded intervals do not make earlier history complete.
 Viewing unfinished timing never scores it or adds it to performance reports.
 
+If a resume response is lost, the client reads the server status before trusting
+the old paused snapshot. A confirmed active attempt shows its running timer and
+must save and pause successfully before in-app navigation. If the read fails,
+the page shows **Attempt status unconfirmed**, warns that the timer may still be
+running, and retains the unload warning. Navigation retries the status check;
+polling can also recover it. **Retry resume** explicitly continues the attempt,
+and **Abandon** remains a separate confirmed discard action. Polls begun before
+a pause/resume mutation cannot overwrite its newer state or recovered status.
+
 Development browser verification uses a disposable synthetic database under
 `private/verification/`, leaving private question banks and the user's library
 untouched.
@@ -248,6 +257,14 @@ These browser-only checks are separate from `npm test`. Run against a disposable
 populated database: transpile each exported function with TypeScript's ESNext
 module target, evaluate it in the app page, and call it with each documented mode
 and outcome. Vite intentionally does not serve the tests directory.
+
+`tests/quiz-resume.browser.ts` exports `lostResumeCheck(mode, outcome)` for both
+modes. It forwards Resume to the real server and loses the response. Outcomes
+`leave`, `read-failure`, `pause-failure`, `poll-recovery`, and `stale-poll` cover
+safe navigation, failed reconciliation/retry, a lost navigation-pause response,
+recovery by polling, and a delayed pre-resume paused poll. Each checks retained
+answers/marks, exactly two pause intervals, frozen remaining time, unfinished
+report exclusion, explicit resume, and one eventual completed report entry.
 
 `tests/pause-recovery.browser.ts` exports `preparePauseRecovery(mode)` and
 `verifyPauseRecovery(saved)`. Prepare both modes, retain the returned objects,
