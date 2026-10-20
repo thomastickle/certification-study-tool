@@ -1,3 +1,4 @@
+import { formatDuration, quizTiming, timingSummary } from './quiz-timing.ts'
 import type { QuizView } from './quiz-contracts.ts'
 
 /** Local plain Markdown suitable for download/copy; no network or bank mutation. */
@@ -7,12 +8,19 @@ export function quizReport(quiz: QuizView): string {
   const mode = quiz.mode ?? quiz.options.mode ?? 'quiz'
   const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const percent = (quiz.correctCount / quiz.total) * 100
+  const timing = quizTiming(quiz)
   const lines = [
     `# CLF-C02 practice ${mode} report`,
     '',
     `${title}: ${quiz.id}`,
     `Started: ${new Date(quiz.startedAt).toISOString()}`,
     `Finished: ${new Date(quiz.finishedAt!).toISOString()}`,
+    timingSummary(timing),
+    'Durations: HH:MM:SS, rounded down to whole seconds.',
+    ...timing.pauses.map(
+      (pause, index) =>
+        `Pause ${index + 1}: ${pause.cause ?? 'Cause not recorded'} · ${new Date(pause.startedAt).toISOString()} → ${pause.endedAt === null ? 'Ongoing' : new Date(pause.endedAt).toISOString()} · ${formatDuration(pause.durationMs)}`,
+    ),
     `Result: ${percent >= 80 ? 'Pass' : 'Fail'} — ${quiz.correctCount}/${quiz.total} (${percent.toFixed(0)}%). Practice target: 80%.`,
     '',
     'Please help me understand my answers, especially incorrect answers and answers I was not confident about. Source answer keys are study material, not an independent guarantee of correctness.',

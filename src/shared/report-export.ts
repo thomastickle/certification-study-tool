@@ -1,3 +1,4 @@
+import { timingSummary } from './quiz-timing.ts'
 import type { StudyReport } from './report-contracts.ts'
 
 /** Formats unmeasured accuracy without implying a zero score. */
@@ -54,9 +55,11 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
     '',
     '## Completed attempts',
     '',
+    'Durations: HH:MM:SS, rounded down to whole seconds. Active study excludes pauses; elapsed includes pauses. Missing history is not recorded.',
+    '',
     ...report.attempts.map(
       (attempt) =>
-        `- ${new Date(attempt.finishedAt).toISOString()} · ${attempt.mode} · ${attempt.counts.correct}/${attempt.counts.total} (${percentage(attempt.counts.score)}) · ${attempt.passed ? 'Target met' : 'Below target'} · ${attempt.id}`,
+        `- ${new Date(attempt.finishedAt).toISOString()} · ${attempt.mode} · ${attempt.counts.correct}/${attempt.counts.total} (${percentage(attempt.counts.score)}) · ${attempt.passed ? 'Target met' : 'Below target'} · ${timingSummary(attempt.timing)} · ${attempt.id}`,
     ),
     '',
   ]

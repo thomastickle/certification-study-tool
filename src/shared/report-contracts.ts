@@ -1,3 +1,5 @@
+import type { QuizTiming } from './quiz-timing.ts'
+
 export type ReportMode = 'all' | 'quiz' | 'exam'
 
 export type ReportCounts = {
@@ -24,7 +26,9 @@ export type ReportAttempt = {
   finishedAt: number
   counts: ReportCounts
   passed: boolean
+  /** Wall-clock elapsed duration retained for API compatibility. */
   durationMs: number
+  timing: QuizTiming
 }
 
 export type StudyReport = {

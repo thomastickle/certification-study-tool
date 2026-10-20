@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type {
+  PauseCause,
   PracticeMode,
   QuizAnswer,
   QuizOptions,
@@ -54,6 +55,7 @@ export class QuizService {
       const quiz: StoredQuiz = {
         id: randomUUID(),
         status: 'active',
+        pauseHistory: { complete: true, intervals: [] },
         startedAt: time,
         deadline: time + (options.mode === 'exam' ? 90 : 20) * 60 * 1000,
         finishedAt: null,
@@ -109,12 +111,16 @@ export class QuizService {
   }
 
   /** Freeze the remaining server-owned time without grading or changing mastery. */
-  pause(id: string): QuizView {
+  pause(id: string, input: unknown = {}): QuizView {
+    const cause = this.pauseCause(input)
     return this.repository.quizStore().transaction(() => {
-      const quiz = this.load(id)
+      const time = this.now()
+      const quiz = this.load(id, time)
       if (quiz.status === 'active') {
         quiz.status = 'paused'
-        quiz.pausedAt = this.now()
+        quiz.pausedAt = time
+        quiz.pauseHistory ??= { complete: false, intervals: [] }
+        quiz.pauseHistory.intervals.push({ startedAt: quiz.pausedAt, endedAt: null, cause })
         this.repository.quizStore().save(quiz)
       }
       return this.view(quiz)
@@ -126,7 +132,16 @@ export class QuizService {
     return this.repository.quizStore().transaction(() => {
       const quiz = this.load(id)
       if (quiz.status === 'paused') {
-        quiz.deadline = this.now() + Math.max(0, quiz.deadline - quiz.pausedAt!)
+        const time = this.now()
+        quiz.pauseHistory ??= { complete: false, intervals: [] }
+        let interval = quiz.pauseHistory.intervals.at(-1)
+        if (!interval || interval.endedAt !== null) {
+          // A legacy paused snapshot retains this interval's start, but not its cause.
+          interval = { startedAt: quiz.pausedAt!, endedAt: null, cause: null }
+          quiz.pauseHistory.intervals.push(interval)
+        }
+        interval.endedAt = time
+        quiz.deadline = time + Math.max(0, quiz.deadline - quiz.pausedAt!)
         quiz.pausedAt = null
         quiz.status = 'active'
         this.repository.quizStore().save(quiz)
@@ -230,10 +245,10 @@ export class QuizService {
     })
   }
 
-  private load(id: string): StoredQuiz {
+  private load(id: string, time = this.now()): StoredQuiz {
     const quiz = this.repository.quizStore().find(id)
     if (!quiz) throw new ApplicationError('Quiz not found.', 404)
-    if (quiz.status === 'active' && quiz.deadline <= this.now()) this.finish(quiz)
+    if (quiz.status === 'active' && quiz.deadline <= time) this.finish(quiz)
     return quiz
   }
 
@@ -260,6 +275,24 @@ export class QuizService {
     view.mode = quiz.options.mode ?? 'quiz'
     view.serverNow = this.now()
     return view
+  }
+
+  /**
+   * Missing causes remain unknown for older API clients.
+   * @throws {ApplicationError} When pause options or their cause are invalid.
+   */
+  private pauseCause(input: unknown): PauseCause | null {
+    if (!input || typeof input !== 'object') {
+      throw new ApplicationError('Pause options must be an object.')
+    }
+    const cause = (input as { cause?: unknown }).cause
+    if (cause === undefined) {
+      return null
+    }
+    if (cause !== 'manual' && cause !== 'navigation') {
+      throw new ApplicationError('Choose a valid pause cause: manual or navigation.')
+    }
+    return cause
   }
 
   private options(input: unknown): QuizOptions {
