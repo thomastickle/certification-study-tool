@@ -141,7 +141,11 @@ is resumed or abandoned.
 Leaving an active quiz or exam through **in-app navigation** saves the latest
 answers, confidence, and review marks, then pauses the same attempt on the server
 before opening the destination. Navigation waits for pending starts, answer saves,
-manual pause/resume, and submissions. A failed start, save, or pause retains the
+manual pause/resume, submissions, and setup/Continue recovery reads. An active
+attempt offered on setup is suspended even if Continue was never pressed.
+Unknown recovery state blocks navigation and starting new work; retry recovery
+or navigation after a read failure. Reviewing an older result does not bypass
+recovery of unfinished work in that mode. A failed start, save, or pause retains the
 current page and shows the error; retry the action or navigation. If a start
 response is lost, recovery checks the server's current attempt before allowing
 navigation or another start. If recovery also fails, navigation remains blocked
@@ -268,6 +272,15 @@ These browser-only checks are separate from `npm test`. Run against a disposable
 populated database: transpile each exported function with TypeScript's ESNext
 module target, evaluate it in the app page, and call it with each documented mode
 and outcome. Vite intentionally does not serve the tests directory.
+
+`tests/setup-recovery.browser.ts` exports `setupRecoveryCheck(mode, outcome)` for
+both modes. Outcomes `loaded`, `pending`, `read-failure`, `pending-failure`,
+`continue-failure`, `history-pending`, `retry-button`, `completed`, `paused`, and
+`no-current` exercise recovery before Continue, delayed/failed reads and retry,
+and viewing completed history while recovery is pending. The checks inspect the
+real server for retained identity/answers/confidence/flags, frozen remaining time,
+pause cause/count, unchanged unfinished report totals, explicit resume, and one
+eventual completion. Each run prepares synthetic attempts through the public API.
 
 `tests/quiz-resume.browser.ts` exports `lostResumeCheck(mode, outcome)` for both
 modes. It forwards Resume to the real server and loses the response. Outcomes

@@ -39,6 +39,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const [sourcesLoading, setSourcesLoading] = useState(true)
   const [recoverable, setRecoverable] = useState<QuizView | null>(null)
   const [recoveryLoading, setRecoveryLoading] = useState(true)
+  const [recoveryFailed, setRecoveryFailed] = useState(false)
   const [view, setView] = useState<QuizView>()
   const [summaries, setSummaries] = useState<QuizSummary[]>([])
   const [questionIndex, setQuestionIndex] = useState(0)
@@ -61,6 +62,9 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const pendingSave = useRef<Promise<boolean> | null>(null)
   const pendingAction = useRef<Promise<unknown> | null>(null)
   const pendingLoad = useRef<Promise<unknown> | null>(null)
+  const pendingRecovery = useRef<Promise<boolean> | null>(null)
+  // Undefined means unknown; only a successful current-attempt read can establish null.
+  const recoveredAttempt = useRef<QuizView | null | undefined>(undefined)
   const leavingRef = useRef(false)
   const uncertainStart = useRef(false)
   const uncertainResume = useRef(false)
@@ -199,15 +203,62 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       updateView(next)
       if (next.status === 'active') setStage('question')
     } else {
+      setRecoveryLoading(true)
       setStage('setup')
     }
     return next
   }, [mode, updateView])
 
+  /** Resolve setup recovery without replacing an opened attempt or newer local edits. */
+  const recoverSetup = useCallback(() => {
+    if (pendingRecovery.current) {
+      return pendingRecovery.current
+    }
+    const revision = viewRevision.current
+    recoveredAttempt.current = undefined
+    setRecoveryLoading(true)
+    setRecoveryFailed(false)
+    return track(
+      pendingRecovery,
+      (async () => {
+        try {
+          const next = await api<QuizView | null>(`/quizzes/current?mode=${mode}`)
+          if (revision === viewRevision.current) {
+            recoveredAttempt.current = next
+            setRecoverable(next)
+            if (!viewRef.current) {
+              uncertainStart.current = false
+            }
+          }
+          return true
+        } catch (reason) {
+          const message =
+            reason instanceof Error ? reason.message : 'Could not recover the attempt.'
+          setRecoveryFailed(true)
+          if (!uncertainStart.current) {
+            setError(
+              `${message} Retry recovery or navigation before leaving; the timer may be running.`,
+            )
+          }
+          return false
+        } finally {
+          setRecoveryLoading(false)
+        }
+      })(),
+    )
+  }, [mode])
+
   function start() {
-    if (pendingStart.current || leavingRef.current || uncertainStart.current) {
+    if (
+      pendingStart.current ||
+      leavingRef.current ||
+      uncertainStart.current ||
+      pendingRecovery.current ||
+      recoveredAttempt.current === undefined
+    ) {
       return
     }
+    viewRevision.current++
     pendingAnswers.current = false
     setMutationError(false)
     setAutoSubmitFailed(false)
@@ -248,6 +299,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     if (leavingRef.current) {
       return
     }
+    viewRevision.current++
     return track(pendingLoad, loadSavedAttempt(id))
   }
 
@@ -272,9 +324,12 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
               ? 'paused'
               : 'question',
       )
+      return true
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not load that result.')
+      const message = reason instanceof Error ? reason.message : 'Could not load that result.'
+      setError(`${message} Retry Continue or navigation to recover safely.`)
       setStage('setup')
+      return false
     }
   }
 
@@ -319,7 +374,9 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       if ((await starting) === false) {
         return false
       }
-      await loading
+      if ((await loading) === false) {
+        return false
+      }
       if ((await action) === false) {
         return false
       }
@@ -330,6 +387,21 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       const saved = await saving
       if (saved === false && viewRef.current?.status === 'active') {
         return false
+      }
+      const opened = viewRef.current
+      if (!opened || !['active', 'paused'].includes(opened.status)) {
+        if ((await pendingRecovery.current) === false) {
+          return false
+        }
+        if (recoveredAttempt.current === undefined && !(await recoverSetup())) {
+          return false
+        }
+        if (recoveredAttempt.current && recoveredAttempt.current.id !== opened?.id) {
+          updateView(recoveredAttempt.current)
+          if (recoveredAttempt.current.status === 'active') {
+            setStage('question')
+          }
+        }
       }
       const current = viewRef.current
       if (!current || current.status !== 'active') {
@@ -357,7 +429,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       leavingRef.current = false
       setNavigating(false)
     }
-  }, [recoverStartedAttempt, recoverResume, saveAnswers, updateView])
+  }, [recoverStartedAttempt, recoverResume, recoverSetup, saveAnswers, updateView])
 
   /** Save pending choices before freezing the server timer; failed saves keep the attempt open. */
   function changePause(action: 'pause' | 'resume') {
@@ -445,33 +517,21 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   useEffect(() => {
     if (stage !== 'setup') return
     let cancelled = false
-    setRecoveryLoading(true)
-    Promise.all([
-      api<QuizSummary[]>('/quizzes'),
-      api<QuizView | null>(`/quizzes/current?mode=${mode}`),
-    ])
-      .then(([items, unfinished]) => {
+    void recoverSetup()
+    api<QuizSummary[]>('/quizzes')
+      .then((items) => {
         if (!cancelled) {
           setSummaries(items.filter((item) => item.status === 'completed'))
-          setRecoverable(unfinished)
-          if (uncertainStart.current) {
-            uncertainStart.current = false
-            viewRef.current = unfinished ?? undefined
-            setView(unfinished ?? undefined)
-          }
         }
       })
       .catch((reason) => {
         if (!cancelled && !uncertainStart.current)
           setError(reason instanceof Error ? reason.message : `Could not load ${plural} history.`)
       })
-      .finally(() => {
-        if (!cancelled) setRecoveryLoading(false)
-      })
     return () => {
       cancelled = true
     }
-  }, [stage, plural, mode])
+  }, [stage, plural, recoverSetup])
 
   useEffect(() => {
     if (!notice) return
@@ -597,6 +657,11 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
         <div className="message error" role="alert">
           <strong>Couldn’t complete that action</strong>
           <pre>{error}</pre>
+          {recoveryFailed && (
+            <button disabled={busy || recoveryLoading} onClick={() => void recoverSetup()}>
+              Retry recovery
+            </button>
+          )}
           {(mutationError || autoSubmitFailed) && (
             <button
               onClick={() =>
@@ -674,7 +739,11 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                   ? 'The timer is stopped.'
                   : 'The timer is still running.'}
               </p>
-              <button className="primary" onClick={() => void loadAttempt(recoverable.id)}>
+              <button
+                className="primary"
+                disabled={busy || recoveryLoading || recoveryFailed}
+                onClick={() => void loadAttempt(recoverable.id)}
+              >
                 Continue {mode}
               </button>
             </section>
@@ -697,6 +766,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                 disabled={
                   sourcesLoading ||
                   recoveryLoading ||
+                  recoveryFailed ||
                   uncertainStart.current ||
                   !options.sourceIds?.length
                 }
