@@ -17,7 +17,8 @@ choices; unanswered questions and incomplete/incorrect multi-select sets are
 misses. Late changes are ignored. A running server checks deadlines every second;
 after a server restart it also scores overdue attempts. If a save fails, the UI
 shows that the latest changes are unsaved and offers retry. The deadline does
-not pause during failures, navigation, or browser sleep.
+not pause during failures or browser sleep. In-app navigation pauses it only after
+the save and pause requests succeed.
 
 During an attempt the compact toolbar shows question progress, save status, an
 **HH:MM:SS** clock, Pause, and an Actions dropdown. The dropdown offers Review
@@ -36,7 +37,7 @@ Each question supports its original single/multiple selection count, optional
 confidence (Confident, Educated Guess, Unsure), and a Mark for Review checkbox. The review
 screen lists all questions and highlights unanswered, marked, low-confidence,
 and unrecorded-confidence items. Submit and score ends the attempt. The result
-shows correct count, raw percentage, and an **80% practice target**: green Pass
+shows correct count, score (correct / all questions, including skips), and an **80% practice target**: green Pass
 at or above 80%, red Fail below it, with text labels as well as color. This raw
 percentage is not AWS's scaled certification score.
 
@@ -137,18 +138,77 @@ to the first incomplete answer. Another mode can be started without discarding a
 paused attempt; a second attempt in the same mode is blocked until the paused one
 is resumed or abandoned.
 
-Leaving an active attempt through app navigation asks before abandoning; Cancel
-lets you pause first. Abandoning discards the unfinished snapshot entirely: no saved result, history entry,
-or mastery change. Reads and answer submissions for a discarded attempt return 404; repeated
-abandon requests succeed with `null`, so a lost response does not block leaving. Completed results
-remain unchanged. Browser reload/close warns
-while starting or active, and saved active attempts can be reopened, but their
-time keeps running unless explicitly paused. Active overdue attempts still score
-normally. All completed results remain available through the history list for
+Leaving an active quiz or exam through **in-app navigation** saves the latest
+answers, confidence, and review marks, then pauses the same attempt on the server
+before opening the destination. Navigation waits for pending starts, answer saves,
+manual pause/resume, submissions, and setup/Continue recovery reads. An active
+attempt offered on setup is suspended even if Continue was never pressed.
+Unknown recovery state blocks navigation and starting new work; retry recovery
+or navigation after a read failure. Reviewing an older result does not bypass
+recovery of unfinished work in that mode. A failed start, save, or pause retains the
+current page and shows the error; retry the action or navigation. If a start
+response is lost, recovery checks the server's current attempt before allowing
+navigation or another start. If recovery also fails, navigation remains blocked
+until that check succeeds. Concurrent navigation requests do not discard work.
+A pause accepted at or after the server deadline still scores the previously
+saved answers normally; suspension cannot undo expiry.
+
+**Abandon** remains a separate, confirmed discard action. It removes the unfinished
+snapshot entirely: no saved result, history entry, or mastery change. Reads and
+answer submissions for a discarded attempt return 404; repeated abandon requests
+succeed with `null`, so a lost response does not block retry. Completed results
+remain unchanged.
+
+**Browser unload is different:** reload, close, or leaving the site retains the
+existing `beforeunload` warning while starting, active, or waiting for a mutation.
+An uncertain start also warns until recovery succeeds. There is no guaranteed
+asynchronous save or pause during unload. Saved active attempts can be reopened,
+but their server deadline keeps running unless a pause was accepted. Active
+overdue attempts still score normally. Switching browser tabs has no pause or
+resume semantics. All completed results remain available through the history list for
 their mode and through the Reports dashboard.
 
-Development verification uses a separate `private/app/quiz-preview.sqlite3`
-copy, leaving the original library and curated import preview untouched.
+### Pause history and study time
+
+New snapshots persist `pauseHistory: { complete: true, intervals: [] }` in the
+existing SQLite JSON session data; no schema migration or rewriting old snapshots
+is needed. Each accepted pause appends its server start timestamp, nullable end
+timestamp, and available cause (`manual` or `navigation`). Resume closes that
+interval and restores the frozen remaining time. Repeated pause/resume requests
+in the same state do not append intervals, change the cause, or extend the timer.
+Older clients can still send an empty pause body; their cause is not recorded.
+
+Paused screens, completed results, report attempt details, the study journal, and
+Markdown exports distinguish **Active study**, **Elapsed**, **Pauses**, and
+**Total paused**. Details and individual exports list every recorded interval,
+its cause, timestamps, and duration. All durations use HH:MM:SS, truncating each
+millisecond duration independently to whole seconds. Elapsed is start to finish
+(or current server observation for unfinished work); total paused sums intervals;
+active study subtracts paused time from elapsed. These timing fields do not
+change score, answer accuracy, targets, or mastery. The report API retains its
+older `durationMs` field as wall-clock elapsed time and adds explicit `timing`.
+
+An open interval is labeled **Ongoing**, with its duration calculated as of the
+returned `serverNow`; the paused page refreshes that observation every five
+seconds. It is never represented as resumed. Legacy snapshots without complete
+history show **Not recorded** for pause count, total paused, and active study
+time, while retaining known elapsed time. A legacy current `pausedAt` or later
+recorded intervals can still be displayed, with unknown historical causes left
+unknown; newly recorded intervals do not make earlier history complete.
+Viewing unfinished timing never scores it or adds it to performance reports.
+
+If a resume response is lost, the client reads the server status before trusting
+the old paused snapshot. A confirmed active attempt shows its running timer and
+must save and pause successfully before in-app navigation. If the read fails,
+the page shows **Attempt status unconfirmed**, warns that the timer may still be
+running, and retains the unload warning. Navigation retries the status check;
+polling can also recover it. **Retry resume** explicitly continues the attempt,
+and **Abandon** remains a separate confirmed discard action. Polls begun before
+a pause/resume mutation cannot overwrite its newer state or recovered status.
+
+Development browser verification uses a disposable synthetic database under
+`private/verification/`, leaving private question banks and the user's library
+untouched.
 
 ## Reports
 
@@ -158,19 +218,30 @@ attempt's completion time; daily chart dates are UTC. CLF-C02 is the currently
 supported certification. Reports recognize the practice session `mode` field and
 treat legacy snapshots as quizzes.
 
-- **Correct answers** counts every correct question appearance across the
+- **Correct-answer activity** counts every correct question appearance across the
   selected completed attempts. Repeat questions count each time; this is study
   activity rather than a count of unique mastered questions.
-- **Answer accuracy** divides correct answers by answered questions. Incorrect
-  partial multi-select answers are answered and incorrect. Skipped questions are
-  reported separately. No answered questions means no accuracy measurement.
-- **Raw attempt score** divides correct answers by all questions, including
-  skipped ones. An attempt meets the existing practice target at 80% or higher,
-  using the unrounded fraction. These are not AWS scaled scores or predictions
-  of exam readiness.
-- **Domain summary** shows answered-question accuracy with the practice target.
-  **Study details** shows correct, incorrect and skipped outcomes by domain,
+- **Score** divides correct answers by all questions, including skipped ones as
+  misses. Headlines, domain summaries, confidence groups and daily performance
+  charts use this same denominator. Aggregates sum correct and total questions,
+  rather than averaging attempt percentages. An attempt meets the existing 80%
+  practice target using the unrounded fraction. No questions means no measured
+  score; an all-skipped attempt has a measured 0% score. Practice targets are not
+  AWS scaled scores or predictions of exam readiness.
+- **Accuracy on answered questions** appears only in detailed views, with answered
+  and skipped counts nearby. It divides correct answers by answered questions;
+  partial multi-select answers are answered and incorrect. No answered questions
+  means no accuracy measurement. Accuracy has no practice target marker.
+- **Domain summary** shows score with the 80% practice target. **Study details**
+  shows score, labeled answered-question accuracy, and outcome counts by domain,
   saved study area and topic. Missing classifications remain unclassified.
+  Domains explored counts domains with completed question appearances. The focus
+  suggestion uses the lowest measured domain score, including skipped questions;
+  repeat questions and small samples still limit its evidence. Mastery and unique
+  question rules are unchanged.
+- **Progress chart** switches between daily score (daily correct / daily total)
+  and cumulative correct-answer activity. The cumulative count is activity, not
+  unique-question mastery. Only the score chart has the 80% target marker.
 - **Study journal** opens any completed attempt with domain results and saved
   answer review. Filter questions by domain, incorrect, skipped or flagged;
   expand a question for choices, selections, correct answers, confidence and
@@ -187,8 +258,13 @@ report generation and downloads remain local.
 
 ## Browser regression checks
 
-`tests/quiz-navigation.browser.ts` checks delayed start followed by leave, cancel,
-and failure for both modes. `tests/practice-controls.browser.ts` checks autosave,
+`tests/quiz-navigation.browser.ts` exports `navigationCheck(mode, outcome)` for
+both `quiz` and `exam`. Outcomes are `leave` (delayed start), `failure` (rejected
+start), `lost-start`, `recovery-failure`, `save-failure`, `pause-failure`,
+`pending-save`, `pending-save-failure`, `pending-pause-failure`, `lost-pause`,
+`manual-race`, `resume-race`, and `submit-race`. It checks suspension, retained
+identity/edits, error/retry behavior, recovery, explicit resume, report exclusion,
+and eventual single completion. `tests/practice-controls.browser.ts` checks autosave,
 Previous/Next, review metadata, pause, recovery, resume, and menu abandonment.
 `tests/practice-reading.browser.ts` checks the final-question review transition,
 review highlighting, readable controls, and warning placement without layout shifts.
@@ -196,6 +272,35 @@ These browser-only checks are separate from `npm test`. Run against a disposable
 populated database: transpile each exported function with TypeScript's ESNext
 module target, evaluate it in the app page, and call it with each documented mode
 and outcome. Vite intentionally does not serve the tests directory.
+
+`tests/setup-recovery.browser.ts` exports `setupRecoveryCheck(mode, outcome)` for
+both modes. Outcomes `loaded`, `pending`, `read-failure`, `pending-failure`,
+`continue-failure`, `history-pending`, `retry-button`, `completed`, `paused`, and
+`no-current` exercise recovery before Continue, delayed/failed reads and retry,
+and viewing completed history while recovery is pending. The checks inspect the
+real server for retained identity/answers/confidence/flags, frozen remaining time,
+pause cause/count, unchanged unfinished report totals, explicit resume, and one
+eventual completion. Each run prepares synthetic attempts through the public API.
+Outcomes `history-return`, `history-return-no-current`, and
+`history-return-read-failure` return from completed history before recovery finishes,
+then verify that a fresh read restores Continue, enables a working Start, or exposes
+a retryable error.
+
+`tests/quiz-resume.browser.ts` exports `lostResumeCheck(mode, outcome)` for both
+modes. It forwards Resume to the real server and loses the response. Outcomes
+`leave`, `read-failure`, `pause-failure`, `poll-recovery`, and `stale-poll` cover
+safe navigation, failed reconciliation/retry, a lost navigation-pause response,
+recovery by polling, and a delayed pre-resume paused poll. Each checks retained
+answers/marks, exactly two pause intervals, frozen remaining time, unfinished
+report exclusion, explicit resume, and one eventual completed report entry.
+
+`tests/pause-recovery.browser.ts` exports `preparePauseRecovery(mode)` and
+`verifyPauseRecovery(saved)`. Prepare both modes, retain the returned objects,
+stop and restart the disposable app server with the same synthetic database,
+reload the page, then verify each object. This checks frozen remaining time and
+persisted intervals across an actual restart, ongoing server-time refresh,
+explicit resume, and journal/detail/Markdown timing. It leaves completed synthetic
+results for layout inspection.
 
 The question card has no outer border. The answer-choice group reserves room for
 six single-line choices so Confidence and Mark for Review stay aligned when moving
@@ -212,3 +317,14 @@ without changing the reserved toolbar layout.
 `tests/reports-layout.browser.ts` checks confidence bars remain full-width below
 their labels when both practice and report stylesheets are loaded. Run it with
 at least one completed synthetic attempt in the disposable database.
+
+`tests/score-reports.browser.ts` checks score-first headlines, weighted master
+and mode/date filters, the daily score plot and chart data, domain zero/no-data
+states, labeled detailed accuracy, individual reports, and quiz/exam results.
+Create a fresh disposable database using
+`node tests/seed-score-reports.ts private/app/score-browser.sqlite3`, then launch
+with `STUDY_DB_PATH=private/app/score-browser.sqlite3 STUDY_PORT=5193 npm run dev`.
+Transpile and run `scoreReportsTest()` using the browser-only workflow above.
+The seed refuses an existing path and adds only synthetic snapshots: an 8/20 quiz,
+a 52/65 exam at the exact target, and an older all-skipped quiz. No private banks
+or personal study database are needed. Restart from the app start page for each run.

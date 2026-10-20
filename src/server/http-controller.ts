@@ -30,7 +30,17 @@ function send(response: ServerResponse, status: number, value: unknown): void {
   response.end(JSON.stringify(value))
 }
 
-async function body(request: IncomingMessage): Promise<Record<string, unknown>> {
+async function body(
+  request: IncomingMessage,
+  allowEmpty = false,
+): Promise<Record<string, unknown>> {
+  if (
+    allowEmpty &&
+    !request.headers['transfer-encoding'] &&
+    Number(request.headers['content-length'] ?? 0) === 0
+  ) {
+    return {}
+  }
   if (!request.headers['content-type']?.startsWith('application/json'))
     throw new ApplicationError('Expected application/json.', 415)
   let size = 0
@@ -101,7 +111,7 @@ export function apiController(repository: LibraryRepository) {
         if (request.method === 'POST' && quizRoute[2] === 'submit')
           return send(response, 200, quizzes.submit(id, await body(request)))
         if (request.method === 'POST' && quizRoute[2] === 'pause')
-          return send(response, 200, quizzes.pause(id))
+          return send(response, 200, quizzes.pause(id, await body(request, true)))
         if (request.method === 'POST' && quizRoute[2] === 'resume')
           return send(response, 200, quizzes.resume(id))
         if (request.method === 'POST' && quizRoute[2] === 'abandon')

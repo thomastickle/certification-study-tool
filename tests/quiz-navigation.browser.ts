@@ -1,12 +1,21 @@
-/**
- * Browser-only regression: run against a disposable database with enough questions.
- * Transpile with TypeScript's ESNext module target, evaluate in the app's page,
- * then call this for each mode and outcome. This is separate from `npm test`.
- */
-export async function delayedStartNavigationTest(
+/** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
+export async function navigationCheck(
   mode: 'quiz' | 'exam',
-  outcome: 'leave' | 'cancel' | 'failure',
-): Promise<string> {
+  outcome:
+    | 'leave'
+    | 'lost-start'
+    | 'recovery-failure'
+    | 'failure'
+    | 'save-failure'
+    | 'pause-failure'
+    | 'pending-save'
+    | 'pending-save-failure'
+    | 'pending-pause-failure'
+    | 'lost-pause'
+    | 'manual-race'
+    | 'resume-race'
+    | 'submit-race',
+) {
   const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const originalFetch = window.fetch
   const originalConfirm = window.confirm
@@ -15,22 +24,30 @@ export async function delayedStartNavigationTest(
     release = resolve
   })
   let started = false
-  let attemptId: string | undefined
+  let mutationStarted = false
+  let attemptId = ''
+  let fail = true
   let confirmations = 0
 
   function assert(condition: unknown, message: string): asserts condition {
-    if (!condition) throw new Error(message)
+    if (!condition) {
+      throw new Error(message)
+    }
   }
 
   async function until(predicate: () => boolean, message: string) {
-    const deadline = Date.now() + 5000
+    const deadline = Date.now() + 8000
     while (!predicate()) {
-      assert(Date.now() < deadline, message)
+      assert(Date.now() < deadline, `${message}: ${document.body.innerText.slice(-700)}`)
       await new Promise((resolve) => window.setTimeout(resolve, 10))
     }
   }
 
   function click(label: string) {
+    if (label === 'Actions') {
+      document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+      return
+    }
     const button = [...document.querySelectorAll('button')].find(
       (item) => item.textContent?.trim() === label,
     )
@@ -38,60 +55,303 @@ export async function delayedStartNavigationTest(
     button.click()
   }
 
+  async function attempt() {
+    return (await originalFetch(`/api/quizzes/${attemptId}`)).json()
+  }
+
   window.confirm = () => {
     confirmations++
-    return outcome !== 'cancel'
+    return true
   }
   window.fetch = async (input, init) => {
-    if (input === '/api/quizzes' && init?.method === 'POST') {
+    const url = String(input)
+    if (url === '/api/quizzes' && init?.method === 'POST') {
       started = true
-      if (outcome === 'failure') {
+      if (outcome === 'failure' && fail) {
         await delayed
         return new Response(JSON.stringify({ error: 'Synthetic start failure' }), { status: 422 })
       }
       const response = await originalFetch(input, init)
       attemptId = (await response.clone().json()).id
+      if (['lost-start', 'recovery-failure'].includes(outcome) && fail) {
+        await delayed
+        return new Response(JSON.stringify({ error: 'Synthetic lost start response' }), {
+          status: 500,
+        })
+      }
+      if (outcome === 'leave') {
+        await delayed
+      }
+      return response
+    }
+    if (started && outcome === 'recovery-failure' && fail && url.includes('/quizzes/current')) {
+      return new Response(JSON.stringify({ error: 'Synthetic recovery failure' }), { status: 500 })
+    }
+    if (url.endsWith('/answers') && init?.method === 'PUT') {
+      if (outcome === 'save-failure' && fail) {
+        return new Response(JSON.stringify({ error: 'Synthetic answer failure' }), { status: 500 })
+      }
+      if (outcome === 'pending-save-failure' && fail) {
+        mutationStarted = true
+        await delayed
+        return new Response(JSON.stringify({ error: 'Synthetic answer failure' }), { status: 500 })
+      }
+      const response = await originalFetch(input, init)
+      if (outcome === 'pending-save' && !mutationStarted) {
+        mutationStarted = true
+        await delayed
+      }
+      return response
+    }
+    if (url.endsWith('/pause') && fail) {
+      if (outcome === 'pending-pause-failure' && !mutationStarted) {
+        mutationStarted = true
+        await delayed
+        return new Response(JSON.stringify({ error: 'Synthetic pause failure' }), { status: 500 })
+      }
+      if (outcome === 'pause-failure' || outcome === 'lost-pause') {
+        if (outcome === 'lost-pause') {
+          await originalFetch(input, init)
+        }
+        return new Response(JSON.stringify({ error: 'Synthetic pause failure' }), { status: 500 })
+      }
+      if (outcome === 'manual-race') {
+        const response = await originalFetch(input, init)
+        mutationStarted = true
+        await delayed
+        return response
+      }
+    }
+    if (
+      (url.endsWith('/resume') && outcome === 'resume-race') ||
+      (url.endsWith('/submit') && outcome === 'submit-race')
+    ) {
+      const response = await originalFetch(input, init)
+      mutationStarted = true
       await delayed
       return response
     }
     return originalFetch(input, init)
   }
   try {
+    click('Reports')
+    await until(() => !!document.querySelector('.reports-page'), 'Could not leave previous screen')
     click(title)
     const startLabel = `Start ${mode === 'exam' ? 65 : 20}-question ${mode}`
     await until(
       () =>
         [...document.querySelectorAll('button')].some(
-          (button) => button.textContent?.trim() === startLabel && !button.disabled,
+          (b) => b.textContent?.trim() === startLabel && !b.disabled,
         ),
       'Setup did not load',
     )
     click(startLabel)
     await until(() => started, 'Start request was not sent')
-    click('Reports')
-    // Let React process navigation while the response is deliberately held.
-    await new Promise((resolve) => window.setTimeout(resolve, 50))
-    assert(
-      document.querySelector('h1')?.textContent === title,
-      'Navigation orphaned the pending attempt',
-    )
-    release()
-    if (outcome === 'cancel') {
-      await until(() => confirmations === 1, 'Leave confirmation was not shown')
+    if (['leave', 'failure', 'lost-start', 'recovery-failure'].includes(outcome)) {
+      click('Reports')
+      click('Importer')
+      await new Promise((resolve) => window.setTimeout(resolve, 50))
       assert(
         document.querySelector('[aria-current=page]')?.textContent === title,
-        'Canceled navigation left the attempt',
+        'Navigation orphaned pending start',
       )
-      window.confirm = () => true
+      release()
+      if (['lost-start', 'recovery-failure'].includes(outcome)) {
+        await until(
+          () => document.body.innerText.includes('Synthetic lost start response'),
+          'Lost start error missing',
+        )
+        assert(
+          document.querySelector('[aria-current=page]')?.textContent === title,
+          'Lost start navigated away',
+        )
+        if (outcome === 'recovery-failure') {
+          click('Reports')
+          await new Promise((resolve) => window.setTimeout(resolve, 50))
+          assert(
+            document.querySelector('[aria-current=page]')?.textContent === title,
+            'Unknown start state was orphaned',
+          )
+        }
+        fail = false
+        click('Reports')
+      }
+      if (outcome === 'failure') {
+        await until(
+          () => document.body.innerText.includes('Synthetic start failure'),
+          'Start failure missing',
+        )
+        assert(
+          document.querySelector('[aria-current=page]')?.textContent === title,
+          'Failed start navigated away',
+        )
+        fail = false
+        await until(
+          () =>
+            [...document.querySelectorAll('button')].some(
+              (b) => b.textContent?.trim() === startLabel && !b.disabled,
+            ),
+          'Start retry did not become ready',
+        )
+        click(startLabel)
+        await until(() => !!document.querySelector('.quiz-question'), 'Start retry failed')
+        click('Reports')
+      }
+    } else {
+      await until(() => !!document.querySelector('.quiz-question'), 'Question did not load')
+      await until(
+        () =>
+          document.querySelector<HTMLInputElement>('.answer-choices input')?.matches(':enabled') ===
+          true,
+        'Answer did not become ready',
+      )
+      const choice = document.querySelector<HTMLInputElement>('.answer-choices input')!
+      choice.click()
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+      if (outcome === 'pending-save' || outcome === 'pending-save-failure') {
+        await until(() => mutationStarted, 'Save was not held')
+      } else if (outcome === 'save-failure') {
+        await until(
+          () => document.body.innerText.includes('Synthetic answer failure'),
+          'Save failure missing',
+        )
+      } else {
+        await until(
+          () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
+          'Save did not settle',
+        )
+        const confidence = [
+          ...document.querySelectorAll<HTMLInputElement>('.confidence-row input'),
+        ].find((input) => input.parentElement?.textContent?.trim() === 'Unsure')!
+        confidence.click()
+        await new Promise((resolve) => window.setTimeout(resolve, 0))
+        await until(
+          () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
+          'Confidence did not save',
+        )
+        document.querySelector<HTMLInputElement>('.flag-control input')!.click()
+        await new Promise((resolve) => window.setTimeout(resolve, 0))
+        await until(
+          () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
+          'Flag did not save',
+        )
+      }
+      if (['manual-race', 'resume-race', 'pending-pause-failure'].includes(outcome)) {
+        click('Pause')
+        if (outcome === 'resume-race') {
+          await until(() => !!document.querySelector('.paused-panel'), 'Manual pause failed')
+          click(`Resume ${mode}`)
+        }
+        await until(() => mutationStarted, 'Pause/resume was not held')
+      }
+      if (outcome === 'submit-race') {
+        click('Actions')
+        click('Submit and score')
+        await until(() => mutationStarted, 'Submit was not held')
+      }
       click('Reports')
+      if (
+        [
+          'pending-save',
+          'pending-save-failure',
+          'pending-pause-failure',
+          'manual-race',
+          'resume-race',
+          'submit-race',
+        ].includes(outcome)
+      ) {
+        await new Promise((resolve) => window.setTimeout(resolve, 50))
+        assert(
+          document.querySelector('[aria-current=page]')?.textContent === title,
+          'Navigation did not wait for mutation',
+        )
+        release()
+      }
+      if (
+        [
+          'save-failure',
+          'pause-failure',
+          'lost-pause',
+          'pending-save-failure',
+          'pending-pause-failure',
+        ].includes(outcome)
+      ) {
+        const message = outcome.includes('save-failure')
+          ? 'Synthetic answer failure'
+          : 'Synthetic pause failure'
+        await until(() => document.body.innerText.includes(message), 'Navigation error missing')
+        await new Promise((resolve) => window.setTimeout(resolve, 50))
+        assert(
+          document.querySelector('[aria-current=page]')?.textContent === title,
+          'Failed suspension left attempt',
+        )
+        fail = false
+        click('Reports')
+      }
     }
-    await until(() => document.querySelector('.reports-page') !== null, 'Navigation did not finish')
-    assert(confirmations === (outcome === 'failure' ? 0 : 1), 'Unexpected confirmation count')
-    if (attemptId) {
-      const response = await originalFetch(`/api/quizzes/${attemptId}`)
-      assert(response.status === 404, 'Leaving did not discard the created attempt')
+    await until(() => !!document.querySelector('.reports-page'), 'Navigation did not finish')
+    const saved = await attempt()
+    assert(saved.id === attemptId, 'Attempt identity changed')
+    assert(confirmations === (outcome === 'submit-race' ? 1 : 0), 'Navigation asked to abandon')
+    if (outcome === 'submit-race') {
+      assert(saved.status === 'completed', 'Pending submission was lost')
+      return `${mode}: ${outcome} passed`
     }
-    return `${mode}: delayed start ${outcome} passed`
+    assert(saved.status === 'paused', 'Navigation did not suspend attempt')
+    assert(
+      saved.pauseHistory.intervals.length === (outcome === 'resume-race' ? 2 : 1),
+      'Pause retry duplicated history',
+    )
+    assert(
+      saved.pauseHistory.intervals.at(-1).cause ===
+        (outcome === 'manual-race' ? 'manual' : 'navigation'),
+      'Pause cause missing',
+    )
+    if (!['leave', 'failure', 'lost-start', 'recovery-failure'].includes(outcome)) {
+      assert(saved.questions[0].selected.length === 1, 'Pending answer was lost')
+      if (!['pending-save', 'pending-save-failure', 'save-failure'].includes(outcome)) {
+        assert(saved.questions[0].confidence === 'Unsure', 'Confidence was lost')
+        assert(saved.questions[0].flagged, 'Review mark was lost')
+      }
+    }
+    const report = await (await originalFetch('/api/reports')).json()
+    assert(
+      !report.attempts.some((item: { id: string }) => item.id === attemptId),
+      'Paused attempt entered report',
+    )
+    click(title)
+    await until(() => document.body.innerText.includes(`Continue ${mode}`), 'Recovery missing')
+    click(`Continue ${mode}`)
+    await until(
+      () => !!document.querySelector('.paused-panel'),
+      'Recovery resumed timer implicitly',
+    )
+    assert(document.body.innerText.includes('Total paused'), 'Pause timing missing')
+    click(`Resume ${mode}`)
+    await until(() => !!document.querySelector('.quiz-question'), 'Explicit resume failed')
+    const resumed = await attempt()
+    assert(resumed.status === 'active', 'Resume did not restore active state')
+    assert(
+      resumed.deadline - resumed.serverNow <= saved.deadline - saved.pausedAt,
+      'Resume extended remaining time',
+    )
+    click('Actions')
+    click('Submit and score')
+    await until(
+      () => document.querySelector('h1')?.textContent === `${title} results`,
+      'Submission failed',
+    )
+    const completed = await attempt()
+    const finalReport = await (await originalFetch('/api/reports')).json()
+    assert(
+      finalReport.attempts.filter((item: { id: string }) => item.id === attemptId).length === 1,
+      'Completed attempt not counted once',
+    )
+    assert(
+      completed.pauseHistory.intervals.every((p: { endedAt: number | null }) => p.endedAt !== null),
+      'Completed pause is still open',
+    )
+    return `${mode}: ${outcome} passed`
   } finally {
     release()
     window.fetch = originalFetch

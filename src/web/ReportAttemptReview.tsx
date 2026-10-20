@@ -1,3 +1,4 @@
+import { AttemptTiming } from './AttemptTiming.tsx'
 import { useState } from 'react'
 import type { QuizView } from '../shared/quiz-contracts.ts'
 import { percent, reportDate } from './ReportDashboard.tsx'
@@ -39,7 +40,7 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
     'Billing, Pricing, and Support',
   ]
   const answered = quiz.questions.filter((q) => q.selected.length).length
-  const score = (quiz.correctCount! / quiz.total) * 100
+  const score = quiz.total ? (quiz.correctCount! / quiz.total) * 100 : null
   return (
     <>
       <section className="attempt-summary report-panel">
@@ -47,21 +48,32 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
           <p className="eyebrow">
             {mode.toUpperCase()} · {reportDate(quiz.finishedAt!)} · CLF-C02
           </p>
-          <h2>{score >= 80 ? 'A milestone worth keeping.' : 'Every attempt is a step forward.'}</h2>
+          <h2>
+            {score !== null && score >= 80
+              ? 'A milestone worth keeping.'
+              : 'Every attempt is a step forward.'}
+          </h2>
           <p>
             {quiz.correctCount} correct · {answered - quiz.correctCount!} incorrect ·{' '}
             {quiz.total - answered} skipped
           </p>
+          <p className="report-muted">Score includes skipped questions. Practice target: 80%.</p>
           <p className="report-muted">
-            Raw score includes skipped questions. Practice target: 80%.
+            Accuracy on answered questions:{' '}
+            {percent(answered ? (quiz.correctCount! / answered) * 100 : null)} · {answered} answered
+            · {quiz.total - answered} skipped
           </p>
         </div>
         <div className="attempt-score-large">
           <strong>{percent(score)}</strong>
+          <span>Score</span>
           <span>
             {quiz.correctCount}/{quiz.total} correct
           </span>
         </div>
+      </section>
+      <section className="report-panel">
+        <AttemptTiming quiz={quiz} />
       </section>
       <section className="report-panel">
         <div className="report-card-heading">
@@ -79,9 +91,9 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
               <article className="domain-card" key={name}>
                 <span className="domain-number">0{i + 1}</span>
                 <h3>{name}</h3>
-                <strong>{percent(answered ? (correct / answered) * 100 : null)}</strong>
+                <strong>{percent(group.length ? (correct / group.length) * 100 : null)}</strong>
                 <p>
-                  {correct}/{answered} answered correctly · {group.length - answered} skipped
+                  {correct}/{group.length} questions correct · {group.length - answered} skipped
                 </p>
               </article>
             )

@@ -173,7 +173,8 @@ test('master export records scope, skipped outcomes, domain evidence and individ
     assert.match(text, /CLF-C02 study report/)
     assert.match(text, /Quiz · All time/)
     assert.match(text, /4 correct, 0 incorrect, 1 skipped/)
-    assert.match(text, /Answer accuracy: 100%/)
+    assert.match(text, /Score: 80% \(4\/5 questions; skips count as misses\)/)
+    assert.match(text, /Accuracy on answered questions: 100% \(4 answered · 1 skipped\)/)
     assert.match(text, /Cloud Concepts/)
     assert.match(text, /saved-quiz/)
     assert.match(text, /Repeat questions count each time/)
@@ -211,4 +212,95 @@ test('report reads score expired attempts and remain stable after source deletio
     assert.deepEqual(after.counts, report.counts)
     assert.deepEqual(after.domains, report.domains)
   })
+})
+
+test('score-first exports and aggregates include skips, unequal sizes, domains and filtered days', async () => {
+  const { studyReportMarkdown } = await import('../src/shared/report-export.ts')
+  const repository = new LibraryRepository(':memory:')
+  try {
+    const now = Date.UTC(2026, 9, 19, 12)
+    const base = attempt('eight-of-twenty', now)
+    base.questions = Array.from({ length: 20 }, (_, i) => ({
+      ...base.questions[0]!,
+      questionId: i,
+      domain: i < 10 ? 1 : 2,
+      selected: i < 8 ? [0] : [],
+      correct: i < 8,
+    }))
+    base.total = 20
+    base.correctCount = 8
+    repository.quizStore().save(base)
+    const small = { ...attempt('exact-target', now - 1000), mode: 'exam' as const }
+    repository.quizStore().save(small)
+    const skipped = {
+      ...base,
+      id: 'all-skipped',
+      finishedAt: now - 9 * 86400000,
+      correctCount: 0,
+      questions: base.questions.map((q) => ({ ...q, selected: [], correct: false })),
+    }
+    repository.quizStore().save(skipped)
+    for (const status of ['active', 'paused'] as const) {
+      repository
+        .quizStore()
+        .save({ ...base, id: status, status, finishedAt: null, correctCount: null })
+    }
+    const service = new ReportService(repository, () => now)
+    const filtered = service.get({ days: '7', certification: 'CLF-C02' })
+    assert.equal(filtered.counts.score, 48)
+    assert.equal(filtered.passingAttempts, 1)
+    assert.equal(filtered.attempts.length, 2)
+    assert.equal(filtered.timeline[0]!.counts.score, 48)
+    const quiz = service.get({ mode: 'quiz', days: '7' })
+    assert.equal(quiz.counts.score, 40)
+    assert.equal(quiz.counts.accuracy, 100)
+    assert.equal(quiz.passingAttempts, 0)
+    assert.equal(quiz.domains[0]!.counts.score, 80)
+    assert.equal(quiz.domains[1]!.counts.score, 0)
+    assert.equal(quiz.domains[1]!.counts.accuracy, null)
+    assert.equal(quiz.domains[2]!.counts.score, null)
+    assert.equal(service.get({ mode: 'exam' }).counts.score, 80)
+    const all = service.get()
+    assert.equal(all.counts.score, (12 / 45) * 100)
+    assert.equal(all.attempts.find((a) => a.id === 'all-skipped')!.counts.score, 0)
+    assert.equal(all.attempts.find((a) => a.id === 'all-skipped')!.counts.accuracy, null)
+    const text = studyReportMarkdown(quiz, 'Quiz · Last 7 days')
+    assert.match(text, /Score: 40% \(8\/20 questions; skips count as misses\)/)
+    assert.match(text, /Accuracy on answered questions: 100% \(8 answered · 12 skipped\)/)
+    assert.match(text, /Practice target met: 0\/1 attempts/)
+    assert.match(text, /\| Cloud Concepts \| 8 \| 0 \| 8 \| 2 \| 80% \| 100% \|/)
+    assert.match(text, /\| Security and Compliance \| 0 \| 0 \| 0 \| 10 \| 0% \| No data \|/)
+    assert.match(text, /\| 2026-10-19 \| 8 \| 20 \| 8 \| 12 \| 40% \|/)
+    assert.doesNotMatch(text, /Daily[^\n]*accuracy/i)
+    const exam = studyReportMarkdown(service.get({ mode: 'exam', days: '7' }), 'Exam')
+    assert.match(exam, /Score: 80%/)
+  } finally {
+    repository.close()
+  }
+})
+
+test('empty and all-skipped master exports distinguish no measured score from zero', async () => {
+  const { studyReportMarkdown } = await import('../src/shared/report-export.ts')
+  const repository = new LibraryRepository(':memory:')
+  try {
+    const now = Date.UTC(2026, 9, 19)
+    const service = new ReportService(repository, () => now)
+    const empty = studyReportMarkdown(service.get(), 'Master · All time')
+    assert.match(empty, /Score: No data \(0\/0 questions/)
+    assert.match(empty, /Accuracy on answered questions: No data \(0 answered · 0 skipped\)/)
+    const skipped = attempt('skipped', now)
+    skipped.correctCount = 0
+    skipped.questions = skipped.questions.map((q) => ({ ...q, selected: [], correct: false }))
+    repository.quizStore().save(skipped)
+    const report = service.get()
+    assert.equal(report.counts.score, 0)
+    assert.equal(report.counts.accuracy, null)
+    assert.equal(report.passingAttempts, 0)
+    const text = studyReportMarkdown(report, 'Master · All time')
+    assert.match(text, /Score: 0% \(0\/5 questions/)
+    assert.match(text, /Accuracy on answered questions: No data \(0 answered · 5 skipped\)/)
+    assert.match(text, /\| 2026-10-19 \| 0 \| 5 \| 0 \| 5 \| 0% \|/)
+  } finally {
+    repository.close()
+  }
 })

@@ -82,5 +82,6 @@ completed quiz endpoint. No schema change or new dependency is required.
 `ReportsPage` owns request cancellation and filter state. `ReportDashboard`
 presents the aggregate evidence, and `ReportAttemptReview` presents saved
 question-level results. `report-state.ts` defines the time-axis geometry and
-omits days without answers from accuracy charts. Shared Markdown exporters
+plots daily correct/total scores, including all-skipped zeroes, and keeps cumulative
+correct-answer activity separate. Days without questions have no measured score. Shared Markdown exporters
 produce local downloadable artifacts.

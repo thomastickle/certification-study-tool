@@ -1,3 +1,4 @@
+import { formatDuration, quizTiming, timingSummary } from './quiz-timing.ts'
 import type { QuizView } from './quiz-contracts.ts'
 
 /** Local plain Markdown suitable for download/copy; no network or bank mutation. */
@@ -6,14 +7,34 @@ export function quizReport(quiz: QuizView): string {
     throw new Error('Submit and score the quiz before exporting its report.')
   const mode = quiz.mode ?? quiz.options.mode ?? 'quiz'
   const title = mode === 'exam' ? 'Exam' : 'Quiz'
-  const percent = (quiz.correctCount / quiz.total) * 100
+  const answered = quiz.questions.filter((q) => q.selected.length > 0).length
+  const accuracy = answered ? `${((quiz.correctCount / answered) * 100).toFixed(0)}%` : 'No data'
+  const percent = quiz.total ? (quiz.correctCount / quiz.total) * 100 : null
+  const score = percent === null ? 'No data' : `${percent.toFixed(0)}%`
+  let result = 'No data'
+  if (percent !== null) {
+    result = percent >= 80 ? 'Pass' : 'Fail'
+  }
+  const timing = quizTiming(quiz)
   const lines = [
     `# CLF-C02 practice ${mode} report`,
     '',
     `${title}: ${quiz.id}`,
     `Started: ${new Date(quiz.startedAt).toISOString()}`,
     `Finished: ${new Date(quiz.finishedAt!).toISOString()}`,
-    `Result: ${percent >= 80 ? 'Pass' : 'Fail'} — ${quiz.correctCount}/${quiz.total} (${percent.toFixed(0)}%). Practice target: 80%.`,
+    timingSummary(timing),
+    'Durations: HH:MM:SS, rounded down to whole seconds.',
+    ...timing.pauses.map(
+      (pause, index) =>
+        `Pause ${index + 1}: ${pause.cause ?? 'Cause not recorded'} · ${new Date(pause.startedAt).toISOString()} → ${pause.endedAt === null ? 'Ongoing' : new Date(pause.endedAt).toISOString()} · ${formatDuration(pause.durationMs)}`,
+    ),
+    `Result: ${result} — ${quiz.correctCount}/${quiz.total} (${score}). Practice target: 80%.`,
+    `Score: ${score} (${quiz.correctCount}/${quiz.total} questions; skips count as misses)`,
+    'Practice targets are study aids, not official AWS scaled scores or exam-readiness predictions.',
+    '',
+    '## Scoring details',
+    '',
+    `Accuracy on answered questions: ${accuracy} (${answered} answered · ${quiz.total - answered} skipped)`,
     '',
     'Please help me understand my answers, especially incorrect answers and answers I was not confident about. Source answer keys are study material, not an independent guarantee of correctness.',
     '',

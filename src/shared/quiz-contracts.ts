@@ -42,7 +42,17 @@ export type QuizSummary = {
   total: number
 }
 
+export type PauseCause = 'manual' | 'navigation'
+
+export type QuizPause = {
+  startedAt: number
+  endedAt: number | null
+  cause: PauseCause | null
+}
+
 export type QuizView = QuizSummary & {
+  // Missing or incomplete history must never imply zero historical pauses.
+  pauseHistory?: { complete: boolean; intervals: QuizPause[] }
   pausedAt?: number | null
   serverNow: number
   questions: QuizQuestion[]

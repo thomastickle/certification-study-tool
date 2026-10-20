@@ -1,6 +1,7 @@
+import { timingSummary } from './quiz-timing.ts'
 import type { StudyReport } from './report-contracts.ts'
 
-/** Formats unmeasured accuracy without implying a zero score. */
+/** Formats an unmeasured percentage without implying a zero score. */
 function percentage(value: number | null): string {
   return value === null ? 'No data' : `${Math.round(value)}%`
 }
@@ -19,44 +20,49 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
     `Generated: ${new Date(report.generatedAt).toISOString()}`,
     '',
     `${report.counts.correct} correct, ${report.counts.incorrect} incorrect, ${report.counts.skipped} skipped`,
-    `Answer accuracy: ${percentage(report.counts.accuracy)} (${report.counts.answered} answered)`,
-    `Raw score including skipped questions: ${percentage(report.counts.score)}`,
+    `Score: ${percentage(report.counts.score)} (${report.counts.correct}/${report.counts.total} questions; skips count as misses)`,
     `Practice target met: ${report.passingAttempts}/${report.attempts.length} attempts (80% of all questions correct)`,
     '',
-    'Completed attempts only. Repeat questions count each time. Raw practice scores are not official AWS scaled scores or readiness predictions.',
+    'Completed attempts only. Repeat questions count each time. Correct-answer activity counts are not unique-question mastery. Raw practice scores are not official AWS scaled scores or readiness predictions.',
     '',
-    '## Domains',
+    '## Scoring details',
     '',
-    '| Domain | Correct | Incorrect | Skipped | Accuracy |',
-    '| --- | ---: | ---: | ---: | ---: |',
+    `Accuracy on answered questions: ${percentage(report.counts.accuracy)} (${report.counts.answered} answered · ${report.counts.skipped} skipped)`,
+    '',
+    '## Domain details',
+    '',
+    '| Domain | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |',
+    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...report.domains.map(
       (domain) =>
-        `| ${domain.name} | ${domain.counts.correct} | ${domain.counts.incorrect} | ${domain.counts.skipped} | ${percentage(domain.counts.accuracy)} |`,
+        `| ${domain.name} | ${domain.counts.correct} | ${domain.counts.incorrect} | ${domain.counts.answered} | ${domain.counts.skipped} | ${percentage(domain.counts.score)} | ${percentage(domain.counts.accuracy)} |`,
     ),
     '',
     '## Study areas and topics',
     '',
-    '| Domain | Area · topic | Correct | Incorrect | Skipped | Accuracy |',
-    '| --- | --- | ---: | ---: | ---: | ---: |',
+    '| Domain | Area · topic | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |',
+    '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...report.topics.map(
       (topic) =>
-        `| ${topic.domain} | ${cell(topic.name)} | ${topic.counts.correct} | ${topic.counts.incorrect} | ${topic.counts.skipped} | ${percentage(topic.counts.accuracy)} |`,
+        `| ${topic.domain} | ${cell(topic.name)} | ${topic.counts.correct} | ${topic.counts.incorrect} | ${topic.counts.answered} | ${topic.counts.skipped} | ${percentage(topic.counts.score)} | ${percentage(topic.counts.accuracy)} |`,
     ),
     '',
-    '## Daily progress (UTC)',
+    '## Daily score and activity (UTC)',
     '',
-    '| Date | Correct | Answered | Skipped | Accuracy |',
-    '| --- | ---: | ---: | ---: | ---: |',
+    '| Date | Correct | Total | Answered | Skipped | Score |',
+    '| --- | ---: | ---: | ---: | ---: | ---: |',
     ...report.timeline.map(
       (day) =>
-        `| ${day.date} | ${day.counts.correct} | ${day.counts.answered} | ${day.counts.skipped} | ${percentage(day.counts.accuracy)} |`,
+        `| ${day.date} | ${day.counts.correct} | ${day.counts.total} | ${day.counts.answered} | ${day.counts.skipped} | ${percentage(day.counts.score)} |`,
     ),
     '',
     '## Completed attempts',
     '',
+    'Durations: HH:MM:SS, rounded down to whole seconds. Active study excludes pauses; elapsed includes pauses. Missing history is not recorded.',
+    '',
     ...report.attempts.map(
       (attempt) =>
-        `- ${new Date(attempt.finishedAt).toISOString()} · ${attempt.mode} · ${attempt.counts.correct}/${attempt.counts.total} (${percentage(attempt.counts.score)}) · ${attempt.passed ? 'Target met' : 'Below target'} · ${attempt.id}`,
+        `- ${new Date(attempt.finishedAt).toISOString()} · ${attempt.mode} · Score: ${attempt.counts.correct}/${attempt.counts.total} (${percentage(attempt.counts.score)}) · ${attempt.passed ? 'Target met' : 'Below target'} · ${timingSummary(attempt.timing)} · ${attempt.id}`,
     ),
     '',
   ]
