@@ -1,5 +1,6 @@
 const paths = {
   home: 'M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9',
+  practice: 'M8 3h8l4 4v14H4V3h4m8 0v5h4M8 12h8M8 16h5',
   quiz: 'M8 3h8l4 4v14H4V3h4m8 0v5h4M8 12h8M8 16h5',
   exam: 'M9 4H5v17h14V4h-4M9 2h6v5H9zM8 12l2 2 5-5M8 18h8',
   review: 'M3 11a9 9 0 1 1 2.7 7M3 4v7h7M12 7v5l3 2',

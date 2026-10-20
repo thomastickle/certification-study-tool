@@ -1,6 +1,7 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 /** Browser-only reading/layout regression; use a disposable populated database. */
 export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string> {
-  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const total = mode === 'exam' ? 65 : 20
   const originalConfirm = window.confirm
   const originalNow = Date.now
@@ -48,7 +49,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     )
     click('Reports')
     await until(() => document.querySelector('.reports-page') !== null, 'Navigation did not finish')
-    click(title)
+    await openPracticePreset(mode)
     await until(
       () =>
         [...document.querySelectorAll('button')].some(

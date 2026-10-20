@@ -1,3 +1,5 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 import type { QuizView } from '../src/shared/quiz-contracts.ts'
 
 /** Exercise setup recovery against a disposable populated app and its real persistence API. */
@@ -19,7 +21,6 @@ export async function setupRecoveryCheck(
     | 'no-current',
 ) {
   const originalFetch = window.fetch
-  const title = mode === 'quiz' ? 'Quiz' : 'Exam'
   let attemptId = ''
   let readStarted = false
   const historyReturn = outcome.startsWith('history-return')
@@ -131,7 +132,7 @@ export async function setupRecoveryCheck(
       }
       return originalFetch(input, init)
     }
-    click(title)
+    await openPracticePreset(mode)
     await until(() => readStarted, 'Setup recovery did not begin')
     if (['loaded', 'paused', 'continue-failure', 'completed'].includes(outcome)) {
       await until(() => !!document.querySelector('.recovery-panel'), 'Recovery panel missing')
@@ -210,7 +211,7 @@ export async function setupRecoveryCheck(
     if (['pending', 'pending-failure', 'continue-failure', 'history-pending'].includes(outcome)) {
       await new Promise((resolve) => setTimeout(resolve, 75))
       assert(
-        document.querySelector('[aria-current=page]')?.textContent === title,
+        document.querySelector('[aria-current=page]')?.textContent === 'Practice',
         'Navigation did not await recovery',
       )
       release()
@@ -219,7 +220,7 @@ export async function setupRecoveryCheck(
       await until(() => !!document.querySelector('[role=alert]'), 'Recovery error missing')
       await new Promise((resolve) => setTimeout(resolve, 75))
       assert(
-        document.querySelector('[aria-current=page]')?.textContent === title,
+        document.querySelector('[aria-current=page]')?.textContent === 'Practice',
         'Failed recovery allowed navigation',
       )
       assert(
@@ -268,7 +269,7 @@ export async function setupRecoveryCheck(
       JSON.stringify(unfinishedReport) === JSON.stringify(baselineReport),
       'Unfinished attempt changed report totals or breakdowns',
     )
-    click(title)
+    await openPracticePreset(mode)
     await until(() => !!document.querySelector('.recovery-panel'), 'Return recovery missing')
     click(`Continue ${mode}`)
     await until(() => !!document.querySelector('.paused-panel'), 'Continue resumed implicitly')

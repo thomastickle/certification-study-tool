@@ -46,8 +46,7 @@ export async function workspaceNavigationTest() {
   assert(!document.querySelector('main .report-stats'), 'Reports are mixed into the home screen')
 
   for (const destination of [
-    { action: 'Set up quiz', label: 'Quiz', target: '.quiz-page' },
-    { action: 'Set up exam', label: 'Exam', target: '.quiz-page' },
+    { action: 'Set up practice', label: 'Practice', target: '.quiz-page' },
     { action: 'Set up review', label: 'Due Review', target: '.quiz-page' },
     { action: 'Open library', label: 'Importer', target: '.library-page' },
   ]) {

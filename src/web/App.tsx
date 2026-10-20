@@ -7,10 +7,11 @@ import { StudyIcon } from './StudyIcon.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
 
-const links: { id: Page; label: string }[] = [
+type Destination = 'home' | 'practice' | 'review' | 'reports' | 'importer'
+
+const links: { id: Destination; label: string }[] = [
   { id: 'home', label: 'Home' },
-  { id: 'quiz', label: 'Quiz' },
-  { id: 'exam', label: 'Exam' },
+  { id: 'practice', label: 'Practice' },
   { id: 'review', label: 'Due Review' },
   { id: 'importer', label: 'Importer' },
   { id: 'reports', label: 'Reports' },
@@ -29,6 +30,10 @@ function readSidebarCollapsed() {
 export function App() {
   const [page, setPage] = useState<Page>('home')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed)
+  const [practiceMode, setPracticeMode] = useState<'quiz' | 'exam'>('quiz')
+  const [practiceSourceIds, setPracticeSourceIds] = useState<number[]>()
+  const [focusPreset, setFocusPreset] = useState(false)
+  const destination = page === 'quiz' || page === 'exam' ? 'practice' : page
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
 
   const navigating = useRef(false)
@@ -45,7 +50,7 @@ export function App() {
   }
 
   /** Serialize page changes while practice work is being suspended. */
-  async function navigate(next: Page) {
+  async function navigate(next: Page, presetChange = false) {
     if (navigating.current || next === page) {
       return
     }
@@ -58,6 +63,8 @@ export function App() {
       ) {
         return
       }
+      if (next === 'quiz' || next === 'exam') setPracticeMode(next)
+      setFocusPreset(presetChange)
       setPage(next)
     } finally {
       navigating.current = false
@@ -104,12 +111,12 @@ export function App() {
           {links.map((link) => (
             <button
               key={link.id}
-              className={page === link.id ? 'active' : ''}
-              aria-current={page === link.id ? 'page' : undefined}
+              className={destination === link.id ? 'active' : ''}
+              aria-current={destination === link.id ? 'page' : undefined}
               aria-label={link.label}
               title={sidebarCollapsed ? link.label : undefined}
               onClick={() => {
-                void navigate(link.id)
+                void navigate(link.id === 'practice' ? practiceMode : link.id)
               }}
             >
               <StudyIcon name={link.id} />
@@ -127,7 +134,7 @@ export function App() {
         {page === 'home' && (
           <HomePage
             onNavigate={(next) => {
-              void navigate(next)
+              void navigate(next === 'practice' ? practiceMode : next)
             }}
           />
         )}
@@ -135,6 +142,16 @@ export function App() {
           <QuizPage
             key={page}
             mode={page}
+            initialSourceIds={page === 'review' ? undefined : practiceSourceIds}
+            onSourceIdsChange={page === 'review' ? undefined : setPracticeSourceIds}
+            focusPreset={focusPreset}
+            onPresetChange={
+              page === 'review'
+                ? undefined
+                : (mode) => {
+                    void navigate(mode, true)
+                  }
+            }
             onRegisterLeave={(fn) => {
               leaveQuiz.current = fn
             }}

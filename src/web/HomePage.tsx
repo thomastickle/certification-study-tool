@@ -1,23 +1,15 @@
 import { StudyIcon } from './StudyIcon.tsx'
 
-type Props = { onNavigate: (page: 'quiz' | 'exam' | 'review' | 'importer') => void }
+type Props = { onNavigate: (page: 'practice' | 'review' | 'importer') => void }
 
 const sessions = [
   {
-    mode: 'quiz',
-    name: 'Quiz',
-    description: 'A short session across the exam domains.',
-    questions: '20 questions',
-    duration: '20 minutes',
-    action: 'Set up quiz',
-  },
-  {
-    mode: 'exam',
-    name: 'Practice exam',
-    description: 'A full-length attempt with time to focus.',
-    questions: '65 questions',
-    duration: '90 minutes',
-    action: 'Set up exam',
+    mode: 'practice',
+    name: 'Practice',
+    description: 'Choose a short quiz or a full-length exam.',
+    questions: '20 or 65 questions',
+    duration: '20 or 90 minutes',
+    action: 'Set up practice',
   },
   {
     mode: 'review',
@@ -54,7 +46,7 @@ export function HomePage({ onNavigate }: Props) {
               </div>
             </div>
             <button
-              className={session.mode === 'quiz' ? 'primary' : ''}
+              className={session.mode === 'practice' ? 'primary' : ''}
               onClick={() => onNavigate(session.mode)}
             >
               {session.action}

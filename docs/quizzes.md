@@ -1,8 +1,12 @@
 # Quiz and exam flow
 
-The start page identifies AWS Cloud Practitioner (CLF-C02) and offers Quiz,
-Practice exam, Due Review, and the question library. Persistent navigation keeps
-Reports as its own final destination. Completed results
+The start page identifies AWS Cloud Practitioner (CLF-C02) and opens Practice,
+Due Review, and the question library. The collapsible sidebar keeps Reports as
+its own final destination. Practice
+provides Quiz and Exam presets in one setup workflow. Switching presets keeps
+the chosen question banks and uses the same save-and-pause guard as navigation.
+Each preset retains its own saved attempt and completed history; presets cannot
+change an attempt that is already open. Due Review remains separate. Completed results
 and local Markdown discussion reports are available within each practice mode
 and through the Reports page.
 
