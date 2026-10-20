@@ -2,25 +2,21 @@ import { useRef, useState } from 'react'
 import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
 import { ReportsPage } from './ReportsPage.tsx'
+import { HomePage } from './HomePage.tsx'
+import { StudyIcon } from './StudyIcon.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
 
 const links: { id: Page; label: string }[] = [
+  { id: 'home', label: 'Home' },
   { id: 'quiz', label: 'Quiz' },
   { id: 'exam', label: 'Exam' },
   { id: 'review', label: 'Due Review' },
-  { id: 'reports', label: 'Reports' },
   { id: 'importer', label: 'Importer' },
+  { id: 'reports', label: 'Reports' },
 ]
 
-const descriptions: Partial<Record<Page, string>> = {
-  quiz: 'Start a timed quiz and review your answers.',
-  exam: 'Take a 65-question, 90-minute practice exam.',
-  review: 'Review due retention checks without quiz or exam domain quotas.',
-  reports: 'Explore your progress, domain strengths, and every attempt.',
-  importer: 'Manage your question library and sources.',
-}
-
+/** Keep every workspace destination behind the existing practice suspension guard. */
 export function App() {
   const [page, setPage] = useState<Page>('home')
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
@@ -49,18 +45,29 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <header className="masthead">
+      <header className="workspace-header">
         <button
-          className="brand brand-button"
+          className="brand-button"
           onClick={() => {
             void navigate('home')
           }}
         >
-          <span className="brand-mark" aria-hidden="true">
-            S
+          <StudyIcon name="cloud" />
+          <span>
+            Certification <span className="brand-secondary">Study Tool</span>
           </span>
-          <span>Certification Study Tool</span>
         </button>
+        <div className="certification-label" role="group" aria-label="Current certification">
+          <span className="certification-provider">AWS</span>
+          <strong>Cloud Practitioner</strong>
+          <span className="certification-code">CLF-C02</span>
+        </div>
+        <span className="local-badge">
+          <span aria-hidden="true" />
+          Local workspace
+        </span>
+      </header>
+      <aside className="workspace-sidebar">
         <nav className="app-nav" aria-label="Main navigation">
           {links.map((link) => (
             <button
@@ -71,52 +78,37 @@ export function App() {
                 void navigate(link.id)
               }}
             >
-              {link.label}
+              <StudyIcon name={link.id} />
+              <span>{link.label}</span>
             </button>
           ))}
         </nav>
-        <span className="local-badge">
-          <span aria-hidden="true" /> Local workspace
-        </span>
-      </header>
-      {page === 'home' && (
-        <main>
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">YOUR STUDY WORKSPACE</p>
-              <h1>Build knowledge, one question at a time.</h1>
-              <p className="intro">Choose where you want to begin.</p>
-            </div>
-          </div>
-          <section className="home-cards" aria-label="Study tools">
-            {links.map((link) => (
-              <button
-                key={link.id}
-                className="home-card"
-                onClick={() => {
-                  void navigate(link.id)
-                }}
-              >
-                <span className="eyebrow">STUDY WORKSPACE</span>
-                <strong>{link.label}</strong>
-                <span>{descriptions[link.id]}</span>
-                <span className="home-card-action">Open →</span>
-              </button>
-            ))}
-          </section>
-        </main>
-      )}
-      {(page === 'quiz' || page === 'exam' || page === 'review') && (
-        <QuizPage
-          key={page}
-          mode={page}
-          onRegisterLeave={(fn) => {
-            leaveQuiz.current = fn
-          }}
-        />
-      )}
-      {page === 'reports' && <ReportsPage />}
-      {page === 'importer' && <LibraryPage />}
+        <p className="sidebar-note">
+          Your library and progress
+          <br />
+          stay on this device.
+        </p>
+      </aside>
+      <div className="workspace-content">
+        {page === 'home' && (
+          <HomePage
+            onNavigate={(next) => {
+              void navigate(next)
+            }}
+          />
+        )}
+        {(page === 'quiz' || page === 'exam' || page === 'review') && (
+          <QuizPage
+            key={page}
+            mode={page}
+            onRegisterLeave={(fn) => {
+              leaveQuiz.current = fn
+            }}
+          />
+        )}
+        {page === 'reports' && <ReportsPage />}
+        {page === 'importer' && <LibraryPage />}
+      </div>
     </div>
   )
 }

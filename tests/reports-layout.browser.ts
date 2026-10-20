@@ -22,5 +22,8 @@ export async function reportsLayoutTest(): Promise<string> {
       throw new Error('Report confidence bars must sit below their labels at the full row width.')
     }
   }
+  if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1) {
+    throw new Error('Reports must fit the viewport without horizontal scrolling.')
+  }
   return 'Report confidence bars stay stacked with both practice and report stylesheets loaded.'
 }

@@ -130,9 +130,9 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     return `${mode}: stable 4/5/6-choice spacing, compact Clear, review label and dark report text passed`
   } finally {
     window.fetch = originalFetch
-    if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
     click('Reports')
     await until(() => document.querySelector('.reports-page') !== null, 'Cleanup navigation failed')
+    if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
     window.confirm = originalConfirm
   }
 }

@@ -1,7 +1,8 @@
 # Quiz and exam flow
 
-The start page links to Quiz, Exam, Reports, and Importer. Both practice modes,
-the library/importer, and the Reports dashboard are implemented. Completed results
+The start page identifies AWS Cloud Practitioner (CLF-C02) and offers Quiz,
+Practice exam, Due Review, and the question library. Persistent navigation keeps
+Reports as its own final destination. Completed results
 and local Markdown discussion reports are available within each practice mode
 and through the Reports page.
 

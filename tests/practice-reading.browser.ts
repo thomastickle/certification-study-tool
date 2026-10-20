@@ -195,12 +195,12 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     Date.now = originalNow
     window.setTimeout = originalSetTimeout
     if (attemptId) {
-      await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
       click('Reports')
       await until(
         () => document.querySelector('.reports-page') !== null,
         'Cleanup navigation failed',
       )
+      await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
     }
     window.confirm = originalConfirm
   }
