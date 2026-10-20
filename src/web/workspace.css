@@ -225,6 +225,12 @@
 .session-option button {
   min-width: 146px;
 }
+.session-option button:hover,
+.session-option button:focus-visible {
+  color: var(--accent-hover);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
 .session-option button .study-icon,
 .home-library button .study-icon {
   width: 16px;

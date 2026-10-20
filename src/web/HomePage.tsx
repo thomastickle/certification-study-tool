@@ -45,10 +45,7 @@ export function HomePage({ onNavigate }: Props) {
                 <span>{session.duration}</span>
               </div>
             </div>
-            <button
-              className={session.mode === 'practice' ? 'primary' : ''}
-              onClick={() => onNavigate(session.mode)}
-            >
+            <button onClick={() => onNavigate(session.mode)}>
               {session.action}
               <StudyIcon name="arrow" />
             </button>
