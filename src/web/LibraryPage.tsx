@@ -446,7 +446,7 @@ export function LibraryPage() {
           </section>
         </div>
         <footer>
-          Study Library <span>Start small. Learn deliberately.</span>
+          Certification Study Tool <span>Start small. Learn deliberately.</span>
         </footer>
       </main>
       <dialog
