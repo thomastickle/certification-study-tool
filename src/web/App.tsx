@@ -23,11 +23,22 @@ export function App() {
   const [page, setPage] = useState<Page>('home')
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
 
+  const navigating = useRef(false)
+
+  /** Serialize page changes while practice work is being suspended. */
   async function navigate(next: Page) {
-    if ((page === 'quiz' || page === 'exam') && next !== page && !(await leaveQuiz.current())) {
+    if (navigating.current || next === page) {
       return
     }
-    setPage(next)
+    navigating.current = true
+    try {
+      if ((page === 'quiz' || page === 'exam') && next !== page && !(await leaveQuiz.current())) {
+        return
+      }
+      setPage(next)
+    } finally {
+      navigating.current = false
+    }
   }
 
   return (

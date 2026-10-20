@@ -1,3 +1,4 @@
+import { quizTiming } from '../../shared/quiz-timing.ts'
 import type { QuizQuestion } from '../../shared/quiz-contracts.ts'
 import type { StudyReport, ReportCounts, ReportBreakdown } from '../../shared/report-contracts.ts'
 import { ApplicationError } from '../errors.ts'
@@ -89,6 +90,7 @@ export class ReportService {
       finishedAt: quiz.finishedAt!,
       counts: counts(quiz.questions),
       passed: quiz.correctCount! / quiz.total >= 0.8,
+      timing: quizTiming(quiz),
       durationMs: Math.max(0, quiz.finishedAt! - quiz.startedAt),
     }))
     const daily = new Map<string, { questions: QuizQuestion[]; attempts: number }>()

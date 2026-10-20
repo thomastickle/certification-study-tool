@@ -1,3 +1,4 @@
+import { formatDuration, quizTiming, timingSummary } from './quiz-timing.ts'
 import type { QuizView } from './quiz-contracts.ts'
 
 /** Local plain Markdown suitable for download/copy; no network or bank mutation. */
@@ -14,12 +15,19 @@ export function quizReport(quiz: QuizView): string {
   if (percent !== null) {
     result = percent >= 80 ? 'Pass' : 'Fail'
   }
+  const timing = quizTiming(quiz)
   const lines = [
     `# CLF-C02 practice ${mode} report`,
     '',
     `${title}: ${quiz.id}`,
     `Started: ${new Date(quiz.startedAt).toISOString()}`,
     `Finished: ${new Date(quiz.finishedAt!).toISOString()}`,
+    timingSummary(timing),
+    'Durations: HH:MM:SS, rounded down to whole seconds.',
+    ...timing.pauses.map(
+      (pause, index) =>
+        `Pause ${index + 1}: ${pause.cause ?? 'Cause not recorded'} · ${new Date(pause.startedAt).toISOString()} → ${pause.endedAt === null ? 'Ongoing' : new Date(pause.endedAt).toISOString()} · ${formatDuration(pause.durationMs)}`,
+    ),
     `Result: ${result} — ${quiz.correctCount}/${quiz.total} (${score}). Practice target: 80%.`,
     `Score: ${score} (${quiz.correctCount}/${quiz.total} questions; skips count as misses)`,
     'Practice targets are study aids, not official AWS scaled scores or exam-readiness predictions.',

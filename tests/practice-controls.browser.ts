@@ -162,10 +162,30 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
     assert(document.querySelector('.paused-panel'), 'Navigation orphaned a pending resume')
     releaseResume()
     await until(
+      () => !!document.querySelector('.reports-page'),
+      'Navigation did not await resume and suspend the attempt',
+    )
+    assert((await current()).id === paused.id, 'Resume created a new attempt')
+    assert((await current()).status === 'paused', 'Navigation did not suspend the resumed attempt')
+    button(title).click()
+    await until(
+      () => !!document.querySelector('.recovery-panel'),
+      'Suspended attempt was not recoverable',
+    )
+    button(`Continue ${mode}`).click()
+    await until(() => !!document.querySelector('.paused-panel'), 'Recovery resumed implicitly')
+    button(`Resume ${mode}`).click()
+    await until(
       () => !!document.querySelector('.question-navigation'),
       'Resume did not restore question',
     )
-    assert((await current()).id === paused.id, 'Resume created a new attempt')
+    await until(
+      () =>
+        [...document.querySelectorAll('button')].some(
+          (b) => b.textContent?.trim() === `Abandon ${mode}` && !b.disabled,
+        ),
+      'Resumed actions did not become ready',
+    )
     let lostAbandonResponse = false
     window.fetch = async (input, init) => {
       const response = await originalFetch(input, init)

@@ -1,3 +1,4 @@
+import { AttemptTiming } from './AttemptTiming.tsx'
 import { useState } from 'react'
 import type { QuizView } from '../shared/quiz-contracts.ts'
 import { percent, reportDate } from './ReportDashboard.tsx'
@@ -70,6 +71,9 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
             {quiz.correctCount}/{quiz.total} correct
           </span>
         </div>
+      </section>
+      <section className="report-panel">
+        <AttemptTiming quiz={quiz} />
       </section>
       <section className="report-panel">
         <div className="report-card-heading">

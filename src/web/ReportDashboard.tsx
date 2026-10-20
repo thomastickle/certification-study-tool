@@ -1,3 +1,4 @@
+import { timingSummary } from '../shared/quiz-timing.ts'
 import { useState } from 'react'
 import { progressChart } from './report-state.ts'
 import type { ReportCounts, StudyReport } from '../shared/report-contracts.ts'
@@ -362,7 +363,7 @@ export function ReportDashboard({
                       minute: '2-digit',
                       timeZone: 'UTC',
                     })}{' '}
-                    UTC · {Math.round(attempt.durationMs / 60000)} min
+                    UTC · {timingSummary(attempt.timing)}
                   </small>
                 </span>
                 <span className="attempt-score">

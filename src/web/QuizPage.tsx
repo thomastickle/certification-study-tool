@@ -12,6 +12,7 @@ import type { Source } from '../shared/contracts.ts'
 import { PracticeActions } from './PracticeActions.tsx'
 import { QuizSourcePicker } from './QuizSourcePicker.tsx'
 import { api } from './api.ts'
+import { AttemptTiming } from './AttemptTiming.tsx'
 import { quizReport } from '../shared/quiz-report.ts'
 import {
   formatTime,
@@ -44,7 +45,10 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [mutationBusy, setBusy] = useState(false)
+  const [navigating, setNavigating] = useState(false)
+  const [resumeUncertain, setResumeUncertain] = useState(false)
+  const busy = mutationBusy || navigating
   const [mutationError, setMutationError] = useState(false)
   const [autoSubmitFailed, setAutoSubmitFailed] = useState(false)
   const viewRef = useRef<QuizView | undefined>(undefined)
@@ -53,9 +57,31 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const noticesShown = useRef(new Set<string>())
   const timerSubmit = useRef(false)
   const pendingAnswers = useRef(false)
-  const pendingStart = useRef<Promise<void> | null>(null)
+  const pendingStart = useRef<Promise<boolean> | null>(null)
+  const pendingSave = useRef<Promise<boolean> | null>(null)
+  const pendingAction = useRef<Promise<unknown> | null>(null)
+  const pendingLoad = useRef<Promise<unknown> | null>(null)
+  const leavingRef = useRef(false)
+  const uncertainStart = useRef(false)
+  const uncertainResume = useRef(false)
+  const viewRevision = useRef(0)
+
+  /** Keep a waitable handle for navigation without changing the action's error contract. */
+  function track<T>(reference: { current: Promise<T> | null }, operation: Promise<T>): Promise<T> {
+    reference.current = operation
+
+    const clear = () => {
+      if (reference.current === operation) {
+        reference.current = null
+      }
+    }
+
+    void operation.then(clear, clear)
+    return operation
+  }
 
   const updateView = useCallback((next: QuizView) => {
+    viewRevision.current++
     viewRef.current = next
     setView(next)
     deadlineOffset.current = next.serverNow - Date.now()
@@ -63,70 +89,125 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     if (next.status === 'abandoned') setStage('abandoned')
     if (next.status === 'paused') setStage('paused')
   }, [])
-  const saveAnswers = useCallback(
-    async (answers: QuizAnswer[]) => {
-      const current = viewRef.current
-      if (!current || current.status !== 'active' || busyRef.current) return false
-      busyRef.current = true
-      setBusy(true)
-      setError('')
-      setMutationError(false)
-      try {
-        const next = await api<QuizView>(`/quizzes/${current.id}/answers`, {
-          method: 'PUT',
-          body: JSON.stringify({ answers }),
-        })
-        pendingAnswers.current = false
-        updateView(next)
-        return next.status === 'active'
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Could not save answers.')
-        setMutationError(true)
-        return false
-      } finally {
-        busyRef.current = false
-        setBusy(false)
-      }
+
+  /** Only a fresh server observation can settle a resume whose response was lost. */
+  const acceptResumeStatus = useCallback(
+    (next: QuizView) => {
+      uncertainResume.current = false
+      setResumeUncertain(false)
+      updateView(next)
+      timerSubmit.current = false
+      if (next.status === 'active') setStage('question')
     },
+    [updateView],
+  )
+
+  /**
+   * Reconcile an uncertain resume before trusting the local paused snapshot to leave.
+   * @throws {Error} If the status read fails; retain the warning and allow a later retry.
+   */
+  const recoverResume = useCallback(async () => {
+    const current = viewRef.current
+    if (uncertainResume.current && current) {
+      acceptResumeStatus(await api<QuizView>(`/quizzes/${current.id}`))
+    }
+  }, [acceptResumeStatus])
+
+  const saveAnswers = useCallback(
+    (answers: QuizAnswer[]) =>
+      track(
+        pendingSave,
+        (async () => {
+          const current = viewRef.current
+          if (!current || current.status !== 'active' || busyRef.current) return false
+          busyRef.current = true
+          setBusy(true)
+          setError('')
+          setMutationError(false)
+          try {
+            const next = await api<QuizView>(`/quizzes/${current.id}/answers`, {
+              method: 'PUT',
+              body: JSON.stringify({ answers }),
+            })
+            pendingAnswers.current = false
+            updateView(next)
+            return next.status === 'active'
+          } catch (reason) {
+            setError(reason instanceof Error ? reason.message : 'Could not save answers.')
+            setMutationError(true)
+            return false
+          } finally {
+            busyRef.current = false
+            setBusy(false)
+          }
+        })(),
+      ),
     [updateView, mode],
   )
 
   const submit = useCallback(
-    async (automatic = false) => {
-      const current = viewRef.current
-      if (!current || current.status !== 'active' || busyRef.current) return
-      busyRef.current = true
-      setBusy(true)
-      setError('')
-      setAutoSubmitFailed(false)
-      try {
-        const next = await api<QuizView>(`/quizzes/${current.id}/submit`, {
-          method: 'POST',
-          body: JSON.stringify({ answers: current.questions.map(answerPayload) }),
-        })
-        updateView(next)
-        setStage(
-          next.status === 'completed'
-            ? 'completed'
-            : next.status === 'abandoned'
-              ? 'abandoned'
-              : next.status === 'paused'
-                ? 'paused'
-                : 'question',
-        )
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : `Could not submit the ${mode}.`)
-        if (automatic) setAutoSubmitFailed(true)
-      } finally {
-        busyRef.current = false
-        setBusy(false)
-      }
-    },
+    (automatic = false) =>
+      track(
+        pendingAction,
+        (async () => {
+          if (leavingRef.current) {
+            return false
+          }
+          const current = viewRef.current
+          if (!current || current.status !== 'active' || busyRef.current) return false
+          busyRef.current = true
+          setBusy(true)
+          setError('')
+          setAutoSubmitFailed(false)
+          try {
+            const next = await api<QuizView>(`/quizzes/${current.id}/submit`, {
+              method: 'POST',
+              body: JSON.stringify({ answers: current.questions.map(answerPayload) }),
+            })
+            updateView(next)
+            setStage(
+              next.status === 'completed'
+                ? 'completed'
+                : next.status === 'abandoned'
+                  ? 'abandoned'
+                  : next.status === 'paused'
+                    ? 'paused'
+                    : 'question',
+            )
+            return true
+          } catch (reason) {
+            setError(reason instanceof Error ? reason.message : `Could not submit the ${mode}.`)
+            if (automatic) setAutoSubmitFailed(true)
+            return false
+          } finally {
+            busyRef.current = false
+            setBusy(false)
+          }
+        })(),
+      ),
     [updateView, mode],
   )
 
+  /**
+   * A lost start response may still have created a snapshot; recover before allowing leave.
+   * @throws {Error} If recovery is unavailable; the caller retains the uncertain start warning.
+   */
+  const recoverStartedAttempt = useCallback(async () => {
+    const next = await api<QuizView | null>(`/quizzes/current?mode=${mode}`)
+    uncertainStart.current = false
+    if (next) {
+      updateView(next)
+      if (next.status === 'active') setStage('question')
+    } else {
+      setStage('setup')
+    }
+    return next
+  }, [mode, updateView])
+
   function start() {
-    if (pendingStart.current) return
+    if (pendingStart.current || leavingRef.current || uncertainStart.current) {
+      return
+    }
     pendingAnswers.current = false
     setMutationError(false)
     setAutoSubmitFailed(false)
@@ -143,17 +224,34 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
         updateView(next)
         setStage(next.status === 'completed' ? 'completed' : 'question')
         setQuestionIndex(0)
+        return true
       })
-      .catch((reason) => {
-        setError(reason instanceof Error ? reason.message : `Could not start a ${mode}.`)
-        setStage('setup')
+      .catch(async (reason) => {
+        let message = reason instanceof Error ? reason.message : `Could not start a ${mode}.`
+        uncertainStart.current = true
+        try {
+          await recoverStartedAttempt()
+        } catch {
+          message +=
+            ' Could not check whether the attempt started. Retry navigation to recover safely.'
+          setStage('setup')
+        }
+        setError(message)
+        return false
       })
       .finally(() => {
         pendingStart.current = null
       })
   }
 
-  async function loadAttempt(id: string) {
+  function loadAttempt(id: string) {
+    if (leavingRef.current) {
+      return
+    }
+    return track(pendingLoad, loadSavedAttempt(id))
+  }
+
+  async function loadSavedAttempt(id: string) {
     setStage('loading')
     setError('')
     try {
@@ -194,6 +292,8 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
         body: '{}',
       })
       updateView(next ?? { ...current, status: 'abandoned', finishedAt: null })
+      uncertainResume.current = false
+      setResumeUncertain(false)
       return true
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `Could not abandon the ${mode}.`)
@@ -204,54 +304,106 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
     }
   }, [updateView, mode])
 
+  /** Navigation suspends only after all in-flight changes have settled successfully. */
   const leave = useCallback(async () => {
-    await pendingStart.current
-    if (busyRef.current) return false
-    if (viewRef.current?.status !== 'active') return true
-    if (
-      !window.confirm(
-        `Leave this active ${mode}? Choose Cancel and Pause to keep it for later, or OK to abandon it.`,
-      )
-    )
+    if (leavingRef.current) {
       return false
-    // The navigation confirmation already authorizes abandonment.
-    busyRef.current = true
-    setBusy(true)
+    }
+    leavingRef.current = true
+    setNavigating(true)
+    const starting = pendingStart.current
+    const loading = pendingLoad.current
+    const action = pendingAction.current
+    const saving = pendingSave.current
     try {
+      if ((await starting) === false) {
+        return false
+      }
+      await loading
+      if ((await action) === false) {
+        return false
+      }
+      if (uncertainStart.current) {
+        await recoverStartedAttempt()
+      }
+      await recoverResume()
+      const saved = await saving
+      if (saved === false && viewRef.current?.status === 'active') {
+        return false
+      }
       const current = viewRef.current
-      const next = await api<QuizView | null>(`/quizzes/${current.id}/abandon`, {
+      if (!current || current.status !== 'active') {
+        return true
+      }
+      const flushed = await saveAnswers(current.questions.map(answerPayload))
+      // An expiry or a previously accepted pause may be discovered by the save response.
+      if (viewRef.current?.status !== 'active') {
+        return true
+      }
+      if (!flushed) {
+        return false
+      }
+      const next = await api<QuizView>(`/quizzes/${current.id}/pause`, {
         method: 'POST',
-        body: '{}',
+        body: JSON.stringify({ cause: 'navigation' }),
       })
-      updateView(next ?? { ...current, status: 'abandoned', finishedAt: null })
-      return true
+      updateView(next)
+      return next.status !== 'active'
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : `Could not abandon the ${mode}.`)
+      const message = reason instanceof Error ? reason.message : 'Could not suspend the attempt.'
+      setError(`${message} Your attempt is still open. Retry navigation to suspend it safely.`)
       return false
     } finally {
-      busyRef.current = false
-      setBusy(false)
+      leavingRef.current = false
+      setNavigating(false)
     }
-  }, [updateView, mode])
+  }, [recoverStartedAttempt, recoverResume, saveAnswers, updateView])
 
   /** Save pending choices before freezing the server timer; failed saves keep the attempt open. */
-  async function changePause(action: 'pause' | 'resume') {
+  function changePause(action: 'pause' | 'resume') {
+    if (leavingRef.current) {
+      return
+    }
+    return track(pendingAction, performPauseChange(action))
+  }
+
+  async function performPauseChange(action: 'pause' | 'resume') {
     const current = viewRef.current
-    if (!current || busyRef.current) return
-    if (action === 'pause' && !(await saveAnswers(current.questions.map(answerPayload)))) return
+    if (!current || busyRef.current) return false
+    if (action === 'pause' && !(await saveAnswers(current.questions.map(answerPayload)))) {
+      return viewRef.current?.status !== 'active'
+    }
     busyRef.current = true
+    // Invalidate polls begun before this mutation, including an uncertain resume.
+    viewRevision.current++
     setBusy(true)
     setError('')
     try {
       const next = await api<QuizView>(`/quizzes/${current.id}/${action}`, {
         method: 'POST',
-        body: '{}',
+        body: JSON.stringify(action === 'pause' ? { cause: 'manual' } : {}),
       })
-      updateView(next)
+      if (action === 'resume') {
+        acceptResumeStatus(next)
+      } else {
+        updateView(next)
+      }
       timerSubmit.current = false
       if (next.status === 'active') setStage('question')
+      return true
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : `Could not ${action} the ${mode}.`)
+      let message = reason instanceof Error ? reason.message : `Could not ${action} the ${mode}.`
+      if (action === 'resume') {
+        uncertainResume.current = true
+        setResumeUncertain(true)
+        try {
+          await recoverResume()
+        } catch {
+          message += ' Could not check the attempt status. The timer may still be running.'
+        }
+      }
+      setError(message)
+      return false
     } finally {
       busyRef.current = false
       setBusy(false)
@@ -302,10 +454,15 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
         if (!cancelled) {
           setSummaries(items.filter((item) => item.status === 'completed'))
           setRecoverable(unfinished)
+          if (uncertainStart.current) {
+            uncertainStart.current = false
+            viewRef.current = unfinished ?? undefined
+            setView(unfinished ?? undefined)
+          }
         }
       })
       .catch((reason) => {
-        if (!cancelled)
+        if (!cancelled && !uncertainStart.current)
           setError(reason instanceof Error ? reason.message : `Could not load ${plural} history.`)
       })
       .finally(() => {
@@ -336,7 +493,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
         noticesShown.current.add(threshold)
         setNotice(threshold === '10-minute' ? '10 min remaining' : '2 min remaining')
       }
-      if (remain === 0 && !timerSubmit.current && !busyRef.current) {
+      if (remain === 0 && !timerSubmit.current && !busyRef.current && !leavingRef.current) {
         timerSubmit.current = true
         void submit(true)
       }
@@ -348,19 +505,29 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   }, [stage, view, submit])
 
   useEffect(() => {
-    if ((stage !== 'question' && stage !== 'review') || !view || view.status !== 'active') return
+    if (!view || !['active', 'paused'].includes(view.status)) return
     let cancelled = false
 
     const poll = async () => {
-      if (busyRef.current) return
+      if (busyRef.current || leavingRef.current) return
+      const revision = viewRevision.current
       try {
         const next = await api<QuizView>(`/quizzes/${view.id}`)
-        if (cancelled || busyRef.current || (pendingAnswers.current && next.status === 'active'))
+        if (
+          cancelled ||
+          revision !== viewRevision.current ||
+          busyRef.current ||
+          leavingRef.current ||
+          (pendingAnswers.current && next.status === 'active')
+        )
           return
+        if (uncertainResume.current) {
+          acceptResumeStatus(next)
+          return
+        }
         const current = viewRef.current
         const merged = current ? mergeQuizPoll(current, next) : next
         if (merged !== current) updateView(merged)
-        if (next.status === 'paused') setStage('paused')
       } catch (reason) {
         if (!cancelled)
           setError(reason instanceof Error ? reason.message : `Could not refresh ${mode} status.`)
@@ -374,11 +541,18 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [stage, view?.id, view?.status, updateView, mode])
+  }, [stage, view?.id, view?.status, updateView, acceptResumeStatus, mode])
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (!pendingStart.current && !busyRef.current && viewRef.current?.status !== 'active') return
+      if (
+        !pendingStart.current &&
+        !uncertainStart.current &&
+        !uncertainResume.current &&
+        !busyRef.current &&
+        viewRef.current?.status !== 'active'
+      )
+        return
       event.preventDefault()
       event.returnValue = ''
     }
@@ -391,7 +565,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   const currentQuestion = questions[questionIndex]
 
   function changeAnswer(question: QuizQuestion, patch: Partial<QuizAnswer>) {
-    if (!view || busy || secondsLeft === 0 || view.status !== 'active') return
+    if (!view || busy || leavingRef.current || secondsLeft === 0 || view.status !== 'active') return
     const updatedQuestions = view.questions.map((item) =>
       item.questionId === question.questionId ? { ...item, ...patch } : item,
     )
@@ -520,7 +694,12 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
               )}
               <button
                 className="primary"
-                disabled={sourcesLoading || recoveryLoading || !options.sourceIds?.length}
+                disabled={
+                  sourcesLoading ||
+                  recoveryLoading ||
+                  uncertainStart.current ||
+                  !options.sourceIds?.length
+                }
                 onClick={() => void start()}
               >
                 Start {count}-question {mode}
@@ -658,13 +837,29 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
           </section>
         </>
       )}
-      {stage === 'paused' && view && (
+      {resumeUncertain && (
+        <section className="quiz-panel resume-uncertain" role="alert">
+          <h1>Attempt status unconfirmed</h1>
+          <p>
+            The timer may still be running. Retry resume to continue, or retry navigation to suspend
+            the attempt safely.
+          </p>
+          <button disabled={busy} onClick={() => void changePause('resume')}>
+            Retry resume
+          </button>
+          <button className="danger" disabled={busy} onClick={() => void abandon()}>
+            Abandon {mode}
+          </button>
+        </section>
+      )}
+      {stage === 'paused' && view && !resumeUncertain && (
         <section className="quiz-panel paused-panel">
           <p className="eyebrow">{title} paused</p>
           <h1>{formatTime(Math.max(0, Math.ceil((view.deadline - view.pausedAt!) / 1000)))}</h1>
           <p>
             Time remaining · Your answers are saved. Paused time does not affect your study stats.
           </p>
+          <AttemptTiming quiz={view} />
           <div className="quiz-actions">
             <button className="primary" disabled={busy} onClick={() => void changePause('resume')}>
               Resume {mode}
@@ -839,6 +1034,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
           <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
         </p>
         <p>This is a practice target, not an AWS scaled score.</p>
+        <AttemptTiming quiz={view} />
         <div className="quiz-actions">
           <button onClick={onBack}>Back to {mode} history</button>
           <button onClick={() => void copyReport()}>Copy discussion report</button>
