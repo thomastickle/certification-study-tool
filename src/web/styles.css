@@ -6,7 +6,8 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color: #22372f;
+  color: #172b22;
+  font-size: 18px;
   background: #f7f7f1;
   font-synthesis: none;
   line-height: 1.55;
@@ -397,8 +398,8 @@ p {
   font-weight: 600;
 }
 .muted {
-  color: #7e8c75;
-  font-size: 12px;
+  color: #4c5e48;
+  font-size: 14px;
 }
 .explanation {
   background: #f5f6f0;
@@ -842,7 +843,7 @@ select {
 }
 .result-score > p:nth-of-type(2) {
   font-size: 22px;
-  color: #466b4c;
+  color: #172019;
 }
 .result-question {
   border-top: 1px solid #e8ece3;
@@ -855,7 +856,7 @@ select {
 .result-question ul {
   list-style: none;
   padding: 0;
-  font-size: 13px;
+  font-size: 16px;
 }
 .result-question li {
   padding: 9px;
@@ -863,14 +864,15 @@ select {
 }
 .result-question li.result-correct {
   background: #edf5e8;
-  color: #426435;
+  color: #172019;
+  border-left: 4px solid #235b31;
 }
 .result-question li.result-selected:not(.result-correct) {
   background: #fff0e9;
   color: #8c4635;
 }
 .correct-text {
-  color: #4c713c;
+  color: #1e5029;
 }
 .incorrect-text {
   color: #9f3b36;
@@ -1078,24 +1080,31 @@ select {
 .practice-session .quiz-status {
   margin-bottom: 12px;
   padding: 8px 12px;
-  gap: 12px;
+  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto 112px auto auto auto;
+  font-size: 14px;
 }
 .practice-session .quiz-panel {
   padding: 18px;
   margin-bottom: 12px;
 }
 .practice-session .quiz-question h2 {
-  font-size: 21px;
+  font-size: 24px;
   margin: 10px 0;
 }
-.practice-session .quiz-question > .muted {
+.practice-session .selection-instruction {
   margin: 8px 0;
 }
 .practice-session .choice {
+  font-size: 16px;
   padding: 9px 12px;
   margin: 6px 0;
 }
 .practice-session .confidence-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   margin-top: 12px !important;
   padding-top: 10px !important;
 }
@@ -1103,9 +1112,14 @@ select {
   margin-bottom: 4px;
 }
 .question-navigation {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
   margin-top: 10px;
+}
+.question-navigation button {
+  inline-size: 11.5rem;
+  max-inline-size: 48%;
 }
 .practice-menu {
   position: relative;
@@ -1167,20 +1181,108 @@ select {
   .practice-session .quiz-status {
     gap: 8px;
   }
-  .practice-session .quiz-status > span {
-    flex-basis: 100%;
-  }
-  .practice-session .quiz-status strong {
-    margin-left: 0;
-    margin-right: auto;
-  }
   .question-navigation button {
     padding: 9px 6px;
-    font-size: 12px;
+    font-size: 14px;
   }
 }
 
 .answer-save-status {
-  color: #657561;
+  color: #435540;
   font-size: 12px;
+}
+
+.practice-session .question-meta,
+.practice-session .choice-letter,
+.practice-session .review-list li span {
+  color: #435540;
+  font-size: 14px;
+}
+.practice-session .question-meta span:first-child {
+  color: #36512c;
+}
+.practice-session .confidence-row legend,
+.practice-session .confidence-row label,
+.practice-session .review-list li {
+  font-size: 14px;
+}
+.timer-warning {
+  inline-size: 112px;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  text-align: center;
+  border-radius: 5px;
+  padding: 2px 4px;
+}
+.timer-warning.pending {
+  visibility: hidden;
+}
+.timer-warning.warning {
+  background: #fff0b3;
+  color: #715000;
+}
+.timer-warning.urgent {
+  background: #ffe0da;
+  color: #98291e;
+}
+.quiz-status .timer.warning {
+  color: #805b00;
+}
+.quiz-status .timer.urgent {
+  color: #98291e;
+}
+.practice-session .review-list li.needs-review {
+  background: #fff5ce;
+  border-color: #d3ae43;
+}
+.practice-session .review-list .review-attention {
+  color: #715000;
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .practice-session .quiz-status {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'progress save warning' 'timer pause actions';
+  }
+  .practice-progress {
+    grid-area: progress;
+  }
+  .answer-save-status {
+    grid-area: save;
+  }
+  .timer-warning {
+    grid-area: warning;
+  }
+  .practice-session .quiz-status .timer {
+    grid-area: timer;
+    margin-left: 0;
+  }
+  .practice-session .quiz-status > button {
+    grid-area: pause;
+  }
+  .practice-menu {
+    grid-area: actions;
+  }
+}
+
+.practice-session .quiz-question {
+  border: 0;
+}
+.practice-session .answer-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 16px;
+  /* Keep room for six single-line choices without shifting the confidence controls. */
+  min-block-size: calc(6 * (1.55em + 20px) + 5 * 6px);
+}
+.practice-session .answer-choices .choice {
+  margin: 0;
+}
+.confidence-clear {
+  font-size: 14px;
+  line-height: 20px;
+  padding: 3px 8px;
 }

@@ -317,6 +317,12 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   }, [stage, plural, mode])
 
   useEffect(() => {
+    if (!notice) return
+    const timeout = window.setTimeout(() => setNotice(''), 30_000)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
+
+  useEffect(() => {
     if ((stage !== 'question' && stage !== 'review') || !view || view.status !== 'active') return
 
     const tick = () => {
@@ -328,11 +334,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       const threshold = warningThreshold(remain * 1000)
       if (threshold && !noticesShown.current.has(threshold)) {
         noticesShown.current.add(threshold)
-        setNotice(
-          threshold === '10-minute'
-            ? '10 minutes remaining. Keep an eye on the timer.'
-            : '2 minutes remaining. Review and submit your answers.',
-        )
+        setNotice(threshold === '10-minute' ? '10 min remaining' : '2 min remaining')
       }
       if (remain === 0 && !timerSubmit.current && !busyRef.current) {
         timerSubmit.current = true
@@ -437,7 +439,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
       {(stage === 'question' || stage === 'review') && view && (
         <>
           <div className="quiz-status">
-            <span>
+            <span className="practice-progress">
               {stage === 'review'
                 ? 'Review before submitting'
                 : `Question ${questionIndex + 1} of ${questions.length}`}
@@ -445,8 +447,16 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
             <span className="answer-save-status" role="status">
               {busy ? 'Saving…' : pendingAnswers.current ? 'Unsaved changes' : 'Saved'}
             </span>
+            <span
+              className={`timer-warning ${secondsLeft <= 120 ? 'urgent' : 'warning'} ${notice ? '' : 'pending'}`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {notice || '\u00a0'}
+            </span>
             <strong
-              className={secondsLeft <= 120 ? 'timer urgent' : 'timer'}
+              className={`timer ${secondsLeft <= 600 ? 'warning' : ''} ${secondsLeft <= 120 ? 'urgent' : ''}`}
               aria-label="Time remaining"
             >
               {formatTime(secondsLeft)}
@@ -469,11 +479,6 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
               onAbandon={() => void abandon()}
             />
           </div>
-          {notice && (
-            <div className="message warning" role="status" aria-live="polite">
-              {notice}
-            </div>
-          )}
           {pendingAnswers.current && mutationError && (
             <p role="alert">
               Your last changes are not saved. Retry before the timer expires; automatic scoring
@@ -582,10 +587,16 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
               Previous question
             </button>
             <button
-              disabled={busy || questionIndex === questions.length - 1}
-              onClick={() => setQuestionIndex((i) => i + 1)}
+              disabled={busy}
+              onClick={() => {
+                if (questionIndex === questions.length - 1) {
+                  setStage('review')
+                } else {
+                  setQuestionIndex((i) => i + 1)
+                }
+              }}
             >
-              Next question
+              {questionIndex === questions.length - 1 ? 'Review answers' : 'Next question'}
             </button>
           </div>
         </>
@@ -597,7 +608,10 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
             <p>Select a question number to return to it. Marked items need attention:</p>
             <ul className="review-list">
               {questions.map((question, index) => (
-                <li key={question.questionId}>
+                <li
+                  key={question.questionId}
+                  className={reviewIds.includes(question.questionId) ? 'needs-review' : undefined}
+                >
                   <button
                     onClick={() => {
                       setQuestionIndex(index)
@@ -608,10 +622,16 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                   </button>
                   <span>
                     {question.selected.length === 0 ? 'Unanswered · ' : 'Answered · '}
+                    {question.selected.length > 0 && question.selected.length < question.selectCount
+                      ? 'Incomplete · '
+                      : ''}
                     {question.flagged ? 'Flagged · ' : ''}
                     {question.confidence ?? 'Confidence not recorded'}
                     {question.confidence && question.confidence !== 'Confident' ? ' · Review' : ''}
                   </span>
+                  {reviewIds.includes(question.questionId) && (
+                    <span className="review-attention">Needs review</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -723,10 +743,10 @@ function QuestionEditor({
         </span>
       </div>
       <h2>{question.question}</h2>
-      <p className="muted">
-        {multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}
+      <p className="selection-instruction">
+        <strong>{multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}</strong>
       </p>
-      <fieldset disabled={disabled}>
+      <fieldset className="answer-choices" disabled={disabled}>
         <legend className="sr-only">Answer choices</legend>
         {question.answers.map((answer, index) => (
           <label className="choice" key={answer.id}>
@@ -756,6 +776,7 @@ function QuestionEditor({
             </label>
           ))}
           <button
+            className="confidence-clear"
             type="button"
             disabled={disabled || question.confidence === null}
             onClick={() => onChange({ confidence: null })}
@@ -770,7 +791,7 @@ function QuestionEditor({
             checked={question.flagged}
             onChange={(event) => onChange({ flagged: event.target.checked })}
           />{' '}
-          Mark for return
+          Mark for Review
         </label>
       </div>
     </article>
@@ -834,7 +855,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
               {question.correct ? 'Correct' : 'Incorrect'} ·{' '}
               {question.confidence ?? 'Confidence not recorded'}
               {question.confidence !== 'Confident' ? ' · Review' : ''}
-              {question.flagged ? ' · Marked for return' : ''}
+              {question.flagged ? ' · Marked for review' : ''}
             </p>
             <p className="muted">
               {question.sourceName} · {question.reference} · Domain {question.domain}

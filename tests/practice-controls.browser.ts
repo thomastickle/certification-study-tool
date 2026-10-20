@@ -106,12 +106,13 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
     button('Review answers').click()
     await until(() => !!document.querySelector('.review-list'), 'Review did not open')
     assert(document.querySelectorAll('.review-list li').length === total, 'Review is incomplete')
-    assert(
-      document
-        .querySelector('.review-list li')
-        ?.textContent?.includes('Answered · Flagged · Unsure'),
-      'Review lost answer/flag/confidence',
-    )
+    const reviewed = document.querySelector('.review-list li')?.textContent ?? ''
+    for (const marker of ['Answered', 'Flagged', 'Unsure']) {
+      assert(reviewed.includes(marker), `Review lost ${marker} metadata`)
+    }
+    if (answer.type === 'checkbox') {
+      assert(reviewed.includes('Incomplete'), 'Partial multi-select is not labeled incomplete')
+    }
     button('Pause').click()
     await until(() => !!document.querySelector('.paused-panel'), 'Pause did not complete')
     const idleUnload = new Event('beforeunload', { cancelable: true })

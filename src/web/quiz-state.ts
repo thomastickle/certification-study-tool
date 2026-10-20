@@ -10,7 +10,7 @@ export function reviewQuestionIds(questions: QuizQuestion[]): number[] {
   return questions
     .filter(
       (question) =>
-        question.selected.length === 0 ||
+        question.selected.length < question.selectCount ||
         question.flagged ||
         question.confidence === null ||
         question.confidence !== 'Confident',
