@@ -11,7 +11,7 @@
 .report-filter-group,
 .stat-label,
 .domain-card-top,
-.confidence-row > div,
+.report-confidence-row > div,
 .attempt-row,
 .history-pagination,
 .attempt-summary,
@@ -408,16 +408,16 @@
   font-size: 8px;
   letter-spacing: 1.7px;
 }
-.confidence-row {
+.report-confidence-row {
   margin-top: 20px;
 }
-.confidence-row > div {
+.report-confidence-row > div {
   font-size: 11px;
 }
-.confidence-row strong {
+.report-confidence-row strong {
   font-weight: 500;
 }
-.confidence-row small {
+.report-confidence-row small {
   color: #7c8573;
   font-size: 9px;
 }

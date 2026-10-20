@@ -27,7 +27,7 @@ test('export report includes every question, raw score, selected/correct answers
     assert.match(report, /My answer: None/)
     assert.match(report, /Confidence: Educated Guess/)
     assert.match(report, /Confidence: Not recorded/)
-    assert.match(report, /Marked for return: Yes/)
+    assert.match(report, /Marked for review: Yes/)
     assert.match(report, /Source: quiz-synthetic \(third_party\)/)
     assert.match(report, /Incorrect/)
     assert.match(report, /Correct answer: [ABC]/)
@@ -51,6 +51,8 @@ test('exam report exports use the exam snapshot mode and preserve quiz fallback'
       })),
     })
     assert.match(quizReport(completed), /# CLF-C02 practice quiz report/)
+    // This case models an options-only snapshot; the new engine also sets a top-level mode.
+    delete completed.mode
     completed.options.mode = 'exam'
     assert.match(quizReport(completed), /# CLF-C02 practice exam report/)
     assert.match(quizReport(completed), new RegExp(`Exam: ${completed.id}`))

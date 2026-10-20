@@ -14,7 +14,7 @@ const links: { id: Page; label: string }[] = [
 
 const descriptions: Partial<Record<Page, string>> = {
   quiz: 'Start a timed quiz and review your answers.',
-  exam: 'Exam tools are coming soon.',
+  exam: 'Take a 65-question, 90-minute practice exam.',
   reports: 'Explore your progress, domain strengths, and every attempt.',
   importer: 'Manage your question library and sources.',
 }
@@ -24,7 +24,9 @@ export function App() {
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
 
   async function navigate(next: Page) {
-    if (page === 'quiz' && next !== 'quiz' && !(await leaveQuiz.current())) return
+    if ((page === 'quiz' || page === 'exam') && next !== page && !(await leaveQuiz.current())) {
+      return
+    }
     setPage(next)
   }
 
@@ -81,52 +83,22 @@ export function App() {
                 <span className="eyebrow">STUDY WORKSPACE</span>
                 <strong>{link.label}</strong>
                 <span>{descriptions[link.id]}</span>
-                <span className="home-card-action">
-                  {link.id === 'exam' ? 'Coming soon' : 'Open →'}
-                </span>
+                <span className="home-card-action">Open →</span>
               </button>
             ))}
           </section>
         </main>
       )}
-      {page === 'quiz' && (
+      {(page === 'quiz' || page === 'exam') && (
         <QuizPage
+          key={page}
+          mode={page}
           onRegisterLeave={(fn) => {
             leaveQuiz.current = fn
           }}
         />
       )}
       {page === 'reports' && <ReportsPage />}
-      {page === 'exam' && (
-        <main>
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">STUDY WORKSPACE</p>
-              <h1>Exam</h1>
-              <p className="intro">This section is coming soon.</p>
-            </div>
-            <button
-              onClick={() => {
-                void navigate('home')
-              }}
-            >
-              Back to workspace
-            </button>
-          </div>
-          <section className="placeholder-panel">
-            <h2>Exam mode is not available yet.</h2>
-            <p>For now, you can take a quiz or manage your question library.</p>
-            <button
-              className="primary"
-              onClick={() => {
-                void navigate('quiz')
-              }}
-            >
-              Go to Quiz
-            </button>
-          </section>
-        </main>
-      )}
       {page === 'importer' && <LibraryPage />}
     </div>
   )

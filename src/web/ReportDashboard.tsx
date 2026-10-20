@@ -311,7 +311,7 @@ export function ReportDashboard({
           <h2 id="confidence-heading">Confidence meets reality.</h2>
           <p className="report-muted">See how certainty lines up with correctness.</p>
           {report.confidence.map((group) => (
-            <div className="confidence-row" key={group.name}>
+            <div className="report-confidence-row" key={group.name}>
               <div>
                 <span>{group.name}</span>
                 <strong>{percent(group.counts.accuracy)}</strong>

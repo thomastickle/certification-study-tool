@@ -2,12 +2,12 @@ import { LibraryRepository } from '../src/server/questions/library-repository.ts
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { bank } from './fixtures.ts'
 
-export function populate(repository: LibraryRepository) {
+export function populate(repository: LibraryRepository, questionsPerDomain = 12) {
   const input = bank('quiz-synthetic')
   input.certification = { provider: 'AWS', code: 'CLF-C02', name: 'Synthetic CLF-C02' }
   input.questions = []
   for (let domain = 1; domain <= 4; domain++)
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < questionsPerDomain; i++) {
       const question = structuredClone(bank().questions[0]!)
       question.source_ref = `d${domain}-${i}`
       question.question = `Synthetic domain ${domain} question ${i}?`
