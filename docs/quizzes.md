@@ -7,7 +7,10 @@ the Reports page and charts are deferred.
 A CLF-C02 quiz has 20 questions and a server-owned 20-minute deadline. An exam
 has **65 questions and a 90-minute deadline**. Both modes share the same bank
 picker, answer controls, timing, review, grading, and report flow. Warnings
-appear at 10 and 2 minutes remaining, including on the pre-submit review screen.
+appear inline in the toolbar at 10 and 2 minutes remaining, including on the
+pre-submit review screen. Their reserved slot keeps the question from shifting;
+the 10-minute warning is yellow and the final warning is red. Each message
+disappears after 30 seconds; its toolbar space stays reserved.
 Answers are saved after each change. At expiry the server scores the saved
 choices; unanswered questions and incomplete/incorrect multi-select sets are
 misses. Late changes are ignored. A running server checks deadlines every second;
@@ -15,8 +18,21 @@ after a server restart it also scores overdue attempts. If a save fails, the UI
 shows that the latest changes are unsaved and offers retry. The deadline does
 not pause during failures, navigation, or browser sleep.
 
+During an attempt the compact toolbar shows question progress, save status, an
+**HH:MM:SS** clock, Pause, and an Actions dropdown. The dropdown offers Review
+answers, Submit and score, and Abandon. The footer has compact, equal-width
+Previous and Next buttons at opposite edges. On the final question, Next becomes
+Review answers and opens answer review. Answers, confidence, and flags save
+immediately, without a lock-in step.
+The question screen omits the redundant mode heading, question count, and duration
+intro. Long content can still scroll naturally; question panels have no nested
+scroll containers. The review grid labels answered/unanswered questions and flags. Questions needing
+review have a yellow background and a Needs review label: unanswered/incomplete
+answers, return flags, and missing or low confidence. Confident complete answers
+without flags are unhighlighted.
+
 Each question supports its original single/multiple selection count, optional
-confidence (Confident, Educated Guess, Unsure), and a mark for return. The review
+confidence (Confident, Educated Guess, Unsure), and a Mark for Review checkbox. The review
 screen lists all questions and highlights unanswered, marked, low-confidence,
 and unrecorded-confidence items. Submit and score ends the attempt. The result
 shows correct count, raw percentage, and an **80% practice target**: green Pass
@@ -105,13 +121,54 @@ not delete or replace library rows. Quiz snapshots have no cascading foreign
 keys to sources, so later deletion/import changes cannot rewrite past results.
 Only completed attempts update shared mastery across quizzes and exams. Repeated submission is idempotent.
 
-Leaving through app navigation asks before abandoning; abandoned attempts cannot
-be resumed and do not affect mastery. Browser reload/close warns but cannot
-reliably send abandonment. An orphaned attempt remains saved until its deadline
-(then scores saved answers), or is abandoned when another quiz or exam starts before
-that deadline. There is no active-attempt resume UI. All completed results remain
-available through the history list for their mode. The Reports page
-and charts are intentionally deferred.
+**Pause** saves current answers first, then freezes the server-owned remaining
+time. A failed save or pause shows an error and leaves the attempt running. A
+paused attempt cannot expire, accept edits, or be submitted until resumed; pause
+and resume do not grade answers or update mastery. Resume restores exactly the
+remaining time, even after a browser or server restart. Repeated pause/resume
+requests are idempotent. A pause arriving at or after the deadline does not undo
+normal scoring.
+
+Paused attempts can be left safely. On returning to Quiz or Exam, the setup screen
+shows a Continue button for that mode's paused or active attempt. Reopening a
+paused attempt keeps its clock stopped until Resume is pressed. Recovery returns
+to the first incomplete answer. Another mode can be started without discarding a
+paused attempt; a second attempt in the same mode is blocked until the paused one
+is resumed or abandoned.
+
+Leaving an active attempt through app navigation asks before abandoning; Cancel
+lets you pause first. Abandoning discards the unfinished snapshot entirely: no saved result, history entry,
+or mastery change. Reads and answer submissions for a discarded attempt return 404; repeated
+abandon requests succeed with `null`, so a lost response does not block leaving. Completed results
+remain unchanged. Browser reload/close warns
+while starting or active, and saved active attempts can be reopened, but their
+time keeps running unless explicitly paused. Active overdue attempts still score
+normally. All completed results remain available through the history list for
+their mode. The Reports page and charts remain deferred.
 
 Development verification uses a separate `private/app/quiz-preview.sqlite3`
 copy, leaving the original library and curated import preview untouched.
+
+## Browser regression checks
+
+`tests/quiz-navigation.browser.ts` checks delayed start followed by leave, cancel,
+and failure for both modes. `tests/practice-controls.browser.ts` checks autosave,
+Previous/Next, review metadata, pause, recovery, resume, and menu abandonment.
+`tests/practice-reading.browser.ts` checks the final-question review transition,
+review highlighting, readable controls, and warning placement without layout shifts.
+These browser-only checks are separate from `npm test`. Run against a disposable
+populated database: transpile each exported function with TypeScript's ESNext
+module target, evaluate it in the app page, and call it with each documented mode
+and outcome. Vite intentionally does not serve the tests directory.
+
+The question card has no outer border. The answer-choice group reserves room for
+six single-line choices so Confidence and Mark for Review stay aligned when moving
+between four, five, and six choices. Longer wrapping choices can grow naturally;
+there is no nested scrollbar or clipped answer text. Confidence's Clear action is
+compact and resets only the confidence choice.
+
+Scored reports use dark neutral answer text, darker green status text, and a dark
+green accent on correct choices. `tests/practice-spacing.browser.ts` checks the
+four/five/six-choice layout, compact Clear action, review wording, and scored-answer
+contrast. The reading regression also verifies each warning's 30-second dismissal
+without changing the reserved toolbar layout.

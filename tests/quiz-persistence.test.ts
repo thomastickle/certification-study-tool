@@ -59,3 +59,28 @@ test('migration preserves v1 library IDs/content; saved results survive reopen a
     rmSync(directory, { recursive: true })
   }
 })
+
+test('paused snapshot and remaining time survive database close and reopen', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'quiz-pause-'))
+  const path = join(directory, 'library.sqlite3')
+  let repository = new LibraryRepository(path)
+  try {
+    populate(repository)
+    let now = 1000
+    const service = new QuizService(repository, () => now)
+    const quiz = service.start({ sourceFilter: 'mixed', questionType: 'mixed' })
+    now += 60_000
+    const paused = service.pause(quiz.id)
+    repository.close()
+    repository = new LibraryRepository(path)
+    now += 24 * 60 * 60_000
+    const restarted = new QuizService(repository, () => now)
+    restarted.expireDue()
+    assert.equal(restarted.current('quiz')?.status, 'paused')
+    assert.equal(restarted.resume(quiz.id).deadline - now, quiz.deadline - paused.pausedAt!)
+    assert.equal(repository.quizStore().boosts().size, 0)
+  } finally {
+    repository.close()
+    rmSync(directory, { recursive: true })
+  }
+})

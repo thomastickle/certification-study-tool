@@ -128,10 +128,11 @@ test('abandon does not score or change mastery; validation rejects invalid selec
       service.get(quiz.id).questions.map((q) => q.selected),
       answers.map((q) => q.selected),
     )
-    assert.equal(service.abandon(quiz.id).status, 'abandoned')
+    assert.equal(service.abandon(quiz.id)?.status, 'abandoned')
     assert.equal(service.recent().length, 0)
     assert.equal(repository.quizStore().boosts().size, 0)
-    assert.equal(service.submit(quiz.id, { answers }).status, 'abandoned')
+    // Abandon now discards the snapshot rather than retaining a tombstone.
+    assert.throws(() => service.submit(quiz.id, { answers }), /not found/)
     assert.throws(
       () => service.start({ sourceFilter: 'bad', questionType: 'mixed' }),
       /valid source/,

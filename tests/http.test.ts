@@ -122,6 +122,17 @@ for (const mode of ['quiz', 'exam'] as const) {
         flagged: true,
       }))
       assert.equal((await post(`/api/quizzes/${quiz.id}/answers`, { answers }, 'PUT')).status, 200)
+      const paused = await (await post(`/api/quizzes/${quiz.id}/pause`, {})).json()
+      assert.equal(paused.status, 'paused')
+      assert.ok(paused.pausedAt >= quiz.startedAt)
+      const recovered = await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json()
+      assert.equal(recovered.id, quiz.id)
+      assert.equal(recovered.status, 'paused')
+      assert.equal('keys' in recovered, false)
+      assert.equal(recovered.questions[0].correctAnswerIds, undefined)
+      const resumed = await (await post(`/api/quizzes/${quiz.id}/resume`, {})).json()
+      assert.equal(resumed.status, 'active')
+      assert.equal(resumed.pausedAt, null)
       const result = await (await post(`/api/quizzes/${quiz.id}/submit`, { answers })).json()
       assert.equal(result.mode, mode)
       assert.equal(result.correctCount, 0)
@@ -133,6 +144,16 @@ for (const mode of ['quiz', 'exam'] as const) {
       const saved = await (await fetch(base + `/api/quizzes/${quiz.id}`)).json()
       assert.equal(saved.mode, mode)
       assert.equal(saved.status, 'completed')
+      const discarded = await (
+        await post('/api/quizzes', { mode, sourceFilter: 'mixed', questionType: 'mixed' })
+      ).json()
+      const abandoned = await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json()
+      assert.equal(abandoned.status, 'abandoned')
+      assert.equal(abandoned.correctCount, null)
+      assert.equal(await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json(), null)
+      assert.equal((await fetch(`${base}/api/quizzes/${discarded.id}`)).status, 404)
+      assert.equal(await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json(), null)
+      assert.equal((await (await fetch(`${base}/api/quizzes`)).json()).length, 1)
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),

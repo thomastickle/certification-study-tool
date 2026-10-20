@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import type { QuizAnswer, QuizOptions, QuizSummary, QuizView } from '../../shared/quiz-contracts.ts'
+import type {
+  PracticeMode,
+  QuizAnswer,
+  QuizOptions,
+  QuizSummary,
+  QuizView,
+} from '../../shared/quiz-contracts.ts'
 import { ApplicationError } from '../errors.ts'
 import type { LibraryRepository } from '../questions/library-repository.ts'
 import type { StoredQuiz } from './quiz-repository.ts'
@@ -20,14 +26,22 @@ export class QuizService {
     const options = this.options(input)
     return this.repository.quizStore().transaction(() => {
       const store = this.repository.quizStore()
-      // Orphaned active attempts are abandoned when starting again; no resume flow yet.
+      if (
+        store
+          .unfinished()
+          .some(
+            (q) => q.status === 'paused' && (q.options.mode ?? 'quiz') === (options.mode ?? 'quiz'),
+          )
+      ) {
+        throw new ApplicationError(
+          'Resume or abandon your paused attempt before starting another in this mode.',
+          409,
+        )
+      }
+      // Starting again abandons only active attempts; explicitly paused work is preserved.
       for (const old of store.active()) {
         if (old.deadline <= this.now()) this.finish(old)
-        else {
-          old.status = 'abandoned'
-          old.finishedAt = this.now()
-          store.save(old)
-        }
+        else store.remove(old.id)
       }
       const picked = selectQuestions(
         this.repository.allQuestions(),
@@ -82,6 +96,45 @@ export class QuizService {
     return this.repository.quizStore().transaction(() => this.view(this.load(id)))
   }
 
+  /** Recover an unfinished attempt for this mode; overdue active attempts score normally. */
+  current(mode: PracticeMode): QuizView | null {
+    return this.repository.quizStore().transaction(() => {
+      for (const stored of this.repository.quizStore().unfinished()) {
+        if ((stored.options.mode ?? 'quiz') !== mode) continue
+        const quiz = this.load(stored.id)
+        if (quiz.status === 'active' || quiz.status === 'paused') return this.view(quiz)
+      }
+      return null
+    })
+  }
+
+  /** Freeze the remaining server-owned time without grading or changing mastery. */
+  pause(id: string): QuizView {
+    return this.repository.quizStore().transaction(() => {
+      const quiz = this.load(id)
+      if (quiz.status === 'active') {
+        quiz.status = 'paused'
+        quiz.pausedAt = this.now()
+        this.repository.quizStore().save(quiz)
+      }
+      return this.view(quiz)
+    })
+  }
+
+  /** Restore exactly the remaining time; repeated resume requests cannot extend it. */
+  resume(id: string): QuizView {
+    return this.repository.quizStore().transaction(() => {
+      const quiz = this.load(id)
+      if (quiz.status === 'paused') {
+        quiz.deadline = this.now() + Math.max(0, quiz.deadline - quiz.pausedAt!)
+        quiz.pausedAt = null
+        quiz.status = 'active'
+        this.repository.quizStore().save(quiz)
+      }
+      return this.view(quiz)
+    })
+  }
+
   expireDue(): void {
     if (
       !this.repository
@@ -112,13 +165,16 @@ export class QuizService {
     return this.change(id, input, 'submit')
   }
 
-  abandon(id: string): QuizView {
+  abandon(id: string): QuizView | null {
     return this.repository.quizStore().transaction(() => {
-      const quiz = this.load(id)
-      if (quiz.status === 'active') {
+      const store = this.repository.quizStore()
+      // Abandonment must not trigger expiry/grading as a side effect of loading.
+      const quiz = store.find(id)
+      if (!quiz) return null
+      if (quiz.status !== 'completed') {
+        store.remove(id)
         quiz.status = 'abandoned'
         quiz.finishedAt = this.now()
-        this.repository.quizStore().save(quiz)
       }
       return this.view(quiz)
     })

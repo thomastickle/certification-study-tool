@@ -79,7 +79,7 @@ export async function delayedStartNavigationTest(
     if (outcome === 'cancel') {
       await until(() => confirmations === 1, 'Leave confirmation was not shown')
       assert(
-        document.querySelector('h1')?.textContent === title,
+        document.querySelector('[aria-current=page]')?.textContent === title,
         'Canceled navigation left the attempt',
       )
       window.confirm = () => true
@@ -91,8 +91,8 @@ export async function delayedStartNavigationTest(
     )
     assert(confirmations === (outcome === 'failure' ? 0 : 1), 'Unexpected confirmation count')
     if (attemptId) {
-      const attempt = await (await originalFetch(`/api/quizzes/${attemptId}`)).json()
-      assert(attempt.status === 'abandoned', 'Leaving did not abandon the created attempt')
+      const response = await originalFetch(`/api/quizzes/${attemptId}`)
+      assert(response.status === 404, 'Leaving did not discard the created attempt')
     }
     return `${mode}: delayed start ${outcome} passed`
   } finally {

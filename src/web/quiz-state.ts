@@ -10,7 +10,7 @@ export function reviewQuestionIds(questions: QuizQuestion[]): number[] {
   return questions
     .filter(
       (question) =>
-        question.selected.length === 0 ||
+        question.selected.length < question.selectCount ||
         question.flagged ||
         question.confidence === null ||
         question.confidence !== 'Confident',
@@ -28,4 +28,11 @@ export function mergeQuizPoll(current: QuizView, incoming: QuizView): QuizView {
   if (incoming.status !== 'active') return incoming
   if (current.status !== 'active' || incoming.serverNow <= current.serverNow) return current
   return { ...current, serverNow: incoming.serverNow }
+}
+
+/** Keep the clock's units unambiguous for both quizzes and longer exams. */
+export function formatTime(seconds: number): string {
+  return [Math.floor(seconds / 3600), Math.floor((seconds % 3600) / 60), seconds % 60]
+    .map((value) => value.toString().padStart(2, '0'))
+    .join(':')
 }

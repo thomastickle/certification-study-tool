@@ -70,8 +70,14 @@ export function apiController(repository: LibraryRepository) {
         if (request.method === 'POST')
           return send(response, 201, quizzes.start(await body(request)))
       }
+      if (request.method === 'GET' && url.pathname === '/api/quizzes/current') {
+        const mode = url.searchParams.get('mode') ?? 'quiz'
+        if (mode !== 'quiz' && mode !== 'exam')
+          throw new ApplicationError('Choose a valid practice mode.')
+        return send(response, 200, quizzes.current(mode))
+      }
       const quizRoute = url.pathname.match(
-        /^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon))?$/,
+        /^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon|pause|resume))?$/,
       )
       if (quizRoute) {
         const id = quizRoute[1]!
@@ -80,6 +86,10 @@ export function apiController(repository: LibraryRepository) {
           return send(response, 200, quizzes.save(id, await body(request)))
         if (request.method === 'POST' && quizRoute[2] === 'submit')
           return send(response, 200, quizzes.submit(id, await body(request)))
+        if (request.method === 'POST' && quizRoute[2] === 'pause')
+          return send(response, 200, quizzes.pause(id))
+        if (request.method === 'POST' && quizRoute[2] === 'resume')
+          return send(response, 200, quizzes.resume(id))
         if (request.method === 'POST' && quizRoute[2] === 'abandon')
           return send(response, 200, quizzes.abandon(id))
       }
