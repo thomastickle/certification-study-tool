@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { ConceptService } from './concepts/concept-service.ts'
+import { conceptRoute } from './concepts/concept-routes.ts'
 import { ReportService } from './reports/report-service.ts'
 import { QuizService } from './quizzes/quiz-service.ts'
 import { ApplicationError } from './errors.ts'
@@ -69,6 +71,7 @@ function positiveInteger(text: string | null, fallback?: number): number {
 }
 
 export function apiController(repository: LibraryRepository) {
+  const concepts = new ConceptService(repository)
   const quizzes = new QuizService(repository)
   const reports = new ReportService(repository)
   const importer = new ImportService(repository)
@@ -77,6 +80,10 @@ export function apiController(repository: LibraryRepository) {
     try {
       checkLocalRequest(request)
       const url = new URL(request.url ?? '/', 'http://localhost')
+      const conceptResponse = await conceptRoute(concepts, request, url, body)
+      if (conceptResponse) {
+        return send(response, conceptResponse.status, conceptResponse.value)
+      }
       if (request.method === 'GET' && url.pathname === '/api/reports') {
         quizzes.expireDue()
         return send(

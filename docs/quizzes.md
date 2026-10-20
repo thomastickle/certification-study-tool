@@ -350,3 +350,14 @@ certification namespace, so this helper supports that legacy contract only and
 must not be used to infer other certifications. The mastery scheduler and unique reporting use this helper internally; identities
 and answer-key hashes are omitted from public aggregate responses. Concept
 grouping is outside this feature.
+
+## Reviewed concept variations
+
+The library can suggest question groups from matching area/topic labels, but
+only explicitly reviewed and activated groups influence normal quiz/exam draws.
+Eligible variations prefer less recent completed appearances within the same
+domain and individual practice priority. Domain quotas, exact duplicate
+suppression and selected source/type filters remain in force; unavailable
+alternates do not block otherwise eligible questions. Dedicated Due Review
+continues to select the actual due identities. Saved labels survive later group
+and source changes. See [reviewed concept groups](concepts.md).

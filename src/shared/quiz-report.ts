@@ -61,6 +61,10 @@ export function quizReport(quiz: QuizView): string {
       `Confidence: ${question.confidence ?? 'Not recorded'}`,
       `Marked for review: ${question.flagged ? 'Yes' : 'No'}`,
       `Source: ${question.sourceName} (${question.sourceKind}); reference: ${question.reference}`,
+      ...(question.concepts?.length
+        ? [`Reviewed concepts: ${question.concepts.map((concept) => concept.name).join('; ')}`]
+        : []),
+      ...(question.variationNote ? [question.variationNote] : []),
       `Exam domain: ${question.domain}; study area: ${question.area ?? 'Unclassified'}; topic: ${question.topic ?? 'Unclassified'}`,
       '',
     )

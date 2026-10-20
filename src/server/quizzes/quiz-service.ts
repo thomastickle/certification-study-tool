@@ -14,6 +14,7 @@ import type { StoredQuiz } from './quiz-repository.ts'
 import { eligibleQuestions, selectQuestions, shuffled } from './quiz-selection.ts'
 import { masteryHistory } from './mastery-history.ts'
 import { currentQuestionIdentity } from './question-identity.ts'
+import { completedRecency } from '../concepts/concept-variations.ts'
 import { studyDay } from './mastery.ts'
 
 export class QuizService {
@@ -48,7 +49,9 @@ export class QuizService {
         if (old.deadline <= this.now()) this.finish(old)
         else store.remove(old.id)
       }
-      const states = masteryHistory(store.completed()).states
+      const completed = store.completed()
+      const states = masteryHistory(completed).states
+      const concepts = this.repository.conceptStore().all()
       const sources = this.repository.sources()
       const boosted = new Set(
         this.repository.allQuestions().flatMap((record) => {
@@ -66,6 +69,7 @@ export class QuizService {
               options,
               boosted,
               this.random,
+              { groups: concepts, recency: completedRecency(completed) },
             )
       if (!picked.length) {
         throw new ApplicationError(
@@ -88,7 +92,27 @@ export class QuizService {
         questions: [],
         keys: [],
       }
+      const eligible = [
+        ...eligibleQuestions(this.repository.allQuestions(), sources, options).values(),
+      ]
       for (const { record, domain } of picked) {
+        const source = sources.find((value) => value.id === record.sourceId)!
+        const identity = currentQuestionIdentity(record, source)
+        const membership = concepts.filter(
+          (group) => identity && group.identities.includes(identity),
+        )
+        const direct = new Set(membership.flatMap((group) => group.identities))
+        const alternate = eligible.some((candidate) => {
+          const candidateSource = sources.find((value) => value.id === candidate.record.sourceId)!
+          const candidateIdentity = currentQuestionIdentity(candidate.record, candidateSource)
+          return (
+            candidateIdentity &&
+            candidateIdentity !== identity &&
+            direct.has(candidateIdentity) &&
+            candidate.domain === domain &&
+            boosted.has(candidate.record.fingerprint) === boosted.has(record.fingerprint)
+          )
+        })
         const answers = shuffled(record.data.answers, this.random)
         quiz.keys.push({
           fingerprint: record.fingerprint,
@@ -106,6 +130,15 @@ export class QuizService {
           reference: record.reference,
           area: record.data.classification?.area ?? null,
           topic: record.data.classification?.topic ?? null,
+          ...(membership.length
+            ? { concepts: membership.map(({ id, name }) => ({ id, name })) }
+            : {}),
+          ...(membership.length && !alternate && options.mode !== 'review'
+            ? {
+                variationNote:
+                  'No other reviewed variation matches these filters and this question’s practice priority.',
+              }
+            : {}),
           selected: [],
           confidence: null,
           flagged: false,

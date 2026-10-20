@@ -1,6 +1,9 @@
 import type { QuizOptions } from '../../shared/quiz-contracts.ts'
 import type { QuestionRecord } from '../questions/library-repository.ts'
 import type { Source } from '../../shared/contracts.ts'
+import type { ReviewedConcept } from '../concepts/concept-repository.ts'
+import { preferVariation } from '../concepts/concept-variations.ts'
+import { currentQuestionIdentity } from './question-identity.ts'
 import { ApplicationError } from '../errors.ts'
 import { domainQuotas, examDomain, examDomainQuotas } from './domain-mapping.ts'
 
@@ -19,8 +22,11 @@ export function selectQuestions(
   options: QuizOptions,
   boosted: Set<string>,
   random = Math.random,
+  concepts?: { groups: ReviewedConcept[]; recency: Map<string, number> },
 ): { record: QuestionRecord; domain: number }[] {
   const groups = eligibleQuestions(questions, sources, options)
+  const sourceMap = new Map(sources.map((source) => [source.id, source]))
+  const used = new Set<string>()
   const selected: { record: QuestionRecord; domain: number }[] = []
   const quotas = options.mode === 'exam' ? examDomainQuotas : domainQuotas
   quotas.forEach((quota, index) => {
@@ -40,6 +46,24 @@ export function selectQuestions(
           chosen = j
           break
         }
+      }
+      if (concepts?.groups.length) {
+        const candidates = pool.map((picked) => ({
+          ...picked,
+          identity:
+            currentQuestionIdentity(picked.record, sourceMap.get(picked.record.sourceId)!) ?? '',
+          tier: boosted.has(picked.record.fingerprint) ? 3 : 1,
+        }))
+        const preferred = preferVariation(
+          candidates[chosen]!,
+          candidates,
+          concepts.groups,
+          concepts.recency,
+          random,
+          used,
+        )
+        chosen = pool.findIndex((picked) => picked.record.id === preferred.record.id)
+        used.add(preferred.identity)
       }
       selected.push(pool.splice(chosen, 1)[0]!)
     }

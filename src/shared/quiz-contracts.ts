@@ -27,6 +27,8 @@ export type QuizQuestion = QuizAnswer & {
   reference: string
   area: string | null
   topic: string | null
+  concepts?: { id: string; name: string }[]
+  variationNote?: string
   correctAnswerIds?: number[]
   correct?: boolean
 }

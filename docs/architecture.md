@@ -85,3 +85,13 @@ question-level results. `report-state.ts` defines the time-axis geometry and
 plots daily correct/total scores, including all-skipped zeroes, and keeps cumulative
 correct-answer activity separate. Days without questions have no measured score. Shared Markdown exporters
 produce local downloadable artifacts.
+
+## Reviewed concepts
+
+`src/server/concepts/` owns local label suggestions, reviewed metadata, atomic
+membership validation, and completed-snapshot variation recency. Bank content and
+individual mastery remain separate. Normal quiz/exam selection preserves the
+weighted draw's priority tier and domain while preferring eligible reviewed
+variations. Due Review retains its actual due identities. Attempt snapshots save
+concept labels for historical reporting. See [reviewed concept groups](concepts.md)
+for the UI, migration, HTTP contracts and verification workflow.
