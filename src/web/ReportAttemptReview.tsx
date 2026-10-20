@@ -57,7 +57,10 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
             {quiz.correctCount} correct · {answered - quiz.correctCount!} incorrect ·{' '}
             {quiz.total - answered} skipped
           </p>
-          <p className="report-muted">Score includes skipped questions. Practice target: 80%.</p>
+          <p className="report-muted">
+            Score includes skipped questions.{' '}
+            {mode === 'review' ? 'Due Review · no pass target.' : 'Practice target: 80%.'}
+          </p>
           <p className="report-muted">
             Accuracy on answered questions:{' '}
             {percent(answered ? (quiz.correctCount! / answered) * 100 : null)} · {answered} answered

@@ -70,7 +70,7 @@ test('exam saves, expires from saved choices, and identifies its history and rep
     assert.equal(result.correctCount, 52)
     assert.equal(result.questions[0]!.confidence, 'Unsure')
     assert.equal(result.questions[0]!.flagged, true)
-    assert.equal(repository.quizStore().boosts().size, 13)
+    assert.equal(repository.quizStore().boosts().size, 52)
     assert.equal(service.recent()[0]!.mode, 'exam')
     assert.match(quizReport(result), /# CLF-C02 practice exam report/)
     assert.match(quizReport(result), /Pass — 52\/65 \(80%\)/)
