@@ -231,6 +231,12 @@
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+.session-option button:active {
+  color: white;
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  transition: none;
+}
 .session-option button .study-icon,
 .home-library button .study-icon {
   width: 16px;
