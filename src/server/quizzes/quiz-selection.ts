@@ -20,25 +20,7 @@ export function selectQuestions(
   boosted: Set<string>,
   random = Math.random,
 ): { record: QuestionRecord; domain: number }[] {
-  const sourceMap = new Map(sources.map((s) => [s.id, s]))
-  const groups = new Map<string, { record: QuestionRecord; domain: number }>()
-  for (const record of questions) {
-    const source = sourceMap.get(record.sourceId)
-    if (!source || source.provider !== 'AWS' || source.certification !== 'CLF-C02') continue
-    if (options.sourceIds && !options.sourceIds.includes(source.id)) continue
-    if (options.sourceFilter !== 'mixed' && source.kind !== options.sourceFilter) continue
-    if (options.questionType !== 'mixed' && record.data.type !== options.questionType) continue
-    const domain = examDomain(record.data)
-    if (!domain) continue
-    const previous = groups.get(record.fingerprint)
-    if (previous && previous.record.answerKey !== record.answerKey)
-      throw new ApplicationError(
-        `Conflicting answer keys for ${record.reference}; resolve the source conflict before starting a quiz.`,
-        409,
-      )
-    // Prefer official provenance for the same question when mixing sources.
-    if (!previous || source.kind === 'official') groups.set(record.fingerprint, { record, domain })
-  }
+  const groups = eligibleQuestions(questions, sources, options)
   const selected: { record: QuestionRecord; domain: number }[] = []
   const quotas = options.mode === 'exam' ? examDomainQuotas : domainQuotas
   quotas.forEach((quota, index) => {
@@ -63,4 +45,35 @@ export function selectQuestions(
     }
   })
   return shuffled(selected, random)
+}
+
+/**
+ * Apply exact requested filters and deduplicate without changing domain quotas.
+ * @throws {ApplicationError} When matching source occurrences disagree on the answer key.
+ */
+export function eligibleQuestions(
+  questions: QuestionRecord[],
+  sources: Source[],
+  options: QuizOptions,
+) {
+  const sourceMap = new Map(sources.map((s) => [s.id, s]))
+  const groups = new Map<string, { record: QuestionRecord; domain: number }>()
+  for (const record of questions) {
+    const source = sourceMap.get(record.sourceId)
+    if (!source || source.provider !== 'AWS' || source.certification !== 'CLF-C02') continue
+    if (options.sourceIds && !options.sourceIds.includes(source.id)) continue
+    if (options.sourceFilter !== 'mixed' && source.kind !== options.sourceFilter) continue
+    if (options.questionType !== 'mixed' && record.data.type !== options.questionType) continue
+    const domain = examDomain(record.data)
+    if (!domain) continue
+    const previous = groups.get(record.fingerprint)
+    if (previous && previous.record.answerKey !== record.answerKey)
+      throw new ApplicationError(
+        `Conflicting answer keys for ${record.reference}; resolve the source conflict before starting a quiz.`,
+        409,
+      )
+    // Prefer official provenance for the same question when mixing sources.
+    if (!previous || source.kind === 'official') groups.set(record.fingerprint, { record, domain })
+  }
+  return groups
 }

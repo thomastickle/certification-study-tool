@@ -267,7 +267,7 @@ test('score-first exports and aggregates include skips, unequal sizes, domains a
     const text = studyReportMarkdown(quiz, 'Quiz · Last 7 days')
     assert.match(text, /Score: 40% \(8\/20 questions; skips count as misses\)/)
     assert.match(text, /Accuracy on answered questions: 100% \(8 answered · 12 skipped\)/)
-    assert.match(text, /Practice target met: 0\/1 attempts/)
+    assert.match(text, /Practice target met: 0\/1 quiz\/exam attempts/)
     assert.match(text, /\| Cloud Concepts \| 8 \| 0 \| 8 \| 2 \| 80% \| 100% \|/)
     assert.match(text, /\| Security and Compliance \| 0 \| 0 \| 0 \| 10 \| 0% \| No data \|/)
     assert.match(text, /\| 2026-10-19 \| 8 \| 20 \| 8 \| 12 \| 40% \|/)

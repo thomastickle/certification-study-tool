@@ -80,7 +80,7 @@ test('explicit abandonment cannot trigger expiry scoring; completed results stay
     })
     assert.deepEqual(service.abandon(completed.id), result)
     assert.equal(service.recent().length, 1)
-    assert.equal(repository.quizStore().boosts().size, 20)
+    assert.equal(repository.quizStore().boosts().size, 0)
   } finally {
     repository.close()
   }

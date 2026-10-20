@@ -1,6 +1,6 @@
 export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure'
 
-export type PracticeMode = 'quiz' | 'exam'
+export type PracticeMode = 'quiz' | 'exam' | 'review'
 
 export type QuizOptions = {
   mode?: PracticeMode
@@ -57,4 +57,12 @@ export type QuizView = QuizSummary & {
   serverNow: number
   questions: QuizQuestion[]
   options: QuizOptions
+}
+
+export type DueReviewSummary = {
+  total: number
+  eligible: number
+  excluded: number
+  unavailable: number
+  oldestDay: string | null
 }

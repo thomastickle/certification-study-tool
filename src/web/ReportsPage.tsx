@@ -84,7 +84,7 @@ export function ReportsPage() {
       returnAttemptId.current = null
     }
   }, [attemptId, quiz, report, error])
-  const modeLabels = { all: 'All practice', exam: 'Exams', quiz: 'Quizzes' }
+  const modeLabels = { all: 'All practice', exam: 'Exams', quiz: 'Quizzes', review: 'Due Reviews' }
   const scope = `${modeLabels[mode]} · ${days === 'all' ? 'All time' : `Last ${days} days`}`
 
   /** Opens a new detail view at its heading, keeping dashboard filters intact. */
@@ -205,6 +205,7 @@ export function ReportsPage() {
                 { value: 'all', label: 'Master report' },
                 { value: 'quiz', label: 'Quizzes' },
                 { value: 'exam', label: 'Exams' },
+                { value: 'review', label: 'Due Reviews' },
               ] as const
             ).map((item) => (
               <button

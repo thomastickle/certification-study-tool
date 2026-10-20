@@ -51,7 +51,7 @@ test('migration preserves v1 library IDs/content; saved results survive reopen a
     try {
       assert.deepEqual(new QuizService(repository, () => 1000).get(quiz.id), result)
       assert.equal(new QuizService(repository).recent().length, 1)
-      assert.equal(repository.quizStore().boosts().size, 20)
+      assert.equal(repository.quizStore().boosts().size, 0)
     } finally {
       repository.close()
     }
