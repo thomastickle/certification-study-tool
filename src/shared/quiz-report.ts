@@ -4,7 +4,7 @@ import type { QuizView } from './quiz-contracts.ts'
 export function quizReport(quiz: QuizView): string {
   if (quiz.status !== 'completed' || quiz.correctCount === null)
     throw new Error('Submit and score the quiz before exporting its report.')
-  const mode = quiz.options.mode ?? 'quiz'
+  const mode = quiz.mode ?? quiz.options.mode ?? 'quiz'
   const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const percent = (quiz.correctCount / quiz.total) * 100
   const lines = [

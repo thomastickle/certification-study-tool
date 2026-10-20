@@ -3,8 +3,10 @@
 A local study-question library with a React interface, TypeScript application
 services, and SQLite storage. This first slice imports version-2 JSON banks,
 shows their contents, and deletes individual source occurrences or whole sources.
-It now includes timed CLF-C02 quizzes with saved results and local discussion reports.
-Exam mode and aggregate reports/charts are not implemented. See [quiz behavior](docs/quizzes.md).
+It includes timed CLF-C02 quizzes and exams with saved results and local discussion reports.
+The Reports page adds progress charts, domain and topic breakdowns, exam/quiz
+filters, saved answer review, and local Markdown exports. See
+[quiz behavior and reporting](docs/quizzes.md).
 
 ## Run
 

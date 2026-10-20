@@ -85,10 +85,7 @@ export async function delayedStartNavigationTest(
       window.confirm = () => true
       click('Reports')
     }
-    await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
-      'Navigation did not finish',
-    )
+    await until(() => document.querySelector('.reports-page') !== null, 'Navigation did not finish')
     assert(confirmations === (outcome === 'failure' ? 0 : 1), 'Unexpected confirmation count')
     if (attemptId) {
       const response = await originalFetch(`/api/quizzes/${attemptId}`)

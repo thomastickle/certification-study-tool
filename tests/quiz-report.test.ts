@@ -35,3 +35,36 @@ test('export report includes every question, raw score, selected/correct answers
     repository.close()
   }
 })
+
+test('exam report exports use the exam snapshot mode and preserve quiz fallback', () => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    populate(repository)
+    const service = new QuizService(repository, () => 1000)
+    const quiz = service.start({ sourceFilter: 'mixed', questionType: 'mixed' })
+    const completed = service.submit(quiz.id, {
+      answers: quiz.questions.map((q) => ({
+        questionId: q.questionId,
+        selected: [],
+        confidence: null,
+        flagged: false,
+      })),
+    })
+    assert.match(quizReport(completed), /# CLF-C02 practice quiz report/)
+    // This case models an options-only snapshot; the new engine also sets a top-level mode.
+    delete completed.mode
+    completed.options.mode = 'exam'
+    assert.match(quizReport(completed), /# CLF-C02 practice exam report/)
+    assert.match(quizReport(completed), new RegExp(`Exam: ${completed.id}`))
+    delete completed.options.mode
+    completed.mode = 'exam'
+    assert.equal(quizReport(completed).startsWith('# CLF-C02 practice exam report'), true)
+    completed.options.mode = 'quiz'
+    assert.equal(quizReport(completed).startsWith('# CLF-C02 practice exam report'), true)
+    completed.mode = 'quiz'
+    completed.options.mode = 'exam'
+    assert.equal(quizReport(completed).startsWith('# CLF-C02 practice quiz report'), true)
+  } finally {
+    repository.close()
+  }
+})

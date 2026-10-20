@@ -68,3 +68,19 @@ completion. See [quiz rules](quizzes.md).
 
 No external hosting or runtime integrations are configured. No independent
 review has been performed for this bootstrap.
+
+## Reporting
+
+`src/server/reports/report-service.ts` calculates reports from completed quiz
+snapshots through the existing quiz repository. `GET /api/reports` validates
+practice mode, CLF-C02 certification and rolling time filters, scores expired
+sessions through the quiz service, and returns aggregate counts, UTC daily
+activity, domain/topic/confidence breakdowns and attempt summaries. It omits
+internal answer keys and fingerprints. Individual review uses the existing
+completed quiz endpoint. No schema change or new dependency is required.
+
+`ReportsPage` owns request cancellation and filter state. `ReportDashboard`
+presents the aggregate evidence, and `ReportAttemptReview` presents saved
+question-level results. `report-state.ts` defines the time-axis geometry and
+omits days without answers from accuracy charts. Shared Markdown exporters
+produce local downloadable artifacts.

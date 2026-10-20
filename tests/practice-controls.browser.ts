@@ -40,7 +40,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
   try {
     button('Reports').click()
     await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
+      () => document.querySelector('.reports-page') !== null,
       'Could not leave previous screen',
     )
     button(title).click()
@@ -126,7 +126,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
     const clock = document.querySelector('.paused-panel h1')?.textContent
     button('Reports').click()
     await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
+      () => document.querySelector('.reports-page') !== null,
       'Paused navigation did not finish',
     )
     button(title).click()

@@ -47,10 +47,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       'App did not mount',
     )
     click('Reports')
-    await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
-      'Navigation did not finish',
-    )
+    await until(() => document.querySelector('.reports-page') !== null, 'Navigation did not finish')
     click(title)
     await until(
       () =>
@@ -201,7 +198,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
       click('Reports')
       await until(
-        () => document.querySelector('h1')?.textContent === 'Reports',
+        () => document.querySelector('.reports-page') !== null,
         'Cleanup navigation failed',
       )
     }

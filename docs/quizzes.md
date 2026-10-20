@@ -1,8 +1,9 @@
 # Quiz and exam flow
 
-The start page links to Quiz, Exam, Reports, and Importer. Quiz, Exam, and the library/importer are implemented. Completed results and
-local Markdown discussion reports live within their respective practice mode;
-the Reports page and charts are deferred.
+The start page links to Quiz, Exam, Reports, and Importer. Both practice modes,
+the library/importer, and the Reports dashboard are implemented. Completed results
+and local Markdown discussion reports are available within each practice mode
+and through the Reports page.
 
 A CLF-C02 quiz has 20 questions and a server-owned 20-minute deadline. An exam
 has **65 questions and a 90-minute deadline**. Both modes share the same bank
@@ -144,10 +145,45 @@ remain unchanged. Browser reload/close warns
 while starting or active, and saved active attempts can be reopened, but their
 time keeps running unless explicitly paused. Active overdue attempts still score
 normally. All completed results remain available through the history list for
-their mode. The Reports page and charts remain deferred.
+their mode and through the Reports dashboard.
 
 Development verification uses a separate `private/app/quiz-preview.sqlite3`
 copy, leaving the original library and curated import preview untouched.
+
+## Reports
+
+Open **Reports** for a master view, or select **Quizzes** / **Exams** to filter
+saved results by practice mode. All time, 7-day, 30-day and 90-day views use the
+attempt's completion time; daily chart dates are UTC. CLF-C02 is the currently
+supported certification. Reports recognize the practice session `mode` field and
+treat legacy snapshots as quizzes.
+
+- **Correct answers** counts every correct question appearance across the
+  selected completed attempts. Repeat questions count each time; this is study
+  activity rather than a count of unique mastered questions.
+- **Answer accuracy** divides correct answers by answered questions. Incorrect
+  partial multi-select answers are answered and incorrect. Skipped questions are
+  reported separately. No answered questions means no accuracy measurement.
+- **Raw attempt score** divides correct answers by all questions, including
+  skipped ones. An attempt meets the existing practice target at 80% or higher,
+  using the unrounded fraction. These are not AWS scaled scores or predictions
+  of exam readiness.
+- **Domain summary** shows answered-question accuracy with the practice target.
+  **Study details** shows correct, incorrect and skipped outcomes by domain,
+  saved study area and topic. Missing classifications remain unclassified.
+- **Study journal** opens any completed attempt with domain results and saved
+  answer review. Filter questions by domain, incorrect, skipped or flagged;
+  expand a question for choices, selections, correct answers, confidence and
+  provenance. The answer keys are the stored source keys, not independently
+  verified explanations.
+- **Export report** downloads the current filtered master report as Markdown.
+  Individual attempt reports include question-level answer evidence.
+
+Reports use saved session snapshots and survive bank changes or deletion.
+Active, paused, and abandoned attempts do not contribute; expired attempts are scored
+before reports are read. The report API returns aggregate evidence and attempt
+summaries without internal mastery fingerprints or question answer keys. All
+report generation and downloads remain local.
 
 ## Browser regression checks
 
@@ -172,3 +208,7 @@ green accent on correct choices. `tests/practice-spacing.browser.ts` checks the
 four/five/six-choice layout, compact Clear action, review wording, and scored-answer
 contrast. The reading regression also verifies each warning's 30-second dismissal
 without changing the reserved toolbar layout.
+
+`tests/reports-layout.browser.ts` checks confidence bars remain full-width below
+their labels when both practice and report stylesheets are loaded. Run it with
+at least one completed synthetic attempt in the disposable database.

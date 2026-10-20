@@ -64,10 +64,7 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
   try {
     await until(() => !!document.querySelector('nav'), 'App did not mount')
     click('Reports')
-    await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
-      'Navigation did not finish',
-    )
+    await until(() => document.querySelector('.reports-page') !== null, 'Navigation did not finish')
     click(title)
     await until(
       () =>
@@ -119,7 +116,7 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     window.fetch = originalFetch
     click('Reports')
     await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
+      () => document.querySelector('.reports-page') !== null,
       'Could not leave scored attempt',
     )
     click(title)
@@ -135,10 +132,7 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     window.fetch = originalFetch
     if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
     click('Reports')
-    await until(
-      () => document.querySelector('h1')?.textContent === 'Reports',
-      'Cleanup navigation failed',
-    )
+    await until(() => document.querySelector('.reports-page') !== null, 'Cleanup navigation failed')
     window.confirm = originalConfirm
   }
 }

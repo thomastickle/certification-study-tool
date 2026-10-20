@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
+import { ReportsPage } from './ReportsPage.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'reports' | 'importer'
 
@@ -10,6 +11,13 @@ const links: { id: Page; label: string }[] = [
   { id: 'reports', label: 'Reports' },
   { id: 'importer', label: 'Importer' },
 ]
+
+const descriptions: Partial<Record<Page, string>> = {
+  quiz: 'Start a timed quiz and review your answers.',
+  exam: 'Take a 65-question, 90-minute practice exam.',
+  reports: 'Explore your progress, domain strengths, and every attempt.',
+  importer: 'Manage your question library and sources.',
+}
 
 export function App() {
   const [page, setPage] = useState<Page>('home')
@@ -74,18 +82,8 @@ export function App() {
               >
                 <span className="eyebrow">STUDY WORKSPACE</span>
                 <strong>{link.label}</strong>
-                <span>
-                  {link.id === 'quiz'
-                    ? 'Start a timed quiz and review your answers.'
-                    : link.id === 'exam'
-                      ? 'Take a 65-question, 90-minute practice exam.'
-                      : link.id === 'importer'
-                        ? 'Manage your question library and sources.'
-                        : `${link.label} tools are coming soon.`}
-                </span>
-                <span className="home-card-action">
-                  {link.id === 'reports' ? 'Coming soon' : 'Open →'}
-                </span>
+                <span>{descriptions[link.id]}</span>
+                <span className="home-card-action">Open →</span>
               </button>
             ))}
           </section>
@@ -100,36 +98,7 @@ export function App() {
           }}
         />
       )}
-      {page === 'reports' && (
-        <main>
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">STUDY WORKSPACE</p>
-              <h1>Reports</h1>
-              <p className="intro">This section is coming soon.</p>
-            </div>
-            <button
-              onClick={() => {
-                void navigate('home')
-              }}
-            >
-              Back to workspace
-            </button>
-          </div>
-          <section className="placeholder-panel">
-            <h2>Reports are not available yet.</h2>
-            <p>For now, you can take a quiz or manage your question library.</p>
-            <button
-              className="primary"
-              onClick={() => {
-                void navigate('importer')
-              }}
-            >
-              Go to Importer
-            </button>
-          </section>
-        </main>
-      )}
+      {page === 'reports' && <ReportsPage />}
       {page === 'importer' && <LibraryPage />}
     </div>
   )
