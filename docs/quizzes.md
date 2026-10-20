@@ -328,3 +328,23 @@ Transpile and run `scoreReportsTest()` using the browser-only workflow above.
 The seed refuses an existing path and adds only synthetic snapshots: an 8/20 quiz,
 a 52/65 exam at the exact target, and an older all-skipped quiz. No private banks
 or personal study database are needed. Restart from the app start page for each run.
+
+## Internal question identity foundation
+
+The internal `question-identity.ts` helper composes a versioned mastery identity
+from the exact provider/certification namespace and the importer's content
+fingerprint and answer key. It reuses importer text normalization and unordered
+answer text semantics. Source IDs, references, classifications, and choice order
+are excluded; content, question type, correct answer text, and required choice
+count distinguish identities. Existing exact-duplicate selection is unchanged.
+
+Completed snapshot identity uses only saved question text, choices, type,
+`selectCount`, and correct answer IDs (public completed evidence and/or private
+saved keys). IDs are matched to saved answer IDs, not array positions. Both keys
+must agree when present. Missing, invalid, or ambiguous evidence returns `null`,
+including duplicate normalized choice text. Snapshots are never mutated or
+resolved against the current library, so deletion and key edits preserve history.
+Legacy app-created quizzes are exclusively AWS CLF-C02; snapshots lack a saved
+certification namespace, so this helper supports that legacy contract only and
+must not be used to infer other certifications. It adds no report API fields,
+mastery transitions, scheduling, thresholds, or concept grouping.
