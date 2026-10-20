@@ -5,17 +5,17 @@ import { ReportsPage } from './ReportsPage.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
 
-const links: { id: Page; label: string }[] = [
-  { id: 'quiz', label: 'Quiz' },
-  { id: 'exam', label: 'Exam' },
+type Destination = 'practice' | 'review' | 'reports' | 'importer'
+
+const links: { id: Destination; label: string }[] = [
+  { id: 'practice', label: 'Practice' },
   { id: 'review', label: 'Due Review' },
   { id: 'reports', label: 'Reports' },
   { id: 'importer', label: 'Importer' },
 ]
 
-const descriptions: Partial<Record<Page, string>> = {
-  quiz: 'Start a timed quiz and review your answers.',
-  exam: 'Take a 65-question, 90-minute practice exam.',
+const descriptions: Record<Destination, string> = {
+  practice: 'Choose a short quiz or a full-length exam, then review your answers.',
   review: 'Review due retention checks without quiz or exam domain quotas.',
   reports: 'Explore your progress, domain strengths, and every attempt.',
   importer: 'Manage your question library and sources.',
@@ -23,12 +23,16 @@ const descriptions: Partial<Record<Page, string>> = {
 
 export function App() {
   const [page, setPage] = useState<Page>('home')
+  const [practiceMode, setPracticeMode] = useState<'quiz' | 'exam'>('quiz')
+  const [practiceSourceIds, setPracticeSourceIds] = useState<number[]>()
+  const [focusPreset, setFocusPreset] = useState(false)
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
+  const destination = page === 'quiz' || page === 'exam' ? 'practice' : page
 
   const navigating = useRef(false)
 
   /** Serialize page changes while practice work is being suspended. */
-  async function navigate(next: Page) {
+  async function navigate(next: Page, presetChange = false) {
     if (navigating.current || next === page) {
       return
     }
@@ -41,6 +45,8 @@ export function App() {
       ) {
         return
       }
+      if (next === 'quiz' || next === 'exam') setPracticeMode(next)
+      setFocusPreset(presetChange)
       setPage(next)
     } finally {
       navigating.current = false
@@ -65,10 +71,10 @@ export function App() {
           {links.map((link) => (
             <button
               key={link.id}
-              className={page === link.id ? 'active' : ''}
-              aria-current={page === link.id ? 'page' : undefined}
+              className={destination === link.id ? 'active' : ''}
+              aria-current={destination === link.id ? 'page' : undefined}
               onClick={() => {
-                void navigate(link.id)
+                void navigate(link.id === 'practice' ? practiceMode : link.id)
               }}
             >
               {link.label}
@@ -94,7 +100,7 @@ export function App() {
                 key={link.id}
                 className="home-card"
                 onClick={() => {
-                  void navigate(link.id)
+                  void navigate(link.id === 'practice' ? practiceMode : link.id)
                 }}
               >
                 <span className="eyebrow">STUDY WORKSPACE</span>
@@ -110,6 +116,16 @@ export function App() {
         <QuizPage
           key={page}
           mode={page}
+          initialSourceIds={page === 'review' ? undefined : practiceSourceIds}
+          onSourceIdsChange={page === 'review' ? undefined : setPracticeSourceIds}
+          focusPreset={focusPreset}
+          onPresetChange={
+            page === 'review'
+              ? undefined
+              : (mode) => {
+                  void navigate(mode, true)
+                }
+          }
           onRegisterLeave={(fn) => {
             leaveQuiz.current = fn
           }}

@@ -1,8 +1,10 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 /** Browser-only regression, evaluated in the app against a disposable populated database. */
 export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<string> {
-  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const total = mode === 'exam' ? 65 : 20
   const originalConfirm = window.confirm
+  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const originalFetch = window.fetch
 
   let releaseResume = () => {}
@@ -43,7 +45,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
       () => document.querySelector('.reports-page') !== null,
       'Could not leave previous screen',
     )
-    button(title).click()
+    await openPracticePreset(mode)
     await until(
       () =>
         [...document.querySelectorAll('button')].some(
@@ -129,7 +131,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
       () => document.querySelector('.reports-page') !== null,
       'Paused navigation did not finish',
     )
-    button(title).click()
+    await openPracticePreset(mode)
     await until(
       () => !!document.querySelector('.recovery-panel'),
       'Paused attempt was not recoverable',
@@ -167,7 +169,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
     )
     assert((await current()).id === paused.id, 'Resume created a new attempt')
     assert((await current()).status === 'paused', 'Navigation did not suspend the resumed attempt')
-    button(title).click()
+    await openPracticePreset(mode)
     await until(
       () => !!document.querySelector('.recovery-panel'),
       'Suspended attempt was not recoverable',

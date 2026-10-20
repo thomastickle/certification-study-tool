@@ -1,11 +1,13 @@
+import { openPracticePreset } from './practice-browser-helpers.ts'
+
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
 export async function lostResumeCheck(
   mode: 'quiz' | 'exam',
   outcome: 'leave' | 'read-failure' | 'pause-failure' | 'poll-recovery' | 'stale-poll',
 ) {
+  const title = mode === 'exam' ? 'Exam' : 'Quiz'
   const originalFetch = window.fetch
   const originalConfirm = window.confirm
-  const title = mode === 'quiz' ? 'Quiz' : 'Exam'
   let attemptId = ''
   let resumed = false
   let failRead = outcome === 'read-failure' || outcome === 'poll-recovery'
@@ -73,7 +75,7 @@ export async function lostResumeCheck(
   try {
     click('Reports')
     await until(() => !!document.querySelector('.reports-page'), 'Previous screen did not close')
-    click(title)
+    await openPracticePreset(mode)
     const startLabel = `Start ${mode === 'quiz' ? 20 : 65}-question ${mode}`
     await until(
       () =>
@@ -171,7 +173,7 @@ export async function lostResumeCheck(
       !report.attempts.some((item: { id: string }) => item.id === attemptId),
       'Unfinished attempt entered reports',
     )
-    click(title)
+    await openPracticePreset(mode)
     await until(() => document.body.innerText.includes(`Continue ${mode}`), 'Recovery missing')
     click(`Continue ${mode}`)
     await until(() => !!document.querySelector('.paused-panel'), 'Recovery resumed implicitly')
