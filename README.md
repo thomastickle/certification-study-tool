@@ -35,6 +35,38 @@ the original Python app's database; existing unrelated databases are refused.
 The current schema is version 2 and uses an application identifier to recognize
 its own databases. No legacy database migration is implemented.
 
+## Run with Docker
+
+With Docker Engine/Desktop and Docker Compose running:
+
+```sh
+docker compose up --build -d
+```
+
+Open **http://127.0.0.1:3000**. The image builds the frontend and runs the
+production server as a non-root user. Only the host loopback interface is
+published; keep this binding because the app has no user authentication.
+Port 3000 must be free. Keep host and container ports the same because the
+local Host/Origin checks use the server port.
+
+```sh
+docker compose logs -f study  # View logs
+docker compose down           # Stop; retain your library
+docker compose up -d          # Start again
+```
+
+The `study-data` Docker volume stores SQLite data across container rebuilds and
+recreation. `docker compose down --volumes` **permanently deletes that library**.
+Back up the volume while the service is stopped before removing volumes or
+moving machines. This starts a new, empty library; your existing
+`private/app/library.sqlite3` is not copied. Import banks through the browser as
+usual. Private files, local databases, credentials, and Git history are excluded
+from the build context and image. No image publishing is required.
+
+For native runs, `STUDY_HOST` defaults to `127.0.0.1`; the image sets it to
+`0.0.0.0` so Docker can forward connections. Local Host/Origin protections remain
+active in either mode.
+
 ## Import and review
 
 1. Choose **Import a bank**, then a version-2 JSON file (maximum 10 MB).

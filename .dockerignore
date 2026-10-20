@@ -1,0 +1,10 @@
+# Allow only build inputs; private banks, databases, credentials and Git stay local.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts
+!src/
+!src/**
+!docs/
+!docs/**

@@ -5,6 +5,7 @@ import { QuizService } from './quizzes/quiz-service.ts'
 import { apiController, checkLocalRequest } from './http-controller.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 
+const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error('STUDY_PORT must be a valid port.')
@@ -90,9 +91,7 @@ if (!production) {
     }
   }
 }
-server.listen(port, '127.0.0.1', () =>
-  console.log(`Certification Study Tool: http://127.0.0.1:${port}`),
-)
+server.listen(port, host, () => console.log(`Certification Study Tool: http://127.0.0.1:${port}`))
 
 async function shutdown() {
   clearInterval(expiryTimer)

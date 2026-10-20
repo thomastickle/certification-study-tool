@@ -1,0 +1,12 @@
+services:
+  study:
+    build: .
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - study-data:/data
+    restart: unless-stopped
+    init: true
+
+volumes:
+  study-data:
