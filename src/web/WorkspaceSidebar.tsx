@@ -82,7 +82,7 @@ export function WorkspaceSidebar({ destination, onNavigate }: Props) {
   function startDrag(event: PointerEvent<HTMLDivElement>) {
     if (!event.isPrimary || event.button !== 0 || drag.current) return
     event.preventDefault()
-    event.currentTarget.focus()
+    event.currentTarget.blur()
     event.currentTarget.setPointerCapture(event.pointerId)
     drag.current = {
       pointerId: event.pointerId,
