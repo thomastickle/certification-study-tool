@@ -29,9 +29,9 @@ function OutcomeBar({ counts }: { counts: ReportCounts }) {
   )
 }
 
-/** Plots cumulative correct answers or daily answered-question accuracy on a real time axis. */
+/** Plots cumulative correct answers or daily score including skips on a real time axis. */
 function ProgressChart({ report }: { report: StudyReport }) {
-  const [metric, setMetric] = useState<'correct' | 'accuracy'>('correct')
+  const [metric, setMetric] = useState<'correct' | 'score'>('correct')
   const { points, max } = progressChart(report.timeline, metric)
   const line = points.map((point) => `${point.x},${point.y}`).join(' ')
   const start = points[0]
@@ -45,17 +45,17 @@ function ProgressChart({ report }: { report: StudyReport }) {
         </div>
         <div className="chart-switch" aria-label="Chart metric">
           <button aria-pressed={metric === 'correct'} onClick={() => setMetric('correct')}>
-            Correct answers
+            Correct-answer activity
           </button>
-          <button aria-pressed={metric === 'accuracy'} onClick={() => setMetric('accuracy')}>
-            Accuracy
+          <button aria-pressed={metric === 'score'} onClick={() => setMetric('score')}>
+            Score
           </button>
         </div>
       </div>
       <p className="chart-caption">
         {metric === 'correct'
           ? 'Cumulative correct answers'
-          : 'Daily accuracy on answered questions'}{' '}
+          : 'Daily score · correct / all questions'}{' '}
         · UTC
       </p>
       <svg
@@ -65,7 +65,7 @@ function ProgressChart({ report }: { report: StudyReport }) {
         aria-label={
           metric === 'correct'
             ? `Cumulative correct answers: ${report.counts.correct}. Daily values in chart data below.`
-            : 'Daily answered-question accuracy. Values in chart data below.'
+            : 'Daily score including skipped questions. Values in chart data below.'
         }
       >
         <defs>
@@ -86,11 +86,11 @@ function ProgressChart({ report }: { report: StudyReport }) {
             />
             <text x="32" y={184 - fraction * 145} textAnchor="end">
               {Math.round(fraction * max)}
-              {metric === 'accuracy' ? '%' : ''}
+              {metric === 'score' ? '%' : ''}
             </text>
           </g>
         ))}
-        {metric === 'accuracy' && (
+        {metric === 'score' && (
           <g>
             <line x1="48" x2="686" y1="64" y2="64" stroke="#ebc78c" strokeDasharray="5 5" />
             <text x="680" y="55" textAnchor="end" className="chart-target">
@@ -111,7 +111,7 @@ function ProgressChart({ report }: { report: StudyReport }) {
         {points.map((point) => (
           <circle key={point.date} cx={point.x} cy={point.y} r="4" fill="#e2f3c7">
             <title>
-              {point.date}: {point.counts.correct} correct / {point.counts.answered} answered;{' '}
+              {point.date}: {point.counts.correct} correct / {point.counts.total} questions;{' '}
               {point.counts.skipped} skipped
             </title>
           </circle>
@@ -140,7 +140,7 @@ function ProgressChart({ report }: { report: StudyReport }) {
                 <th>Correct</th>
                 <th>Answered</th>
                 <th>Skipped</th>
-                <th>Accuracy</th>
+                <th>Score</th>
               </tr>
             </thead>
             <tbody>
@@ -150,7 +150,7 @@ function ProgressChart({ report }: { report: StudyReport }) {
                   <td>{day.counts.correct}</td>
                   <td>{day.counts.answered}</td>
                   <td>{day.counts.skipped}</td>
-                  <td>{percent(day.counts.accuracy)}</td>
+                  <td>{percent(day.counts.score)}</td>
                 </tr>
               ))}
             </tbody>
@@ -172,28 +172,28 @@ export function ReportDashboard({
   const [domainView, setDomainView] = useState<'summary' | 'detail'>('summary')
   const [historyPage, setHistoryPage] = useState(0)
   const counts = report.counts
-  const studied = report.domains.filter((domain) => domain.counts.answered > 0)
-  const weakest = [...studied].sort((a, b) => a.counts.accuracy! - b.counts.accuracy!)[0]
+  const studied = report.domains.filter((domain) => domain.counts.total > 0)
+  const weakest = [...studied].sort((a, b) => a.counts.score! - b.counts.score!)[0]
   return (
     <>
       <section className="report-stats" aria-label="Performance summary">
         <div>
           <span className="stat-label">
-            Correct answers <span>↗</span>
+            Correct-answer activity <span>↗</span>
           </span>
           <strong>
             {counts.correct.toLocaleString()}
             <small> / {counts.total.toLocaleString()}</small>
           </strong>
-          <p>Across all question appearances</p>
+          <p>Repeat questions count each time</p>
         </div>
         <div>
           <span className="stat-label">
-            Answer accuracy <span>◎</span>
+            Score <span>◎</span>
           </span>
-          <strong>{percent(counts.accuracy)}</strong>
+          <strong>{percent(counts.score)}</strong>
           <p>
-            {counts.answered} answered · {counts.skipped} skipped
+            {counts.correct}/{counts.total} questions correct · skips count as misses
           </p>
         </div>
         <div>
@@ -214,7 +214,7 @@ export function ReportDashboard({
             {studied.length}
             <small> / 4 domains</small>
           </strong>
-          <p>Every answer builds the picture</p>
+          <p>Completed question appearances</p>
         </div>
       </section>
       <div className="report-feature-grid">
@@ -227,7 +227,7 @@ export function ReportDashboard({
           <h2>{weakest ? weakest.name : 'Make your first mark.'}</h2>
           <p>
             {weakest
-              ? `Your lowest answered-question accuracy is ${percent(weakest.counts.accuracy)} here, based on ${weakest.counts.answered} answers. A focused review is a useful next step.`
+              ? `Your lowest score is ${percent(weakest.counts.score)} here, based on ${weakest.counts.total} question appearances. A focused review is a useful next step.`
               : 'Answer a few questions to discover where a little extra practice can help.'}
           </p>
           <div className="focus-footnote">
@@ -235,7 +235,10 @@ export function ReportDashboard({
               ? `${weakest.counts.correct} correct · ${weakest.counts.incorrect} incorrect · ${weakest.counts.skipped} skipped`
               : 'Your study story starts with an answer.'}
           </div>
-          <small>Practice evidence, not an official exam score or readiness prediction.</small>
+          <small>
+            Repeated questions and small samples can limit this suggestion. This is practice
+            evidence, not an official exam score or readiness prediction.
+          </small>
         </aside>
       </div>
       <section className="report-panel" aria-labelledby="domains-heading">
@@ -257,7 +260,7 @@ export function ReportDashboard({
           </div>
         </div>
         <p className="report-muted">
-          Accuracy uses answered questions. The marker is your 80% practice target.
+          Score uses all questions, including skips. The marker is your 80% practice target.
         </p>
         {domainView === 'summary' ? (
           <div className="domain-grid">
@@ -265,17 +268,17 @@ export function ReportDashboard({
               <article className="domain-card" key={domain.id}>
                 <div className="domain-card-top">
                   <span className="domain-number">0{domain.domain}</span>
-                  <strong>{percent(domain.counts.accuracy)}</strong>
+                  <strong>{percent(domain.counts.score)}</strong>
                 </div>
                 <h3>{domain.name}</h3>
                 <div className="domain-meter">
-                  <span style={{ width: `${domain.counts.accuracy ?? 0}%` }} />
+                  <span style={{ width: `${domain.counts.score ?? 0}%` }} />
                   <i />
                 </div>
                 <p>
-                  {domain.counts.answered
-                    ? `${domain.counts.correct} of ${domain.counts.answered} answered correctly`
-                    : 'No answers in this domain yet'}
+                  {domain.counts.total
+                    ? `${domain.counts.correct} of ${domain.counts.total} questions correct`
+                    : 'No questions in this domain yet'}
                 </p>
                 <span className="domain-note">
                   {domain.counts.skipped} skipped · {domain.counts.total} appearances
@@ -292,8 +295,10 @@ export function ReportDashboard({
                   <th>Domain / study area / topic</th>
                   <th>Correct</th>
                   <th>Incorrect</th>
+                  <th>Answered</th>
                   <th>Skipped</th>
-                  <th>Accuracy</th>
+                  <th>Score</th>
+                  <th>Accuracy on answered questions</th>
                 </tr>
               </thead>
               <tbody>
@@ -314,12 +319,12 @@ export function ReportDashboard({
             <div className="report-confidence-row" key={group.name}>
               <div>
                 <span>{group.name}</span>
-                <strong>{percent(group.counts.accuracy)}</strong>
+                <strong>{percent(group.counts.score)}</strong>
               </div>
               <OutcomeBar counts={group.counts} />
               <small>
-                {group.counts.correct} correct / {group.counts.answered} answered ·{' '}
-                {group.counts.skipped} skipped
+                Score · {group.counts.correct}/{group.counts.total} questions correct ·{' '}
+                {group.counts.answered} answered · {group.counts.skipped} skipped
               </small>
             </div>
           ))}
@@ -392,8 +397,9 @@ export function ReportDashboard({
         </section>
       </div>
       <p className="report-method">
-        Completed attempts only · Repeat questions count each time · Raw practice scores, not AWS
-        scaled scores · All activity stays in your local workspace
+        Completed attempts only · Repeat questions count each time · Activity counts are not
+        unique-question mastery · Raw practice scores, not AWS scaled scores · All activity stays in
+        your local workspace
       </p>
     </>
   )
@@ -411,7 +417,9 @@ function DomainRows({ report, domain }: { report: StudyReport; domain: number })
         </th>
         <td>{group.counts.correct}</td>
         <td>{group.counts.incorrect}</td>
+        <td>{group.counts.answered}</td>
         <td>{group.counts.skipped}</td>
+        <td>{percent(group.counts.score)}</td>
         <td>{percent(group.counts.accuracy)}</td>
       </tr>
       {topics.map((topic) => (
@@ -421,7 +429,9 @@ function DomainRows({ report, domain }: { report: StudyReport; domain: number })
           </th>
           <td>{topic.counts.correct}</td>
           <td>{topic.counts.incorrect}</td>
+          <td>{topic.counts.answered}</td>
           <td>{topic.counts.skipped}</td>
+          <td>{percent(topic.counts.score)}</td>
           <td>{percent(topic.counts.accuracy)}</td>
         </tr>
       ))}
