@@ -47,8 +47,7 @@ export function HomePage({ onNavigate }: Props) {
           <p className="home-kicker">YOUR CERTIFICATION</p>
           <p className="exam-brief-code">CLF-C02</p>
           <p className="exam-brief-name">
-            AWS Certified
-            <br />
+            AWS Certified <br />
             Cloud Practitioner
           </p>
           <dl>
