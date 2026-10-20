@@ -19,8 +19,10 @@ not pause during failures, navigation, or browser sleep.
 
 During an attempt the compact toolbar shows question progress, save status, an
 **HH:MM:SS** clock, Pause, and an Actions dropdown. The dropdown offers Review
-answers, Submit and score, and Abandon; the question footer contains only Previous
-and Next. Answers, confidence, and flags save immediately, without a lock-in step.
+answers, Submit and score, and Abandon. The footer has compact, equal-width
+Previous and Next buttons at opposite edges. On the final question, Next becomes
+Review / submit and opens answer review. Answers, confidence, and flags save
+immediately, without a lock-in step.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
 scroll containers. The review grid labels answered/unanswered questions and flags. Questions needing
