@@ -2,10 +2,12 @@ import { useRef, useState } from 'react'
 import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
 import { ReportsPage } from './ReportsPage.tsx'
+import { HomePage } from './HomePage.tsx'
 
 type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
 
 const links: { id: Page; label: string }[] = [
+  { id: 'home', label: 'Home' },
   { id: 'quiz', label: 'Quiz' },
   { id: 'exam', label: 'Exam' },
   { id: 'review', label: 'Due Review' },
@@ -13,14 +15,7 @@ const links: { id: Page; label: string }[] = [
   { id: 'importer', label: 'Importer' },
 ]
 
-const descriptions: Partial<Record<Page, string>> = {
-  quiz: 'Start a timed quiz and review your answers.',
-  exam: 'Take a 65-question, 90-minute practice exam.',
-  review: 'Review due retention checks without quiz or exam domain quotas.',
-  reports: 'Explore your progress, domain strengths, and every attempt.',
-  importer: 'Manage your question library and sources.',
-}
-
+/** Keep practice navigation serialized so a session is safely suspended before leaving. */
 export function App() {
   const [page, setPage] = useState<Page>('home')
   const leaveQuiz = useRef<() => Promise<boolean>>(async () => true)
@@ -57,7 +52,9 @@ export function App() {
           }}
         >
           <span className="brand-mark" aria-hidden="true">
-            S
+            <span />
+            <span />
+            <span />
           </span>
           <span>Certification Study Tool</span>
         </button>
@@ -75,36 +72,23 @@ export function App() {
             </button>
           ))}
         </nav>
+      </header>
+      <div className="workspace-context">
+        <div className="certification-context" role="group" aria-label="Practice certification">
+          <span className="context-label">Practice certification</span>
+          <strong>AWS Cloud Practitioner</strong>
+          <span className="exam-code">CLF-C02</span>
+        </div>
         <span className="local-badge">
           <span aria-hidden="true" /> Local workspace
         </span>
-      </header>
+      </div>
       {page === 'home' && (
-        <main>
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">YOUR STUDY WORKSPACE</p>
-              <h1>Build knowledge, one question at a time.</h1>
-              <p className="intro">Choose where you want to begin.</p>
-            </div>
-          </div>
-          <section className="home-cards" aria-label="Study tools">
-            {links.map((link) => (
-              <button
-                key={link.id}
-                className="home-card"
-                onClick={() => {
-                  void navigate(link.id)
-                }}
-              >
-                <span className="eyebrow">STUDY WORKSPACE</span>
-                <strong>{link.label}</strong>
-                <span>{descriptions[link.id]}</span>
-                <span className="home-card-action">Open →</span>
-              </button>
-            ))}
-          </section>
-        </main>
+        <HomePage
+          onNavigate={(next) => {
+            void navigate(next)
+          }}
+        />
       )}
       {(page === 'quiz' || page === 'exam' || page === 'review') && (
         <QuizPage

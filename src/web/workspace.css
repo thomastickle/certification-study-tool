@@ -1,0 +1,390 @@
+.masthead {
+  min-height: 76px;
+  padding-inline: max(5vw, calc((100vw - 1206px) / 2));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  background: #fffefb;
+  border-bottom: 1px solid #d9dcd7;
+}
+.brand-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #252e35;
+  font-size: 16px;
+  letter-spacing: -0.5px;
+}
+.brand-button:hover {
+  background: transparent;
+}
+.brand-mark {
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  height: 25px;
+  transform: skewY(-12deg);
+}
+.brand-mark span {
+  width: 5px;
+  height: 100%;
+  background: #c25b35;
+}
+.brand-mark span:nth-child(2) {
+  height: 75%;
+}
+.brand-mark span:last-child {
+  height: 50%;
+}
+.app-nav {
+  display: flex;
+  align-self: stretch;
+  gap: 20px;
+}
+.app-nav button {
+  flex-shrink: 0;
+  padding: 6px 0 3px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #5b6369;
+  font-size: 13px;
+  font-weight: 500;
+}
+.app-nav button:hover {
+  color: #252e35;
+  border-bottom-color: #bbbfb9;
+}
+.app-nav button.active {
+  color: #252e35;
+  border-bottom-color: #c25b35;
+}
+.workspace-context {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 12px max(5vw, calc((100vw - 1206px) / 2));
+  background: #f0f1eb;
+  border-bottom: 1px solid #d9dcd7;
+  font-size: 12px;
+}
+.certification-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  color: #303b43;
+}
+.context-label {
+  color: #5e686c;
+}
+.certification-context strong {
+  font-weight: 600;
+}
+.exam-code {
+  padding-left: 14px;
+  border-left: 1px solid #c9ceca;
+  font:
+    11px ui-monospace,
+    monospace;
+}
+.local-badge {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 7px;
+  color: #5e686c;
+  font-size: 11px;
+}
+.local-badge > span {
+  height: 5px;
+  width: 5px;
+  border-radius: 50%;
+  background: #64745c;
+}
+.home-page {
+  padding-top: 60px;
+  padding-bottom: 32px;
+  color: #252e35;
+}
+.home-page button {
+  border-radius: 3px;
+}
+.certification-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 80px;
+  padding-bottom: 48px;
+}
+.home-kicker {
+  margin: 0 0 18px;
+  color: #5b6467;
+  font:
+    10px/1.6 ui-monospace,
+    monospace;
+  letter-spacing: 1.5px;
+}
+.home-page h1 {
+  max-width: 650px;
+  margin: 0 0 22px;
+  font-family: inherit;
+  font-size: clamp(42px, 5.3vw, 68px);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -3px;
+}
+.home-intro {
+  margin: 0 0 28px;
+  color: #5b6467;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.home-page .home-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 36px;
+  padding: 12px 18px;
+  border-color: #263a43;
+  background: #263a43;
+  color: #fffefb;
+  font-size: 13px;
+}
+.home-page .home-primary:hover {
+  background: #3e535b;
+}
+.exam-brief {
+  padding: 22px 0 0 24px;
+  border-left: 2px solid #c25b35;
+}
+.exam-brief .home-kicker {
+  margin-bottom: 9px;
+}
+.exam-brief-code {
+  margin: 0;
+  font:
+    26px/1.5 ui-monospace,
+    monospace;
+  letter-spacing: -1px;
+}
+.exam-brief-name {
+  margin: 8px 0 22px;
+  color: #5b6467;
+  font-size: 13px;
+}
+.exam-brief dl {
+  margin: 0;
+  font-size: 12px;
+}
+.exam-brief dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding-block: 7px;
+  border-top: 1px solid #d9dcd7;
+}
+.exam-brief dt {
+  color: #5b6467;
+}
+.exam-brief dd {
+  margin: 0;
+}
+.study-options-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #929b9b;
+}
+.study-options-heading h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.7px;
+}
+.study-options-heading > span {
+  color: #5b6467;
+  font-size: 12px;
+}
+.study-option {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 180px 190px;
+  align-items: center;
+  gap: 20px;
+  padding-block: 24px;
+  border-bottom: 1px solid #d9dcd7;
+}
+.study-option-number {
+  align-self: start;
+  padding-top: 3px;
+  color: #9b4c2d;
+  font:
+    12px/1.6 ui-monospace,
+    monospace;
+}
+.study-option h3 {
+  margin: 0 0 5px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.study-option p {
+  margin: 0;
+  color: #5b6467;
+  font-size: 13px;
+}
+.study-option-format {
+  color: #5b6467;
+  font-size: 12px;
+}
+.study-option button,
+.workspace-tools button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #303b43;
+  font-size: 13px;
+  text-align: left;
+}
+.study-option button:hover,
+.workspace-tools button:hover {
+  color: #924429;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.workspace-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  padding-top: 32px;
+}
+.workspace-tools > div + div {
+  padding-left: 32px;
+  border-left: 1px solid #d9dcd7;
+}
+.workspace-tools h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.workspace-tools p {
+  margin: 6px 0;
+  color: #5b6467;
+  font-size: 13px;
+}
+.home-scope-note {
+  margin: 28px 0 0;
+  color: #5b6467;
+  font-size: 11px;
+}
+@media (max-width: 1000px) {
+  .masthead {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 16px;
+  }
+  .app-nav {
+    width: 100%;
+    gap: 28px;
+  }
+  .app-nav button {
+    padding-block: 10px;
+  }
+  .certification-overview {
+    gap: 36px;
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+  .study-option {
+    grid-template-columns: 24px minmax(0, 1fr) 180px;
+    gap: 8px 18px;
+  }
+  .study-option-format {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .study-option button {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+}
+@media (max-width: 600px) {
+  .masthead {
+    padding-inline: 20px;
+  }
+  .app-nav {
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .app-nav button {
+    font-size: 12px;
+  }
+  .workspace-context {
+    padding: 12px 20px;
+  }
+  .context-label {
+    width: 100%;
+    font-size: 10px;
+  }
+  .local-badge {
+    display: none;
+  }
+  .home-page {
+    padding-top: 32px;
+  }
+  .certification-overview {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding-bottom: 32px;
+  }
+  .home-page h1 {
+    font-size: 48px;
+    letter-spacing: -2px;
+  }
+  .home-kicker {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .home-intro {
+    font-size: 14px;
+  }
+  .exam-brief {
+    padding: 0 0 0 18px;
+  }
+  .exam-brief-name br {
+    display: none;
+  }
+  .study-options-heading {
+    display: block;
+  }
+  .study-options-heading > span {
+    display: block;
+    margin-top: 5px;
+  }
+  .study-option {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 8px 12px;
+    padding-block: 20px;
+  }
+  .study-option button {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .workspace-tools {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .workspace-tools > div + div {
+    padding: 24px 0 0;
+    border-left: 0;
+    border-top: 1px solid #d9dcd7;
+  }
+}
