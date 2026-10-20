@@ -7,7 +7,9 @@ the Reports page and charts are deferred.
 A CLF-C02 quiz has 20 questions and a server-owned 20-minute deadline. An exam
 has **65 questions and a 90-minute deadline**. Both modes share the same bank
 picker, answer controls, timing, review, grading, and report flow. Warnings
-appear at 10 and 2 minutes remaining, including on the pre-submit review screen.
+appear inline in the toolbar at 10 and 2 minutes remaining, including on the
+pre-submit review screen. Their reserved slot keeps the question from shifting;
+the 10-minute warning is yellow and the final warning is red.
 Answers are saved after each change. At expiry the server scores the saved
 choices; unanswered questions and incomplete/incorrect multi-select sets are
 misses. Late changes are ignored. A running server checks deadlines every second;
@@ -21,7 +23,10 @@ answers, Submit and score, and Abandon; the question footer contains only Previo
 and Next. Answers, confidence, and flags save immediately, without a lock-in step.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
-scroll containers. The review grid labels answered/unanswered questions and flags.
+scroll containers. The review grid labels answered/unanswered questions and flags. Questions needing
+review have a yellow background and a Needs review label: unanswered/incomplete
+answers, return flags, and missing or low confidence. Confident complete answers
+without flags are unhighlighted.
 
 Each question supports its original single/multiple selection count, optional
 confidence (Confident, Educated Guess, Unsure), and a mark for return. The review
@@ -146,6 +151,8 @@ copy, leaving the original library and curated import preview untouched.
 `tests/quiz-navigation.browser.ts` checks delayed start followed by leave, cancel,
 and failure for both modes. `tests/practice-controls.browser.ts` checks autosave,
 Previous/Next, review metadata, pause, recovery, resume, and menu abandonment.
+`tests/practice-reading.browser.ts` checks the final-question review transition,
+review highlighting, readable controls, and warning placement without layout shifts.
 These browser-only checks are separate from `npm test`. Run against a disposable
 populated database: transpile each exported function with TypeScript's ESNext
 module target, evaluate it in the app page, and call it with each documented mode

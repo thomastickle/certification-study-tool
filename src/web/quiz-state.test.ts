@@ -14,11 +14,11 @@ test('warning threshold follows server deadline, including crossed thresholds', 
 
 test('review list includes unanswered, flagged, low confidence, and unrecorded confidence', () => {
   const questions = [
-    { questionId: 1, selected: [], confidence: null, flagged: false },
-    { questionId: 2, selected: [1], confidence: 'Confident', flagged: true },
-    { questionId: 3, selected: [1], confidence: 'Unsure', flagged: false },
-    { questionId: 4, selected: [1], confidence: 'Educated Guess', flagged: false },
-    { questionId: 5, selected: [1], confidence: 'Confident', flagged: false },
+    { questionId: 1, selectCount: 1, selected: [], confidence: null, flagged: false },
+    { questionId: 2, selectCount: 1, selected: [1], confidence: 'Confident', flagged: true },
+    { questionId: 3, selectCount: 1, selected: [1], confidence: 'Unsure', flagged: false },
+    { questionId: 4, selectCount: 1, selected: [1], confidence: 'Educated Guess', flagged: false },
+    { questionId: 5, selectCount: 1, selected: [1], confidence: 'Confident', flagged: false },
   ] as QuizQuestion[]
   assert.deepEqual(reviewQuestionIds(questions), [1, 2, 3, 4])
 })
@@ -87,4 +87,16 @@ test('practice clock uses hours, minutes and seconds for both session lengths', 
   assert.equal(formatTime(1200), '00:20:00')
   assert.equal(formatTime(59), '00:00:59')
   assert.equal(formatTime(0), '00:00:00')
+})
+
+test('incomplete multi-select answers need review even when marked confident', () => {
+  const question = {
+    questionId: 0,
+    selected: [1],
+    selectCount: 2,
+    flagged: false,
+    confidence: 'Confident',
+  } as QuizQuestion
+  assert.deepEqual(reviewQuestionIds([question]), [0])
+  assert.deepEqual(reviewQuestionIds([{ ...question, selected: [1, 2] }]), [])
 })
