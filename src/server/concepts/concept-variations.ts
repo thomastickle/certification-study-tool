@@ -21,14 +21,34 @@ export function completedRecency(attempts: StoredQuiz[]): Map<string, number> {
   return recency
 }
 
-/** Keep the weighted draw unless a direct reviewed sibling is eligible in its domain and tier. */
+/** Prefer fresh groups and less recent direct siblings within the weighted draw’s domain and tier. */
 export function preferVariation<T extends VariationCandidate>(
   drawn: T,
   eligible: T[],
   groups: ReviewedConcept[],
   recency: Map<string, number>,
   random = Math.random,
+  selected: ReadonlySet<string> = new Set(),
 ): T {
+  const represented = (candidate: T) =>
+    groups.some(
+      (group) =>
+        group.identities.includes(candidate.identity) &&
+        group.identities.some((identity) => selected.has(identity)),
+    )
+
+  // The first weighted draw fixes the priority tier, even when avoiding a group repeat.
+  if (represented(drawn)) {
+    const fresh = eligible.filter(
+      (candidate) =>
+        candidate.domain === drawn.domain &&
+        candidate.tier === drawn.tier &&
+        !represented(candidate),
+    )
+    if (fresh.length > 0) {
+      drawn = fresh[Math.floor(random() * fresh.length)]!
+    }
+  }
   const direct = new Set(
     groups
       .filter((group) => group.identities.includes(drawn.identity))
@@ -37,7 +57,7 @@ export function preferVariation<T extends VariationCandidate>(
   if (direct.size === 0) {
     return drawn
   }
-  const alternatives = eligible.filter(
+  let alternatives = eligible.filter(
     (candidate) =>
       direct.has(candidate.identity) &&
       candidate.domain === drawn.domain &&
@@ -45,6 +65,10 @@ export function preferVariation<T extends VariationCandidate>(
   )
   if (alternatives.length === 0) {
     return drawn
+  }
+  const freshAlternatives = alternatives.filter((candidate) => !represented(candidate))
+  if (freshAlternatives.length > 0) {
+    alternatives = freshAlternatives
   }
   const leastRecent = Math.min(
     ...alternatives.map((candidate) => recency.get(candidate.identity) ?? -Infinity),

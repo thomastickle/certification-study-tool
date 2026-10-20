@@ -1,3 +1,4 @@
+import { ConceptLabels } from './ConceptLabels.tsx'
 import { AttemptTiming } from './AttemptTiming.tsx'
 import { useState } from 'react'
 import type { QuizView } from '../shared/quiz-contracts.ts'
@@ -154,6 +155,7 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
                 {domainNames[question.domain - 1]} · {question.area ?? 'Unclassified'} ·{' '}
                 {question.topic ?? 'Unclassified'}
               </p>
+              <ConceptLabels question={question} />
               <ul className="review-choices">
                 {question.answers.map((answer) => (
                   <li

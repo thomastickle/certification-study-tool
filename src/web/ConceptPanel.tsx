@@ -199,7 +199,10 @@ export function ConceptPanel({ refreshKey }: { refreshKey: number }) {
             void run(async () => {
               await api(editor.id ? `/concepts/${editor.id}` : '/concepts', {
                 method: editor.id ? 'PUT' : 'POST',
-                body: JSON.stringify(editor),
+                body: JSON.stringify({
+                  ...editor,
+                  members: editor.members.map(({ id, reviewToken }) => ({ id, reviewToken })),
+                }),
               })
               setEditor(undefined)
               setNotice('Reviewed concept group saved. Excluded questions were not added.')

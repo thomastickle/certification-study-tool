@@ -1,3 +1,4 @@
+import { ConceptLabels } from './ConceptLabels.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Confidence,
@@ -1024,6 +1025,7 @@ function QuestionEditor({
         </span>
       </div>
       <h2>{question.question}</h2>
+      <ConceptLabels question={question} />
       <p className="selection-instruction">
         <strong>{multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}</strong>
       </p>
@@ -1157,6 +1159,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
               {question.area ? ` · ${question.area}` : ''}
               {question.topic ? ` · ${question.topic}` : ''}
             </p>
+            <ConceptLabels question={question} />
             <ul>
               {question.answers.map((answer) => {
                 const selected = question.selected.includes(answer.id)
