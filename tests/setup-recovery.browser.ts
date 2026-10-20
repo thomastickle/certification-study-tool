@@ -10,6 +10,9 @@ export async function setupRecoveryCheck(
     | 'pending-failure'
     | 'continue-failure'
     | 'history-pending'
+    | 'history-return'
+    | 'history-return-no-current'
+    | 'history-return-read-failure'
     | 'completed'
     | 'retry-button'
     | 'paused'
@@ -19,7 +22,15 @@ export async function setupRecoveryCheck(
   const title = mode === 'quiz' ? 'Quiz' : 'Exam'
   let attemptId = ''
   let readStarted = false
-  let failRead = ['read-failure', 'pending-failure', 'retry-button'].includes(outcome)
+  const historyReturn = outcome.startsWith('history-return')
+  const noCurrent = outcome === 'no-current' || outcome === 'history-return-no-current'
+  let recoveryReads = 0
+  let failRead = [
+    'read-failure',
+    'pending-failure',
+    'retry-button',
+    'history-return-read-failure',
+  ].includes(outcome)
   let failContinue = outcome === 'continue-failure'
 
   let release = () => {}
@@ -65,7 +76,7 @@ export async function setupRecoveryCheck(
     await until(() => !!document.querySelector('.reports-page'), 'Previous screen did not close')
     const previous = await request(`/quizzes/current?mode=${mode}`)
     assert(!previous, 'Use a disposable database without unfinished attempts')
-    if (outcome === 'history-pending') {
+    if (outcome === 'history-pending' || historyReturn) {
       const history: QuizView = await request('/quizzes', {
         mode,
         sourceFilter: 'mixed',
@@ -73,7 +84,7 @@ export async function setupRecoveryCheck(
       })
       await request(`/quizzes/${history.id}/submit`, { answers: history.questions })
     }
-    if (outcome !== 'no-current') {
+    if (!noCurrent) {
       const created: QuizView = await request('/quizzes', {
         mode,
         sourceFilter: 'mixed',
@@ -105,10 +116,11 @@ export async function setupRecoveryCheck(
       const url = String(input)
       if (url === `/api/quizzes/current?mode=${mode}`) {
         readStarted = true
-        if (['pending', 'pending-failure', 'history-pending'].includes(outcome)) {
+        recoveryReads++
+        if (['pending', 'pending-failure', 'history-pending'].includes(outcome) || historyReturn) {
           await delayed
         }
-        if (failRead) {
+        if (failRead && (!historyReturn || recoveryReads > 1)) {
           throw new TypeError('Synthetic setup recovery failure')
         }
       }
@@ -124,13 +136,56 @@ export async function setupRecoveryCheck(
     if (['loaded', 'paused', 'continue-failure', 'completed'].includes(outcome)) {
       await until(() => !!document.querySelector('.recovery-panel'), 'Recovery panel missing')
     }
-    if (outcome === 'history-pending') {
+    if (outcome === 'history-pending' || historyReturn) {
       await until(
         () => document.body.innerText.includes('Review results'),
         'Completed history did not load',
       )
       click('Review results')
       await until(() => !!document.querySelector('.result-score'), 'Completed result did not load')
+    }
+    if (historyReturn) {
+      click(`Back to ${mode} history`)
+      await until(() => !document.querySelector('.result-score'), 'History did not reopen')
+      release()
+      if (failRead) {
+        await until(
+          () => document.body.innerText.includes('Synthetic setup recovery failure'),
+          'Fresh recovery failure was not surfaced after returning to history',
+        )
+      } else if (noCurrent) {
+        await until(
+          () =>
+            [...document.querySelectorAll('button')].some(
+              (button) =>
+                button.textContent?.trim() ===
+                  `Start ${mode === 'quiz' ? 20 : 65}-question ${mode}` && !button.disabled,
+            ),
+          'No-current setup did not become ready after returning to history',
+        )
+        click(`Start ${mode === 'quiz' ? 20 : 65}-question ${mode}`)
+        await until(
+          () => !!document.querySelector('.quiz-question'),
+          'Start was enabled but did not start after returning to history',
+        )
+        const started: QuizView = await request(`/quizzes/current?mode=${mode}`)
+        attemptId = started.id
+        click('Reports')
+        await until(() => !!document.querySelector('.reports-page'), 'New attempt did not suspend')
+        assert(
+          (await request(`/quizzes/${attemptId}`)).status === 'paused',
+          'New attempt was left running',
+        )
+        return `${mode}: ${outcome} passed`
+      } else {
+        await until(
+          () =>
+            [...document.querySelectorAll('button')].some(
+              (button) => button.textContent?.trim() === `Continue ${mode}` && !button.disabled,
+            ),
+          'Continue did not recover after returning to history',
+        )
+      }
     }
     if (outcome === 'completed') {
       await request(`/quizzes/${attemptId}/submit`, { answers: originalAttempt!.questions })

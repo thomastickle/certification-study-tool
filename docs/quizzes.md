@@ -281,6 +281,10 @@ and viewing completed history while recovery is pending. The checks inspect the
 real server for retained identity/answers/confidence/flags, frozen remaining time,
 pause cause/count, unchanged unfinished report totals, explicit resume, and one
 eventual completion. Each run prepares synthetic attempts through the public API.
+Outcomes `history-return`, `history-return-no-current`, and
+`history-return-read-failure` return from completed history before recovery finishes,
+then verify that a fresh read restores Continue, enables a working Start, or exposes
+a retryable error.
 
 `tests/quiz-resume.browser.ts` exports `lostResumeCheck(mode, outcome)` for both
 modes. It forwards Resume to the real server and loses the response. Outcomes

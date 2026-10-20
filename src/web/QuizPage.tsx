@@ -517,7 +517,12 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
   useEffect(() => {
     if (stage !== 'setup') return
     let cancelled = false
-    void recoverSetup()
+    void recoverSetup().then((recovered) => {
+      // Returning from results may reuse a read invalidated when those results opened.
+      if (!cancelled && recovered && recoveredAttempt.current === undefined) {
+        void recoverSetup()
+      }
+    })
     api<QuizSummary[]>('/quizzes')
       .then((items) => {
         if (!cancelled) {
@@ -766,6 +771,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                 disabled={
                   sourcesLoading ||
                   recoveryLoading ||
+                  recoveredAttempt.current === undefined ||
                   recoveryFailed ||
                   uncertainStart.current ||
                   !options.sourceIds?.length
