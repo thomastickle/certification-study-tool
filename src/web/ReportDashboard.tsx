@@ -91,7 +91,7 @@ function ProgressChart({ report }: { report: StudyReport }) {
             </text>
           </g>
         ))}
-        {metric === 'score' && (
+        {metric === 'score' && report.targetAttempts > 0 && (
           <g>
             <line x1="48" x2="686" y1="64" y2="64" stroke="#ebc78c" strokeDasharray="5 5" />
             <text x="680" y="55" textAnchor="end" className="chart-target">
@@ -162,6 +162,14 @@ function ProgressChart({ report }: { report: StudyReport }) {
   )
 }
 
+/** Reviews intentionally have no quiz/exam pass classification. */
+function attemptStatus(passed: boolean | null): string {
+  if (passed === null) {
+    return 'Due Review'
+  }
+  return passed ? 'Target met' : 'Keep building'
+}
+
 /** Presents the same filtered evidence as summary, domain details and attempt history. */
 export function ReportDashboard({
   report,
@@ -174,7 +182,7 @@ export function ReportDashboard({
   const [historyPage, setHistoryPage] = useState(0)
   const counts = report.counts
   const studied = report.domains.filter((domain) => domain.counts.total > 0)
-  const weakest = [...studied].sort((a, b) => a.counts.score! - b.counts.score!)[0]
+  const weakest = report.domains.find((domain) => domain.domain === report.focus.domain)
   return (
     <>
       <section className="report-stats" aria-label="Performance summary">
@@ -203,9 +211,9 @@ export function ReportDashboard({
           </span>
           <strong>
             {report.passingAttempts}
-            <small> / {report.attempts.length} attempts</small>
+            <small> / {report.targetAttempts} quiz/exam attempts</small>
           </strong>
-          <p>At least 80% of all questions correct</p>
+          <p>Quiz/exam only · at least 80% correct; Due Reviews excluded</p>
         </div>
         <div>
           <span className="stat-label">
@@ -218,6 +226,26 @@ export function ReportDashboard({
           <p>Completed question appearances</p>
         </div>
       </section>
+      <section className="report-panel" aria-label="Unique coverage and lifetime mastery">
+        <h2>Unique coverage and lifetime mastery</h2>
+        <p>
+          {report.unique.encountered} unique questions encountered · {report.unique.answered}{' '}
+          distinct answered in this filter.
+        </p>
+        <p>
+          {report.unique.mastered} currently mastered: {report.unique.firstEncounter} on first
+          encounter · {report.unique.afterPractice} after practice.
+        </p>
+        <p>
+          Lifetime mastery for questions encountered in this filter uses all completed evidence,
+          including outside this date or mode range.
+        </p>
+        <p>
+          {report.unique.unknownIdentityAppearances} appearances with unknown identity ·{' '}
+          {report.unique.unknownMasteryEvidenceAppearances} with unknown mastery evidence. These
+          supply no mastery credit.
+        </p>
+      </section>
       <div className="report-feature-grid">
         <ProgressChart report={report} />
         <aside className="focus-card">
@@ -225,20 +253,30 @@ export function ReportDashboard({
             ✧
           </span>
           <p className="eyebrow">YOUR NEXT CHAPTER</p>
-          <h2>{weakest ? weakest.name : 'Make your first mark.'}</h2>
+          <h2>{weakest ? weakest.name : 'Insufficient evidence'}</h2>
           <p>
             {weakest
-              ? `Your lowest score is ${percent(weakest.counts.score)} here, based on ${weakest.counts.total} question appearances. A focused review is a useful next step.`
-              : 'Answer a few questions to discover where a little extra practice can help.'}
+              ? `Your lowest score is ${percent(weakest.counts.score)} here, based on ${weakest.counts.total} question appearances after all domains met the evidence requirement. A focused review is a useful next step.`
+              : 'Each supported domain needs at least 10 distinct answered questions across 2 completed attempts before comparing scores.'}
           </p>
           <div className="focus-footnote">
             {weakest
               ? `${weakest.counts.correct} correct · ${weakest.counts.incorrect} incorrect · ${weakest.counts.skipped} skipped`
-              : 'Your study story starts with an answer.'}
+              : 'Broader practice builds useful comparison evidence.'}
           </div>
+          <ul>
+            {report.focus.domains.map((domain) => (
+              <li key={domain.domain}>
+                Domain {domain.domain}: {domain.distinctAnswered}/10 distinct answered ·{' '}
+                {domain.completedAttempts}/2 completed attempts · {domain.answeredAppearances}{' '}
+                answered appearances
+              </li>
+            ))}
+          </ul>
           <small>
-            Repeated questions and small samples can limit this suggestion. This is practice
-            evidence, not an official exam score or readiness prediction.
+            Ranking uses score: correct / all question appearances, including skips. Repeated
+            questions and small samples can limit this suggestion. This is practice evidence, not an
+            official exam score or readiness prediction.
           </small>
         </aside>
       </div>
@@ -261,7 +299,10 @@ export function ReportDashboard({
           </div>
         </div>
         <p className="report-muted">
-          Score uses all questions, including skips. The marker is your 80% practice target.
+          Score uses all question appearances, including skips.{' '}
+          {report.targetAttempts > 0
+            ? 'The marker is the quiz/exam 80% practice target.'
+            : 'Due Reviews have no pass target.'}
         </p>
         {domainView === 'summary' ? (
           <div className="domain-grid">
@@ -274,7 +315,7 @@ export function ReportDashboard({
                 <h3>{domain.name}</h3>
                 <div className="domain-meter">
                   <span style={{ width: `${domain.counts.score ?? 0}%` }} />
-                  <i />
+                  {report.targetAttempts > 0 && <i />}
                 </div>
                 <p>
                   {domain.counts.total
@@ -355,7 +396,9 @@ export function ReportDashboard({
                   {attempt.mode === 'exam' ? 'E' : 'Q'}
                 </span>
                 <span className="attempt-title">
-                  <strong>{attempt.mode === 'exam' ? 'Practice exam' : 'Practice quiz'}</strong>
+                  <strong>
+                    {attempt.mode === 'review' ? 'Due Review' : `Practice ${attempt.mode}`}
+                  </strong>
                   <small>
                     {reportDate(attempt.finishedAt)} ·{' '}
                     {new Date(attempt.finishedAt).toLocaleTimeString('en-US', {
@@ -373,7 +416,7 @@ export function ReportDashboard({
                   </small>
                 </span>
                 <span className={`attempt-status ${attempt.passed ? 'met' : ''}`}>
-                  {attempt.passed ? 'Target met' : 'Keep building'}
+                  {attemptStatus(attempt.passed)}
                 </span>
                 <span aria-hidden="true">↗</span>
               </button>

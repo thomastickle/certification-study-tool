@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type {
+  DueReviewSummary,
   PauseCause,
   PracticeMode,
   QuizAnswer,
@@ -10,7 +11,10 @@ import type {
 import { ApplicationError } from '../errors.ts'
 import type { LibraryRepository } from '../questions/library-repository.ts'
 import type { StoredQuiz } from './quiz-repository.ts'
-import { selectQuestions, shuffled } from './quiz-selection.ts'
+import { eligibleQuestions, selectQuestions, shuffled } from './quiz-selection.ts'
+import { masteryHistory } from './mastery-history.ts'
+import { currentQuestionIdentity } from './question-identity.ts'
+import { studyDay } from './mastery.ts'
 
 export class QuizService {
   private repository: LibraryRepository
@@ -44,13 +48,31 @@ export class QuizService {
         if (old.deadline <= this.now()) this.finish(old)
         else store.remove(old.id)
       }
-      const picked = selectQuestions(
-        this.repository.allQuestions(),
-        this.repository.sources(),
-        options,
-        store.boosts(),
-        this.random,
+      const states = masteryHistory(store.completed()).states
+      const sources = this.repository.sources()
+      const boosted = new Set(
+        this.repository.allQuestions().flatMap((record) => {
+          const source = sources.find((source) => source.id === record.sourceId)
+          const identity = source && currentQuestionIdentity(record, source)
+          return identity && states.get(identity)?.boosted ? [record.fingerprint] : []
+        }),
       )
+      const picked =
+        options.mode === 'review'
+          ? this.dueQuestions(options).picked
+          : selectQuestions(
+              this.repository.allQuestions(),
+              this.repository.sources(),
+              options,
+              boosted,
+              this.random,
+            )
+      if (!picked.length) {
+        throw new ApplicationError(
+          'No eligible due questions. Due items may be excluded by these filters or unavailable in your library; they remain overdue.',
+          422,
+        )
+      }
       const time = this.now()
       const quiz: StoredQuiz = {
         id: randomUUID(),
@@ -92,6 +114,55 @@ export class QuizService {
       store.save(quiz)
       return this.view(quiz)
     })
+  }
+
+  /**
+   * Due obligations survive filters and deletion; reading never clears them.
+   * @throws {ApplicationError} When filters are invalid or selected sources have conflicting keys.
+   */
+  due(input: unknown): DueReviewSummary {
+    const options = this.options(input)
+    this.expireDue()
+    return this.dueQuestions(options).summary
+  }
+
+  /** Resolve lifetime obligations against both the whole library and requested pool. */
+  private dueQuestions(options: QuizOptions) {
+    const day = studyDay(this.now())
+    const states = masteryHistory(this.repository.quizStore().completed()).states
+    const due = [...states]
+      .filter(([, state]) => state.dueDay !== null && state.dueDay <= day)
+      .sort(([a, x], [b, y]) => x.dueDay!.localeCompare(y.dueDay!) || a.localeCompare(b))
+    const sources = this.repository.sources()
+    const records = this.repository.allQuestions()
+    const all = new Set(
+      records.flatMap((record) => {
+        const source = sources.find((source) => source.id === record.sourceId)
+        const identity = source && currentQuestionIdentity(record, source)
+        return identity ? [identity] : []
+      }),
+    )
+    const eligible = new Map(
+      [...eligibleQuestions(records, sources, options).values()].flatMap((picked) => {
+        const source = sources.find((source) => source.id === picked.record.sourceId)!
+        const identity = currentQuestionIdentity(picked.record, source)
+        return identity ? [[identity, picked] as const] : []
+      }),
+    )
+    const picked = due.flatMap(([identity]) =>
+      eligible.has(identity) ? [eligible.get(identity)!] : [],
+    )
+    const unavailable = due.filter(([identity]) => !all.has(identity)).length
+    return {
+      picked: picked.slice(0, 20),
+      summary: {
+        total: due.length,
+        eligible: picked.length,
+        unavailable,
+        excluded: due.length - picked.length - unavailable,
+        oldestDay: due[0]?.[1].dueDay ?? null,
+      },
+    }
   }
 
   get(id: string): QuizView {
@@ -265,7 +336,6 @@ export class QuizService {
       q.correct = correct
       q.correctAnswerIds = [...key.correct]
       if (correct) quiz.correctCount!++
-      this.repository.quizStore().record(key.fingerprint, correct)
     })
     this.repository.quizStore().save(quiz)
   }
@@ -299,8 +369,8 @@ export class QuizService {
     if (!input || typeof input !== 'object')
       throw new ApplicationError('Quiz options are required.')
     const o = input as QuizOptions
-    if (o.mode !== undefined && !['quiz', 'exam'].includes(o.mode)) {
-      throw new ApplicationError('Choose a valid practice mode: quiz or exam.')
+    if (o.mode !== undefined && !['quiz', 'exam', 'review'].includes(o.mode)) {
+      throw new ApplicationError('Choose a valid practice mode: quiz, exam or review.')
     }
     if (
       !['mixed', 'official', 'third_party'].includes(o.sourceFilter) ||

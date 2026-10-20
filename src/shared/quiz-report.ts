@@ -6,7 +6,10 @@ export function quizReport(quiz: QuizView): string {
   if (quiz.status !== 'completed' || quiz.correctCount === null)
     throw new Error('Submit and score the quiz before exporting its report.')
   const mode = quiz.mode ?? quiz.options.mode ?? 'quiz'
-  const title = mode === 'exam' ? 'Exam' : 'Quiz'
+  let title = mode === 'exam' ? 'Exam' : 'Quiz'
+  if (mode === 'review') {
+    title = 'Due Review'
+  }
   const answered = quiz.questions.filter((q) => q.selected.length > 0).length
   const accuracy = answered ? `${((quiz.correctCount / answered) * 100).toFixed(0)}%` : 'No data'
   const percent = quiz.total ? (quiz.correctCount / quiz.total) * 100 : null
@@ -28,7 +31,9 @@ export function quizReport(quiz: QuizView): string {
       (pause, index) =>
         `Pause ${index + 1}: ${pause.cause ?? 'Cause not recorded'} · ${new Date(pause.startedAt).toISOString()} → ${pause.endedAt === null ? 'Ongoing' : new Date(pause.endedAt).toISOString()} · ${formatDuration(pause.durationMs)}`,
     ),
-    `Result: ${result} — ${quiz.correctCount}/${quiz.total} (${score}). Practice target: 80%.`,
+    mode === 'review'
+      ? 'Due Review · no quiz/exam pass target. Only correct + Confident passes a due retention check.'
+      : `Result: ${result} — ${quiz.correctCount}/${quiz.total} (${score}). Practice target: 80%.`,
     `Score: ${score} (${quiz.correctCount}/${quiz.total} questions; skips count as misses)`,
     'Practice targets are study aids, not official AWS scaled scores or exam-readiness predictions.',
     '',

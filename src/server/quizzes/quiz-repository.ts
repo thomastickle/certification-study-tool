@@ -1,3 +1,5 @@
+import { masteryHistory } from './mastery-history.ts'
+import { completedQuestionIdentity } from './question-identity.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import type { QuizSummary, QuizView } from '../../shared/quiz-contracts.ts'
 
@@ -97,15 +99,22 @@ export class QuizRepository {
       .map((row) => JSON.parse(String(row.data)))
   }
 
+  /** Compatibility query for historical callers; the old streak table is never authoritative. */
   boosts(): Set<string> {
+    const completed = this.completed()
+    const states = masteryHistory(completed).states
     return new Set(
-      this.db
-        .prepare('SELECT fingerprint FROM quiz_mastery WHERE boosted = 1')
-        .all()
-        .map((row) => String(row.fingerprint)),
+      completed.flatMap((quiz) =>
+        quiz.questions.flatMap((_, index) => {
+          const identity = completedQuestionIdentity(quiz, index)
+          const fingerprint = quiz.keys?.[index]?.fingerprint
+          return identity && fingerprint && states.get(identity)?.boosted ? [fingerprint] : []
+        }),
+      ),
     )
   }
 
+  /** Legacy table writer retained for compatibility; new scheduling never reads it. */
   record(fingerprint: string, correct: boolean): void {
     const previous = this.db
       .prepare('SELECT boosted, correct_streak FROM quiz_mastery WHERE fingerprint = ?')

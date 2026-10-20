@@ -34,7 +34,7 @@ for (const mode of ['quiz', 'exam'] as const) {
       now = resumed.deadline
       restarted.expireDue()
       assert.equal(restarted.get(attempt.id).status, 'completed')
-      assert.equal(repository.quizStore().boosts().size, attempt.total)
+      assert.equal(repository.quizStore().boosts().size, 0)
     } finally {
       repository.close()
     }
@@ -86,7 +86,7 @@ test('pausing at the deadline cannot prevent normal expiry or expose an editable
     assert.equal(service.pause(quiz.id).status, 'completed')
     assert.equal(service.resume(quiz.id).status, 'completed')
     assert.equal(service.current('quiz'), null)
-    assert.equal(repository.quizStore().boosts().size, 20)
+    assert.equal(repository.quizStore().boosts().size, 0)
   } finally {
     repository.close()
   }

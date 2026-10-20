@@ -77,12 +77,13 @@ block selection. Both question and answer order are shuffled. Insufficient
 mapped questions in any domain cause an actionable error rather than silently
 changing quotas or repeating questions.
 
-Missed fingerprints get **3× weight** in future draws within their domain.
-Three consecutive correct appearances in completed quizzes restore normal
-weight; a miss resets that streak. Quizzes where that question is absent do
-not count as an answer. Confidence affects review, not grading or repeat weight.
-This increases probability without guaranteeing recurrence. No question can
-appear twice in one quiz.
+Mastery and scheduling now use scored completed snapshots, submitted answer sets,
+optional confidence, and stable key-aware identities. The old `quiz_mastery` streak
+table is retained for compatibility only and is never used by the scheduler.
+See [mastery and Due Review](mastery.md) for transitions, recovery, calendar rules,
+legacy evidence, report filters, and evidence thresholds. Extra practice uses the
+existing **3×** weight versus normal **1×**; these are application defaults, not
+scientific learning claims. Same-day practice remains eligible and scores normally.
 
 ## Separate domain mapping
 
@@ -346,5 +347,6 @@ including duplicate normalized choice text. Snapshots are never mutated or
 resolved against the current library, so deletion and key edits preserve history.
 Legacy app-created quizzes are exclusively AWS CLF-C02; snapshots lack a saved
 certification namespace, so this helper supports that legacy contract only and
-must not be used to infer other certifications. It adds no report API fields,
-mastery transitions, scheduling, thresholds, or concept grouping.
+must not be used to infer other certifications. The mastery scheduler and unique reporting use this helper internally; identities
+and answer-key hashes are omitted from public aggregate responses. Concept
+grouping is outside this feature.

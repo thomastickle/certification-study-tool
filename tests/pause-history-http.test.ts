@@ -84,9 +84,9 @@ for (const mode of ['quiz', 'exam'] as const) {
       assert.equal(report.passingAttempts, 1)
       assert.equal(report.attempts[0].timing.pauseCount, 1)
       assert.equal(report.attempts[0].timing.pauses[0].cause, 'navigation')
-      // One completion plus one further correct appearance must not clear a prior miss yet.
+      // Old streak-table writes cannot override completed confidence-based evidence.
       repository.quizStore().record(keys[0]!.fingerprint, true)
-      assert.ok(repository.quizStore().boosts().has(keys[0]!.fingerprint))
+      assert.equal(repository.quizStore().boosts().has(keys[0]!.fingerprint), false)
       assert.ok(
         repository
           .quizStore()

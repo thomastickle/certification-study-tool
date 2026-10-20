@@ -89,6 +89,18 @@ export function apiController(repository: LibraryRepository) {
           }),
         )
       }
+      if (request.method === 'GET' && url.pathname === '/api/quizzes/due') {
+        const ids = url.searchParams.get('sourceIds')
+        return send(
+          response,
+          200,
+          quizzes.due({
+            sourceFilter: url.searchParams.get('sourceFilter') ?? 'mixed',
+            questionType: url.searchParams.get('questionType') ?? 'mixed',
+            ...(ids === null ? {} : { sourceIds: ids.split(',').map(Number) }),
+          }),
+        )
+      }
       if (url.pathname === '/api/quizzes') {
         if (request.method === 'GET') return send(response, 200, quizzes.recent())
         if (request.method === 'POST')
@@ -96,7 +108,7 @@ export function apiController(repository: LibraryRepository) {
       }
       if (request.method === 'GET' && url.pathname === '/api/quizzes/current') {
         const mode = url.searchParams.get('mode') ?? 'quiz'
-        if (mode !== 'quiz' && mode !== 'exam')
+        if (mode !== 'quiz' && mode !== 'exam' && mode !== 'review')
           throw new ApplicationError('Choose a valid practice mode.')
         return send(response, 200, quizzes.current(mode))
       }
