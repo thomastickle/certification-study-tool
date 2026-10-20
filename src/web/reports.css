@@ -55,6 +55,7 @@
   font-size: 18px;
 }
 .report-toolbar {
+  flex-wrap: wrap;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   padding: 16px 0;
@@ -762,7 +763,6 @@
     margin-right: 2px;
   }
   .report-toolbar {
-    flex-wrap: wrap;
     gap: 16px;
   }
   .report-filter-group {
