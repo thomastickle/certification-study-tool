@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS build
+FROM node:24.17.0-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -7,7 +7,7 @@ COPY src ./src
 COPY docs ./docs
 RUN npm run build && npm prune --omit=dev
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:24.17.0-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     STUDY_HOST=0.0.0.0 \
     STUDY_PORT=3000 \
