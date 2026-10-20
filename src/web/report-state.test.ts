@@ -22,21 +22,28 @@ const answered: ReportCounts = {
   score: 50,
 }
 
-test('accuracy charts omit unmeasured days instead of inventing zero accuracy', () => {
+test('score charts include all-skipped zeroes and omit days without questions', () => {
   const chart = progressChart(
     [
+      {
+        date: '2026-09-30',
+        counts: { ...noAnswers, total: 0, skipped: 0, score: null },
+        attempts: 0,
+      },
       { date: '2026-10-01', counts: noAnswers, attempts: 1 },
       { date: '2026-10-02', counts: answered, attempts: 1 },
     ],
-    'accuracy',
+    'score',
   )
-  assert.equal(chart.points.length, 1)
-  assert.equal(chart.points[0]!.value, 50)
-  assert.equal(chart.points[0]!.x, 360)
+  assert.equal(chart.points.length, 2)
+  assert.deepEqual(
+    chart.points.map((point) => point.value),
+    [0, 50],
+  )
+  assert.equal(chart.max, 100)
   assert.equal(
-    progressChart([{ date: '2026-10-01', counts: noAnswers, attempts: 1 }], 'accuracy').points
-      .length,
-    0,
+    progressChart([{ date: '2026-10-01', counts: noAnswers, attempts: 1 }], 'score').points.length,
+    1,
   )
 })
 
@@ -59,4 +66,19 @@ test('correct-answer charts accumulate evidence and space points by elapsed time
   )
   assert.equal(chart.max, 3)
   assert.deepEqual(progressChart([], 'correct'), { points: [], max: 1 })
+})
+
+test('daily performance plots score while cumulative correct answers remain activity counts', () => {
+  const counts = {
+    total: 20,
+    answered: 8,
+    correct: 8,
+    incorrect: 0,
+    skipped: 12,
+    accuracy: 100,
+    score: 40,
+  }
+  const timeline = [{ date: '2026-10-01', counts, attempts: 1 }]
+  assert.equal(progressChart(timeline, 'score').points[0]!.value, 40)
+  assert.equal(progressChart(timeline, 'correct').points[0]!.value, 8)
 })

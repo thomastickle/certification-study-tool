@@ -36,7 +36,7 @@ Each question supports its original single/multiple selection count, optional
 confidence (Confident, Educated Guess, Unsure), and a Mark for Review checkbox. The review
 screen lists all questions and highlights unanswered, marked, low-confidence,
 and unrecorded-confidence items. Submit and score ends the attempt. The result
-shows correct count, raw percentage, and an **80% practice target**: green Pass
+shows correct count, score (correct / all questions, including skips), and an **80% practice target**: green Pass
 at or above 80%, red Fail below it, with text labels as well as color. This raw
 percentage is not AWS's scaled certification score.
 
@@ -158,19 +158,30 @@ attempt's completion time; daily chart dates are UTC. CLF-C02 is the currently
 supported certification. Reports recognize the practice session `mode` field and
 treat legacy snapshots as quizzes.
 
-- **Correct answers** counts every correct question appearance across the
+- **Correct-answer activity** counts every correct question appearance across the
   selected completed attempts. Repeat questions count each time; this is study
   activity rather than a count of unique mastered questions.
-- **Answer accuracy** divides correct answers by answered questions. Incorrect
-  partial multi-select answers are answered and incorrect. Skipped questions are
-  reported separately. No answered questions means no accuracy measurement.
-- **Raw attempt score** divides correct answers by all questions, including
-  skipped ones. An attempt meets the existing practice target at 80% or higher,
-  using the unrounded fraction. These are not AWS scaled scores or predictions
-  of exam readiness.
-- **Domain summary** shows answered-question accuracy with the practice target.
-  **Study details** shows correct, incorrect and skipped outcomes by domain,
+- **Score** divides correct answers by all questions, including skipped ones as
+  misses. Headlines, domain summaries, confidence groups and daily performance
+  charts use this same denominator. Aggregates sum correct and total questions,
+  rather than averaging attempt percentages. An attempt meets the existing 80%
+  practice target using the unrounded fraction. No questions means no measured
+  score; an all-skipped attempt has a measured 0% score. Practice targets are not
+  AWS scaled scores or predictions of exam readiness.
+- **Accuracy on answered questions** appears only in detailed views, with answered
+  and skipped counts nearby. It divides correct answers by answered questions;
+  partial multi-select answers are answered and incorrect. No answered questions
+  means no accuracy measurement. Accuracy has no practice target marker.
+- **Domain summary** shows score with the 80% practice target. **Study details**
+  shows score, labeled answered-question accuracy, and outcome counts by domain,
   saved study area and topic. Missing classifications remain unclassified.
+  Domains explored counts domains with completed question appearances. The focus
+  suggestion uses the lowest measured domain score, including skipped questions;
+  repeat questions and small samples still limit its evidence. Mastery and unique
+  question rules are unchanged.
+- **Progress chart** switches between daily score (daily correct / daily total)
+  and cumulative correct-answer activity. The cumulative count is activity, not
+  unique-question mastery. Only the score chart has the 80% target marker.
 - **Study journal** opens any completed attempt with domain results and saved
   answer review. Filter questions by domain, incorrect, skipped or flagged;
   expand a question for choices, selections, correct answers, confidence and
@@ -212,3 +223,14 @@ without changing the reserved toolbar layout.
 `tests/reports-layout.browser.ts` checks confidence bars remain full-width below
 their labels when both practice and report stylesheets are loaded. Run it with
 at least one completed synthetic attempt in the disposable database.
+
+`tests/score-reports.browser.ts` checks score-first headlines, weighted master
+and mode/date filters, the daily score plot and chart data, domain zero/no-data
+states, labeled detailed accuracy, individual reports, and quiz/exam results.
+Create a fresh disposable database using
+`node tests/seed-score-reports.ts private/app/score-browser.sqlite3`, then launch
+with `STUDY_DB_PATH=private/app/score-browser.sqlite3 STUDY_PORT=5193 npm run dev`.
+Transpile and run `scoreReportsTest()` using the browser-only workflow above.
+The seed refuses an existing path and adds only synthetic snapshots: an 8/20 quiz,
+a 52/65 exam at the exact target, and an older all-skipped quiz. No private banks
+or personal study database are needed. Restart from the app start page for each run.

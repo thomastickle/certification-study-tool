@@ -801,8 +801,9 @@ function QuestionEditor({
 function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   const mode = view.options.mode ?? 'quiz'
   const correct = view.questions.filter((question) => question.correct).length
-  const percent = view.questions.length ? Math.round((correct / view.questions.length) * 100) : 0
-  const passed = meetsPracticeTarget(percent)
+  const percent = view.questions.length ? (correct / view.questions.length) * 100 : null
+  const answered = view.questions.filter((question) => question.selected.length > 0).length
+  const passed = percent !== null && meetsPracticeTarget(percent)
   const review = view.questions
   const [copyNotice, setCopyNotice] = useState('')
 
@@ -833,7 +834,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
         <h2>
           {correct} of {view.questions.length}
         </h2>
-        <p>{percent}% correct</p>
+        <p>Score: {percent === null ? '—' : `${Math.round(percent)}%`} · skips count as misses</p>
         <p className={passed ? 'correct-text' : 'incorrect-text'}>
           <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
         </p>
@@ -847,6 +848,11 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
       </section>
       <section className="quiz-panel">
         <h2>All answers and confidence</h2>
+        <p>
+          Accuracy on answered questions:{' '}
+          {answered ? `${Math.round((correct / answered) * 100)}%` : '—'} · {answered} answered ·{' '}
+          {view.questions.length - answered} skipped
+        </p>
         {review.length === 0 && <p>All answers are correct and marked confident.</p>}
         {review.map((question) => (
           <article className="result-question" key={question.questionId}>
