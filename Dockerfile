@@ -13,12 +13,12 @@ ENV NODE_ENV=production \
     STUDY_PORT=3000 \
     STUDY_DB_PATH=/data/library.sqlite3
 WORKDIR /app
-COPY --from=build /app/package.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/src/server ./src/server
-COPY --from=build /app/src/shared ./src/shared
-COPY --from=build /app/docs/question-bank.schema.json ./docs/question-bank.schema.json
-COPY --from=build /app/dist ./dist
+COPY --chown=node:node --from=build /app/package.json ./
+COPY --chown=node:node --from=build /app/node_modules ./node_modules
+COPY --chown=node:node --from=build /app/src/server ./src/server
+COPY --chown=node:node --from=build /app/src/shared ./src/shared
+COPY --chown=node:node --from=build /app/docs/question-bank.schema.json ./docs/question-bank.schema.json
+COPY --chown=node:node --from=build /app/dist ./dist
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000

@@ -8,11 +8,14 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 // Exercise the actual entry point through a container-like, non-loopback connection.
-test('server can listen beyond loopback while retaining local Host restrictions', async () => {
+test('server can listen beyond loopback while retaining local Host restrictions', async (t) => {
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === 'IPv4' && !entry.internal)?.address
-  assert.ok(address, 'A non-loopback IPv4 interface is required')
+  if (!address) {
+    t.skip('No non-loopback IPv4 interface is available')
+    return
+  }
   const probe = createServer()
   await new Promise<void>((resolve) => probe.listen(0, '0.0.0.0', resolve))
   const socket = probe.address()
