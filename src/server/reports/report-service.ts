@@ -1,3 +1,5 @@
+import { completedQuestionIdentity } from '../quizzes/question-identity.ts'
+import { completedEvidence, masteryHistory } from '../quizzes/mastery-history.ts'
 import { quizTiming } from '../../shared/quiz-timing.ts'
 import type { QuizQuestion } from '../../shared/quiz-contracts.ts'
 import type { StudyReport, ReportCounts, ReportBreakdown } from '../../shared/report-contracts.ts'
@@ -62,7 +64,7 @@ export class ReportService {
     const mode = input.mode ?? 'all'
     const days = input.days ?? 'all'
     if (
-      !['all', 'quiz', 'exam'].includes(mode) ||
+      !['all', 'quiz', 'exam', 'review'].includes(mode) ||
       !['all', '7', '30', '90'].includes(days) ||
       (input.certification != null && input.certification !== 'CLF-C02')
     ) {
@@ -72,11 +74,14 @@ export class ReportService {
     }
     const now = this.now()
     const since = days === 'all' ? -Infinity : now - Number(days) * 86400000
-    const completed = this.repository
+    const lifetime = this.repository
       .quizStore()
       .completed()
+      .filter((quiz) => !Number.isFinite(quiz.finishedAt) || quiz.finishedAt! <= now)
+    const completed = lifetime
       .filter(
         (quiz) =>
+          Number.isFinite(quiz.finishedAt) &&
           (mode === 'all' || (quiz.mode ?? quiz.options.mode ?? 'quiz') === mode) &&
           quiz.finishedAt! >= since &&
           quiz.finishedAt! <= now,
@@ -89,10 +94,65 @@ export class ReportService {
       startedAt: quiz.startedAt,
       finishedAt: quiz.finishedAt!,
       counts: counts(quiz.questions),
-      passed: quiz.correctCount! / quiz.total >= 0.8,
+      passed:
+        (quiz.mode ?? quiz.options.mode) === 'review'
+          ? null
+          : quiz.correctCount! / quiz.total >= 0.8,
       timing: quizTiming(quiz),
       durationMs: Math.max(0, quiz.finishedAt! - quiz.startedAt),
     }))
+    const identities = new Set<string>()
+    const answered = new Set<string>()
+    let unknownIdentityAppearances = 0
+    let unknownMasteryEvidenceAppearances = 0
+    for (const quiz of completed) {
+      quiz.questions.forEach((question, index) => {
+        const identity = completedQuestionIdentity(quiz, index)
+        if (identity) {
+          identities.add(identity)
+          if (question.selected.length) {
+            answered.add(identity)
+          }
+        } else {
+          unknownIdentityAppearances++
+        }
+        if (!completedEvidence(quiz, index)) {
+          unknownMasteryEvidenceAppearances++
+        }
+      })
+    }
+    const states = masteryHistory(lifetime).states
+    const mastered = [...identities].flatMap((identity) => {
+      const state = states.get(identity)
+      return state?.mastered ? [state] : []
+    })
+    const evidence = domainNames.map((_, index) => {
+      const domain = index + 1
+      const distinct = new Set<string>()
+      const attempts = new Set<string>()
+      for (const quiz of completed) {
+        quiz.questions.forEach((q, i) => {
+          const identity = completedQuestionIdentity(quiz, i)
+          if (q.domain === domain && q.selected.length && identity) {
+            distinct.add(identity)
+            attempts.add(quiz.id)
+          }
+        })
+      }
+      const activity = counts(questions.filter((q) => q.domain === domain))
+      return {
+        domain,
+        distinctAnswered: distinct.size,
+        completedAttempts: attempts.size,
+        answeredAppearances: activity.answered,
+        totalAppearances: activity.total,
+        score: activity.score,
+        qualified: distinct.size >= 10 && attempts.size >= 2,
+      }
+    })
+    const weakest = evidence.every((domain) => domain.qualified)
+      ? [...evidence].sort((a, b) => a.score! - b.score! || a.domain - b.domain)[0]!.domain
+      : null
     const daily = new Map<string, { questions: QuizQuestion[]; attempts: number }>()
     for (const quiz of completed) {
       const date = new Date(quiz.finishedAt!).toISOString().slice(0, 10)
@@ -102,6 +162,17 @@ export class ReportService {
       daily.set(date, day)
     }
     return {
+      unique: {
+        encountered: identities.size,
+        answered: answered.size,
+        mastered: mastered.length,
+        firstEncounter: mastered.filter((s) => s.masteryOrigin === 'first').length,
+        afterPractice: mastered.filter((s) => s.masteryOrigin === 'practice').length,
+        unknownIdentityAppearances,
+        unknownMasteryEvidenceAppearances,
+      },
+      focus: { domain: weakest, metric: 'score', domains: evidence },
+      targetAttempts: attempts.filter((a) => a.passed !== null).length,
       certification: 'CLF-C02',
       generatedAt: now,
       counts: counts(questions),

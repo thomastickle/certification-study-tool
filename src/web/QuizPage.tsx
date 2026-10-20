@@ -1,3 +1,4 @@
+import { ConceptLabels } from './ConceptLabels.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   Confidence,
@@ -9,6 +10,7 @@ import type {
   QuizView,
 } from '../shared/quiz-contracts.ts'
 import type { Source } from '../shared/contracts.ts'
+import { DueReviewStatus } from './DueReviewStatus.tsx'
 import { PracticeActions } from './PracticeActions.tsx'
 import { QuizSourcePicker } from './QuizSourcePicker.tsx'
 import { api } from './api.ts'
@@ -29,8 +31,12 @@ type Props = { mode?: PracticeMode; onRegisterLeave: (leave: () => Promise<boole
 const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' }
 
 export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
-  const title = mode === 'exam' ? 'Exam' : 'Quiz'
-  const plural = mode === 'exam' ? 'exams' : 'quizzes'
+  let title = mode === 'exam' ? 'Exam' : 'Quiz'
+  let plural = mode === 'exam' ? 'exams' : 'quizzes'
+  if (mode === 'review') {
+    title = 'Due Review'
+    plural = 'due reviews'
+  }
   const count = mode === 'exam' ? 65 : 20
   const minutes = mode === 'exam' ? 90 : 20
   const [stage, setStage] = useState<Stage>('setup')
@@ -653,7 +659,9 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
             <p className="eyebrow">TIMED STUDY SESSION</p>
             <h1>{stage === 'completed' ? `${title} results` : title}</h1>
             <p className="intro">
-              {count} questions · {minutes} minutes · 80% practice target
+              {mode === 'review'
+                ? 'Up to 20 due questions · 20 minutes · no quiz/exam pass target'
+                : `${count} questions · ${minutes} minutes · 80% practice target`}
             </p>
           </div>
         </div>
@@ -753,6 +761,7 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
               </button>
             </section>
           )}
+          {mode === 'review' && <DueReviewStatus key={stage} options={options} />}
           {!recoverable && (
             <section className="quiz-panel">
               <h2>Set up your {mode}</h2>
@@ -778,7 +787,9 @@ export function QuizPage({ mode = 'quiz', onRegisterLeave }: Props) {
                 }
                 onClick={() => void start()}
               >
-                Start {count}-question {mode}
+                {mode === 'review'
+                  ? 'Start Due Review (up to 20 questions)'
+                  : `Start ${count}-question ${mode}`}
               </button>
             </section>
           )}
@@ -1014,6 +1025,7 @@ function QuestionEditor({
         </span>
       </div>
       <h2>{question.question}</h2>
+      <ConceptLabels question={question} />
       <p className="selection-instruction">
         <strong>{multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}</strong>
       </p>
@@ -1101,15 +1113,22 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   return (
     <>
       <section className="quiz-panel result-score">
-        <p className="eyebrow">{mode === 'exam' ? 'EXAM COMPLETE' : 'QUIZ COMPLETE'}</p>
+        <p className="eyebrow">{mode.toUpperCase()} COMPLETE</p>
         <h2>
           {correct} of {view.questions.length}
         </h2>
         <p>Score: {percent === null ? '—' : `${Math.round(percent)}%`} · skips count as misses</p>
-        <p className={passed ? 'correct-text' : 'incorrect-text'}>
-          <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
-        </p>
-        <p>This is a practice target, not an AWS scaled score.</p>
+        {mode !== 'review' && (
+          <>
+            <p className={passed ? 'correct-text' : 'incorrect-text'}>
+              <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
+            </p>
+            <p>This is a practice target, not an AWS scaled score.</p>
+          </>
+        )}
+        {mode === 'review' && (
+          <p>Due Review · no quiz/exam pass target. Only correct + Confident passes a due check.</p>
+        )}
         <AttemptTiming quiz={view} />
         <div className="quiz-actions">
           <button onClick={onBack}>Back to {mode} history</button>
@@ -1140,6 +1159,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
               {question.area ? ` · ${question.area}` : ''}
               {question.topic ? ` · ${question.topic}` : ''}
             </p>
+            <ConceptLabels question={question} />
             <ul>
               {question.answers.map((answer) => {
                 const selected = question.selected.includes(answer.id)

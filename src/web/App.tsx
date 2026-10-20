@@ -3,11 +3,12 @@ import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
 import { ReportsPage } from './ReportsPage.tsx'
 
-type Page = 'home' | 'quiz' | 'exam' | 'reports' | 'importer'
+type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
 
 const links: { id: Page; label: string }[] = [
   { id: 'quiz', label: 'Quiz' },
   { id: 'exam', label: 'Exam' },
+  { id: 'review', label: 'Due Review' },
   { id: 'reports', label: 'Reports' },
   { id: 'importer', label: 'Importer' },
 ]
@@ -15,6 +16,7 @@ const links: { id: Page; label: string }[] = [
 const descriptions: Partial<Record<Page, string>> = {
   quiz: 'Start a timed quiz and review your answers.',
   exam: 'Take a 65-question, 90-minute practice exam.',
+  review: 'Review due retention checks without quiz or exam domain quotas.',
   reports: 'Explore your progress, domain strengths, and every attempt.',
   importer: 'Manage your question library and sources.',
 }
@@ -32,7 +34,11 @@ export function App() {
     }
     navigating.current = true
     try {
-      if ((page === 'quiz' || page === 'exam') && next !== page && !(await leaveQuiz.current())) {
+      if (
+        (page === 'quiz' || page === 'exam' || page === 'review') &&
+        next !== page &&
+        !(await leaveQuiz.current())
+      ) {
         return
       }
       setPage(next)
@@ -100,7 +106,7 @@ export function App() {
           </section>
         </main>
       )}
-      {(page === 'quiz' || page === 'exam') && (
+      {(page === 'quiz' || page === 'exam' || page === 'review') && (
         <QuizPage
           key={page}
           mode={page}

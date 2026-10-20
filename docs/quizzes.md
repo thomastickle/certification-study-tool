@@ -77,12 +77,13 @@ block selection. Both question and answer order are shuffled. Insufficient
 mapped questions in any domain cause an actionable error rather than silently
 changing quotas or repeating questions.
 
-Missed fingerprints get **3× weight** in future draws within their domain.
-Three consecutive correct appearances in completed quizzes restore normal
-weight; a miss resets that streak. Quizzes where that question is absent do
-not count as an answer. Confidence affects review, not grading or repeat weight.
-This increases probability without guaranteeing recurrence. No question can
-appear twice in one quiz.
+Mastery and scheduling now use scored completed snapshots, submitted answer sets,
+optional confidence, and stable key-aware identities. The old `quiz_mastery` streak
+table is retained for compatibility only and is never used by the scheduler.
+See [mastery and Due Review](mastery.md) for transitions, recovery, calendar rules,
+legacy evidence, report filters, and evidence thresholds. Extra practice uses the
+existing **3×** weight versus normal **1×**; these are application defaults, not
+scientific learning claims. Same-day practice remains eligible and scores normally.
 
 ## Separate domain mapping
 
@@ -328,3 +329,35 @@ Transpile and run `scoreReportsTest()` using the browser-only workflow above.
 The seed refuses an existing path and adds only synthetic snapshots: an 8/20 quiz,
 a 52/65 exam at the exact target, and an older all-skipped quiz. No private banks
 or personal study database are needed. Restart from the app start page for each run.
+
+## Internal question identity foundation
+
+The internal `question-identity.ts` helper composes a versioned mastery identity
+from the exact provider/certification namespace and the importer's content
+fingerprint and answer key. It reuses importer text normalization and unordered
+answer text semantics. Source IDs, references, classifications, and choice order
+are excluded; content, question type, correct answer text, and required choice
+count distinguish identities. Existing exact-duplicate selection is unchanged.
+
+Completed snapshot identity uses only saved question text, choices, type,
+`selectCount`, and correct answer IDs (public completed evidence and/or private
+saved keys). IDs are matched to saved answer IDs, not array positions. Both keys
+must agree when present. Missing, invalid, or ambiguous evidence returns `null`,
+including duplicate normalized choice text. Snapshots are never mutated or
+resolved against the current library, so deletion and key edits preserve history.
+Legacy app-created quizzes are exclusively AWS CLF-C02; snapshots lack a saved
+certification namespace, so this helper supports that legacy contract only and
+must not be used to infer other certifications. The mastery scheduler and unique reporting use this helper internally; identities
+and answer-key hashes are omitted from public aggregate responses. Concept
+grouping is outside this feature.
+
+## Reviewed concept variations
+
+The library can suggest question groups from matching area/topic labels, but
+only explicitly reviewed and activated groups influence normal quiz/exam draws.
+Eligible variations prefer less recent completed appearances within the same
+domain and individual practice priority. Domain quotas, exact duplicate
+suppression and selected source/type filters remain in force; unavailable
+alternates do not block otherwise eligible questions. Dedicated Due Review
+continues to select the actual due identities. Saved labels survive later group
+and source changes. See [reviewed concept groups](concepts.md).

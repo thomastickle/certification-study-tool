@@ -60,9 +60,9 @@ test('scores exact answer sets, unanswered misses, confidence and review marks; 
     assert.equal(result.questions[0]!.confidence, 'Unsure')
     assert.equal(result.questions[0]!.flagged, true)
     assert.ok(result.questions.every((q) => q.correctAnswerIds))
-    assert.equal(repository.quizStore().boosts().size, 4)
+    assert.equal(repository.quizStore().boosts().size, 1)
     assert.deepEqual(service.submit(quiz.id, { answers: [] }), result)
-    assert.equal(repository.quizStore().boosts().size, 4)
+    assert.equal(repository.quizStore().boosts().size, 1)
   } finally {
     repository.close()
   }
@@ -142,21 +142,11 @@ test('abandon does not score or change mastery; validation rejects invalid selec
   }
 })
 
-test('missed fingerprints retain boost until three consecutive correct appearances, and reset on a miss', () => {
+test('legacy streak-table records are not authoritative for the new mastery scheduler', () => {
   const repository = new LibraryRepository(':memory:')
   try {
-    const store = repository.quizStore()
-    store.record('example', false)
-    assert.ok(store.boosts().has('example'))
-    store.record('example', true)
-    store.record('example', true)
-    assert.ok(store.boosts().has('example'))
-    store.record('example', false)
-    store.record('example', true)
-    store.record('example', true)
-    assert.ok(store.boosts().has('example'))
-    store.record('example', true)
-    assert.equal(store.boosts().has('example'), false)
+    repository.quizStore().record('legacy', false)
+    assert.equal(repository.quizStore().boosts().size, 0)
   } finally {
     repository.close()
   }
