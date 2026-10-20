@@ -8,6 +8,7 @@ import type {
   StoredQuestion,
 } from '../shared/contracts.ts'
 import { api } from './api.ts'
+import { ConceptPanel } from './ConceptPanel.tsx'
 
 type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?: number }
 
@@ -297,6 +298,7 @@ export function LibraryPage() {
             )}
           </section>
         )}
+        <ConceptPanel refreshKey={refresh} />
         <div className="library-layout">
           <aside className="source-panel" aria-label="Question sources">
             <div className="source-heading">
