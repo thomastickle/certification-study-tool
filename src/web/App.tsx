@@ -42,7 +42,7 @@ export function App() {
           <span className="brand-mark" aria-hidden="true">
             S
           </span>
-          <span>Study Library</span>
+          <span>Certification Study Tool</span>
         </button>
         <nav className="app-nav" aria-label="Main navigation">
           {links.map((link) => (

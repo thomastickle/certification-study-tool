@@ -90,7 +90,9 @@ if (!production) {
     }
   }
 }
-server.listen(port, '127.0.0.1', () => console.log(`Study library: http://127.0.0.1:${port}`))
+server.listen(port, '127.0.0.1', () =>
+  console.log(`Certification Study Tool: http://127.0.0.1:${port}`),
+)
 
 async function shutdown() {
   clearInterval(expiryTimer)
