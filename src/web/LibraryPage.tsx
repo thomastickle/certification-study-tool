@@ -14,7 +14,7 @@ type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?
 
 const emptyPage: QuestionPage = { items: [], total: 0, page: 1, pageSize: 25 }
 
-export function LibraryPage() {
+export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promise<void> }) {
   const [sources, setSources] = useState<Source[]>([])
   const [questions, setQuestions] = useState<QuestionPage>(emptyPage)
   const [sourceId, setSourceId] = useState<number>()
@@ -113,6 +113,7 @@ export function LibraryPage() {
       setReviewed(false)
       setRefresh((n) => n + 1)
       setPage(1)
+      await onLibraryChange?.()
     })
   }
 
@@ -128,6 +129,7 @@ export function LibraryPage() {
       setPreview(undefined)
       setRefresh((n) => n + 1)
       setPage(1)
+      await onLibraryChange?.()
     })
   }
 

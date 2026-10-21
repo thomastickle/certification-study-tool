@@ -34,12 +34,17 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
     }
     return true
   })
-  const domainNames = [
-    'Cloud Concepts',
-    'Security and Compliance',
-    'Cloud Technology and Services',
-    'Billing, Pricing, and Support',
-  ]
+  const clf =
+    (quiz.options.provider ?? 'AWS') === 'AWS' &&
+    (quiz.options.certification ?? 'CLF-C02') === 'CLF-C02'
+  const domains = clf
+    ? [
+        { id: 1, name: 'Cloud Concepts' },
+        { id: 2, name: 'Security and Compliance' },
+        { id: 3, name: 'Cloud Technology and Services' },
+        { id: 4, name: 'Billing, Pricing, and Support' },
+      ]
+    : [{ id: 0, name: 'Domain not mapped' }]
   const answered = quiz.questions.filter((q) => q.selected.length).length
   const score = quiz.total ? (quiz.correctCount! / quiz.total) * 100 : null
   return (
@@ -47,7 +52,8 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
       <section className="attempt-summary report-panel">
         <div>
           <p className="eyebrow">
-            {mode.toUpperCase()} · {reportDate(quiz.finishedAt!)} · CLF-C02
+            {mode.toUpperCase()} · {reportDate(quiz.finishedAt!)} ·{' '}
+            {quiz.options.certification ?? 'CLF-C02'}
           </p>
           <h2>
             {score !== null && score >= 80
@@ -87,13 +93,13 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
           </div>
         </div>
         <div className="domain-grid">
-          {domainNames.map((name, i) => {
-            const group = quiz.questions.filter((q) => q.domain === i + 1)
+          {domains.map(({ id, name }) => {
+            const group = quiz.questions.filter((q) => q.domain === id)
             const answered = group.filter((q) => q.selected.length).length
             const correct = group.filter((q) => q.correct).length
             return (
               <article className="domain-card" key={name}>
-                <span className="domain-number">0{i + 1}</span>
+                <span className="domain-number">{id ? `0${id}` : '—'}</span>
                 <h3>{name}</h3>
                 <strong>{percent(group.length ? (correct / group.length) * 100 : null)}</strong>
                 <p>
@@ -114,8 +120,8 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
             Domain
             <select value={domain} onChange={(event) => setDomain(event.target.value)}>
               <option value="all">All domains</option>
-              {domainNames.map((name, i) => (
-                <option value={i + 1} key={name}>
+              {domains.map(({ id, name }) => (
+                <option value={id} key={id}>
                   {name}
                 </option>
               ))}
@@ -152,8 +158,8 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
             </summary>
             <div className="answer-detail-body">
               <p className="report-muted">
-                {domainNames[question.domain - 1]} · {question.area ?? 'Unclassified'} ·{' '}
-                {question.topic ?? 'Unclassified'}
+                {domains.find((item) => item.id === question.domain)?.name ?? 'Domain not mapped'} ·{' '}
+                {question.area ?? 'Unclassified'} · {question.topic ?? 'Unclassified'}
               </p>
               <ConceptLabels question={question} />
               <ul className="review-choices">

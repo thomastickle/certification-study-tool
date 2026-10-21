@@ -74,7 +74,9 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
         <span>{summary}</span>
         <span aria-hidden="true">⌄</span>
       </button>
-      {!sources.length && <p className="muted">Import a CLF-C02 question bank to begin.</p>}
+      {!sources.length && (
+        <p className="muted">Import a question bank for this certification to begin.</p>
+      )}
       <dialog
         className="source-picker-popover"
         ref={dialog}
@@ -144,7 +146,7 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
           )
         })}
         <p className="muted">
-          Counts show bank totals. Your selection still needs enough questions in each exam domain.
+          Counts show bank totals. Your selection still needs enough unique eligible questions.
         </p>
       </dialog>
     </fieldset>

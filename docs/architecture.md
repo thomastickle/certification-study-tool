@@ -73,7 +73,7 @@ review has been performed for this bootstrap.
 
 `src/server/reports/report-service.ts` calculates reports from completed quiz
 snapshots through the existing quiz repository. `GET /api/reports` validates
-practice mode, CLF-C02 certification and rolling time filters, scores expired
+practice mode, provider/certification scope and rolling time filters, scores expired
 sessions through the quiz service, and returns aggregate counts, UTC daily
 activity, domain/topic/confidence breakdowns and attempt summaries. It omits
 internal answer keys and fingerprints. Individual review uses the existing

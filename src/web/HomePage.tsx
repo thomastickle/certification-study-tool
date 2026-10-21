@@ -6,7 +6,7 @@ const sessions = [
   {
     mode: 'practice',
     name: 'Practice',
-    description: 'Choose a short quiz or a full-length exam.',
+    description: 'Choose a short quiz or a longer timed exam practice.',
     questions: '20 or 65 questions',
     duration: '20 or 90 minutes',
     action: 'Set up practice',

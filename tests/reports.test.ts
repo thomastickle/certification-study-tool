@@ -154,7 +154,7 @@ test('mode, certification and rolling time filters apply to all report sections 
       0,
     )
     assert.equal((await (await fetch(`${base}/api/reports?mode=quiz`)).json()).counts.correct, 4)
-    for (const query of ['mode=unknown', 'days=-1', 'days=7x', 'certification=SAA-C03']) {
+    for (const query of ['mode=unknown', 'days=-1', 'days=7x', 'certification=']) {
       assert.equal((await fetch(`${base}/api/reports?${query}`)).status, 400, query)
     }
   })
