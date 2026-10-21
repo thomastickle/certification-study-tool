@@ -1277,9 +1277,11 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0.6rem;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 6px;
+  border-color: transparent;
+  background: transparent;
 }
 
 .deletion-deadline {
@@ -1306,4 +1308,47 @@ select {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.result-icon-action:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.result-icon-action .study-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.result-icon-delete {
+  color: #a12d28;
+}
+
+.result-icon-delete:hover {
+  color: #7f211d;
+}
+
+.completed-results a,
+.completed-result-summary {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.completed-result-date,
+.completed-results .completed-result-score {
+  display: block;
+}
+
+.completed-results .completed-result-score {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (pointer: coarse) {
+  .result-icon-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }

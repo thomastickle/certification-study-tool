@@ -26,7 +26,7 @@ export function DeleteResultButton({ id, onDeleted }: { id: string; onDeleted: (
   return (
     <div className="result-deletion">
       <button
-        className="danger result-icon-action"
+        className="result-icon-action result-icon-delete"
         aria-label="Delete result"
         title="Delete result"
         aria-busy={busy}
@@ -142,7 +142,21 @@ export function CompletedResults({
       <ul className="history-list">
         {items.map((item) => {
           const pending = item.status === 'deleted' && 'purgeAt' in item
-          const label = `${new Date(item.finishedAt ?? item.startedAt).toLocaleString()} · ${item.correctCount ?? 0}/${item.total}`
+          const completedAt = new Date(item.finishedAt ?? item.startedAt)
+          let score = 'Score unavailable'
+          if (item.total > 0 && item.correctCount !== null) {
+            score = `${Math.round((item.correctCount / item.total) * 100)}% score`
+          }
+          const summary = (
+            <>
+              <time className="completed-result-date" dateTime={completedAt.toISOString()}>
+                {completedAt.toLocaleString()}
+              </time>
+              <span className="completed-result-score">
+                {score} · {item.correctCount ?? '—'}/{item.total} correct
+              </span>
+            </>
+          )
           return (
             <li
               key={item.id}
@@ -151,7 +165,7 @@ export function CompletedResults({
             >
               <div>
                 {pending ? (
-                  <span>{label}</span>
+                  <div className="completed-result-summary">{summary}</div>
                 ) : (
                   <a
                     href={`#result-${item.id}`}
@@ -160,7 +174,7 @@ export function CompletedResults({
                       onOpen(item.id)
                     }}
                   >
-                    {label}
+                    {summary}
                   </a>
                 )}
                 {pending && (
@@ -173,7 +187,7 @@ export function CompletedResults({
                 )}
               </div>
               <button
-                className={`result-icon-action ${pending ? '' : 'danger'}`}
+                className={`result-icon-action ${pending ? '' : 'result-icon-delete'}`}
                 aria-label={pending ? 'Undo deletion' : 'Delete result'}
                 title={pending ? 'Undo deletion' : 'Delete result'}
                 disabled={busy !== null || (pending && Date.now() >= item.purgeAt)}
