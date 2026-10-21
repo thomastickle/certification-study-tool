@@ -1,6 +1,8 @@
 .certification-picker {
   position: relative;
-  width: 100%;
+  flex: 0 1 400px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .certification-picker-trigger {
@@ -55,7 +57,8 @@
   z-index: 20;
   top: calc(100% + 0.4rem);
   left: 0;
-  width: min(100%, 640px);
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 2rem));
   padding: 0.8rem;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -90,24 +93,28 @@
   overscroll-behavior: contain;
 }
 
-.certification-picker-group + .certification-picker-group {
-  margin-top: 0.45rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--border);
-}
-
-.certification-picker-group h3 {
+.certification-picker-group h3,
+.certification-picker-group h4,
+.certification-picker-group h5 {
   margin: 0;
   padding: 0.45rem 0.55rem 0.3rem;
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+}
+
+.certification-picker-group h3 {
+  margin-top: 0.35rem;
   text-transform: uppercase;
 }
 
-.certification-picker-group h3 span {
-  padding: 0 0.15rem;
+.certification-picker-group h4 {
+  padding-left: 0.8rem;
+}
+
+.certification-picker-group h5 {
+  padding-left: 1rem;
+  font-weight: 600;
 }
 
 .certification-picker-option {
@@ -127,6 +134,7 @@
 }
 
 .certification-picker-option:hover:not(:disabled),
+.certification-picker-option.is-active,
 .certification-picker-option[aria-selected='true'] {
   background: var(--accent-soft);
 }
