@@ -66,7 +66,7 @@ test('known Azure, Google Cloud and Microsoft certifications carry normalized or
   assert.deepEqual(
     certs.map(({ code, organization, platform, level }) => [code, organization, platform, level]),
     [
-      ['CDL', 'Google Cloud', 'Google Cloud', 'Foundational'],
+      ['CDL', 'Google', 'GCP', 'Foundational'],
       ['AZ-900', 'Microsoft', 'Azure', 'Fundamentals'],
       ['MS-900', 'Microsoft', 'Microsoft 365', 'Fundamentals'],
       ['PL-900', 'Microsoft', 'Power Platform', 'Fundamentals'],
@@ -84,6 +84,40 @@ test('unknown certifications remain visible without an inferred level', () => {
   ])!
 
   assert.equal(cert?.level, null)
+})
+
+test('organization and platform stay distinct across cloud and other imported Microsoft programs', () => {
+  const certs = certificationsFromSources([
+    source({ provider: 'AWS' }),
+    source({ provider: 'GCP', certification: 'CDL', certificationName: 'Cloud Digital Leader' }),
+    source({
+      provider: 'Microsoft .NET',
+      certification: 'NET-DEMO',
+      certificationName: 'Imported .NET program',
+    }),
+    source({
+      provider: 'Microsoft',
+      certification: 'OTHER-DEMO',
+      certificationName: 'Other imported program',
+    }),
+  ])
+  assert.deepEqual(
+    certs.map(({ organization, platform }) => [organization, platform]),
+    [
+      ['Amazon', 'AWS'],
+      ['Google', 'GCP'],
+      ['Microsoft', '.NET'],
+      ['Microsoft', 'Microsoft'],
+    ],
+  )
+  assert.equal(filterCertifications(certs, 'Amazon web services')[0]?.provider, 'AWS')
+  assert.equal(filterCertifications(certs, 'Google cloud')[0]?.provider, 'GCP')
+  assert.equal(filterCertifications(certs, 'Microsoft .NET')[0]?.code, 'NET-DEMO')
+  assert.equal(
+    filterCertifications(certs, 'Azure').length,
+    0,
+    'Other Microsoft programs are not Azure',
+  )
 })
 
 test('full platform names support short provider aliases without losing their namespace', () => {
@@ -139,6 +173,6 @@ test('raw backend namespaces and codes survive metadata normalization without al
       '["Microsoft"," AZ-900 "]',
     ]),
   )
-  assert.equal(certs.find((cert) => cert.provider === 'AWS')?.organization, 'Amazon Web Services')
+  assert.equal(certs.find((cert) => cert.provider === 'AWS')?.organization, 'Amazon')
   assert.equal(certs.find((cert) => cert.provider === 'Azure')?.platform, 'Azure')
 })

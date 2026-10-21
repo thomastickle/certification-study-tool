@@ -105,11 +105,17 @@
 }
 
 .certification-picker-group h3 {
-  margin-top: 8px;
+  font-weight: 700;
 }
 
-.certification-picker-group:first-child h3 {
-  margin-top: 0;
+.certification-organization-separator {
+  margin: 8px 0 6px;
+  border-top: 2px solid var(--border);
+}
+
+.certification-platform-separator {
+  margin: 5px 8px 4px 20px;
+  border-top: 1px solid var(--border);
 }
 
 .certification-picker-group h4 {

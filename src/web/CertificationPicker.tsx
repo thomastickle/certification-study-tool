@@ -208,9 +208,18 @@ export function CertificationPicker({
               const key = certificationKey(cert)
               return (
                 <div className="certification-picker-group" role="presentation" key={key}>
+                  {index > 0 && organizationChanged && (
+                    <div className="certification-organization-separator" aria-hidden="true" />
+                  )}
+                  {index > 0 && platformChanged && !organizationChanged && (
+                    <div className="certification-platform-separator" aria-hidden="true" />
+                  )}
                   {organizationChanged && <h3>{cert.organization}</h3>}
                   {platformChanged && cert.platform !== cert.organization && (
-                    <h4>{cert.platform}</h4>
+                    <h4>
+                      {cert.platform}
+                      {cert.platformName && ` (${cert.platformName})`}
+                    </h4>
                   )}
                   {levelChanged && cert.level && <h5>{cert.level}</h5>}
                   <button

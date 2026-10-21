@@ -6,11 +6,15 @@ export type Certification = {
   name: string
   organization: string
   platform: string
+  platformName?: string
   level: string | null
   aliases: string[]
 }
 
-type CertificationDetails = Pick<Certification, 'organization' | 'platform' | 'level'>
+type CertificationDetails = Pick<
+  Certification,
+  'organization' | 'platform' | 'platformName' | 'level'
+>
 
 const amazonCodes: Record<string, string> = {
   'CLF-C02': 'Foundational',
@@ -43,33 +47,39 @@ function normalizeProvider(provider: string): {
   provider: string
   aliases: string[]
   platform: string
+  platformName?: string
 } {
   const normalized = provider.trim()
   const lower = normalized.toLowerCase()
 
   if (['aws', 'amazon', 'amazon web services'].includes(lower)) {
     return {
-      provider: 'Amazon Web Services',
+      provider: 'Amazon',
       aliases: ['AWS', 'Amazon', 'Amazon Web Services'],
       platform: 'AWS',
+      platformName: 'Amazon Web Services',
     }
   }
 
-  if (['azure', 'microsoft azure', 'microsoft', 'ms'].includes(lower)) {
+  if (['azure', 'microsoft azure'].includes(lower)) {
     return { provider: 'Microsoft', aliases: ['Azure', 'Microsoft', 'MS'], platform: 'Azure' }
+  }
+  if (['microsoft', 'ms'].includes(lower)) {
+    return { provider: 'Microsoft', aliases: ['Microsoft', 'MS'], platform: 'Microsoft' }
   }
 
   if (['gcp', 'google', 'google cloud', 'google cloud platform'].includes(lower)) {
     return {
-      provider: 'Google Cloud',
+      provider: 'Google',
       aliases: ['GCP', 'Google Cloud', 'Google Cloud Platform'],
-      platform: 'Google Cloud',
+      platform: 'GCP',
+      platformName: 'Google Cloud',
     }
   }
 
-  const microsoftPlatform = /^(microsoft)\s+(365|power platform|dynamics 365)/i.exec(normalized)
+  const microsoftPlatform = /^microsoft\s+(.+)$/i.exec(normalized)
   if (microsoftPlatform) {
-    const platform = microsoftPlatform[2]!.replace(/^365$/, 'Microsoft 365')
+    const platform = microsoftPlatform[1]!.replace(/^365$/, 'Microsoft 365')
     return { provider: 'Microsoft', aliases: ['Microsoft', 'MS', platform], platform }
   }
 
@@ -80,17 +90,23 @@ function normalizeProvider(provider: string): {
 function detailsFor(provider: string, code: string, name: string): CertificationDetails {
   const upperCode = code.trim().toUpperCase()
   const identity = normalizeProvider(provider)
-  if (identity.provider === 'Amazon Web Services') {
+  if (identity.provider === 'Amazon') {
     return {
       organization: identity.provider,
       platform: identity.platform,
+      platformName: identity.platformName,
       level: amazonCodes[upperCode] ?? null,
     }
   }
 
-  if (identity.provider === 'Google Cloud') {
+  if (identity.provider === 'Google') {
     const level = upperCode === 'CDL' || /cloud digital leader/i.test(name) ? 'Foundational' : null
-    return { organization: identity.provider, platform: identity.platform, level }
+    return {
+      organization: identity.provider,
+      platform: identity.platform,
+      platformName: identity.platformName,
+      level,
+    }
   }
 
   if (identity.provider === 'Microsoft') {
@@ -166,6 +182,7 @@ export function filterCertifications(certs: Certification[], query: string): Cer
       cert.name,
       cert.organization,
       cert.platform,
+      cert.platformName ?? '',
       cert.level ?? '',
       ...cert.aliases,
     ]
