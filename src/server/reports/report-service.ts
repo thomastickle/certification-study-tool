@@ -1,3 +1,4 @@
+import { certificationScope, sameCertification, isClf } from '../quizzes/certification-scope.ts'
 import { completedQuestionIdentity } from '../quizzes/question-identity.ts'
 import { completedEvidence, masteryHistory } from '../quizzes/mastery-history.ts'
 import { quizTiming } from '../../shared/quiz-timing.ts'
@@ -44,7 +45,12 @@ function topics(questions: QuizQuestion[]): ReportBreakdown[] {
     .sort((a, b) => a.domain - b.domain || a.name.localeCompare(b.name))
 }
 
-type ReportInput = { mode?: string | null; days?: string | null; certification?: string | null }
+type ReportInput = {
+  mode?: string | null
+  days?: string | null
+  certification?: string | null
+  provider?: string | null
+}
 
 /** Reports read saved snapshots, so source deletions cannot rewrite study history. */
 export class ReportService {
@@ -58,25 +64,27 @@ export class ReportService {
 
   /**
    * Returns completed-attempt evidence without answer keys or library mutations.
-   * @throws {ApplicationError} When a certification, mode or time range is unsupported.
+   * @throws {ApplicationError} When scope fields are empty or the mode or time range is unsupported.
    */
   get(input: ReportInput = {}): StudyReport {
+    const scope = certificationScope({
+      provider: input.provider ?? undefined,
+      certification: input.certification ?? undefined,
+    })
     const mode = input.mode ?? 'all'
     const days = input.days ?? 'all'
     if (
       !['all', 'quiz', 'exam', 'review'].includes(mode) ||
-      !['all', '7', '30', '90'].includes(days) ||
-      (input.certification != null && input.certification !== 'CLF-C02')
+      !['all', '7', '30', '90'].includes(days)
     ) {
-      throw new ApplicationError(
-        'Choose CLF-C02, a valid practice mode, and an available time range.',
-      )
+      throw new ApplicationError('Choose a valid practice mode and an available time range.')
     }
     const now = this.now()
     const since = days === 'all' ? -Infinity : now - Number(days) * 86400000
     const lifetime = this.repository
       .quizStore()
       .completed()
+      .filter((quiz) => sameCertification(quiz.options, scope))
       .filter((quiz) => !Number.isFinite(quiz.finishedAt) || quiz.finishedAt! <= now)
     const completed = lifetime
       .filter(
@@ -126,8 +134,12 @@ export class ReportService {
       const state = states.get(identity)
       return state?.mastered ? [state] : []
     })
-    const evidence = domainNames.map((_, index) => {
-      const domain = index + 1
+    const domains = isClf(scope)
+      ? domainNames.map((name, index) => ({ domain: index + 1, name }))
+      : [...new Set(questions.map((q) => q.domain))]
+          .sort((a, b) => a - b)
+          .map((domain) => ({ domain, name: domain === 0 ? 'Unclassified' : `Domain ${domain}` }))
+    const evidence = domains.map(({ domain }) => {
       const distinct = new Set<string>()
       const attempts = new Set<string>()
       for (const quiz of completed) {
@@ -150,9 +162,10 @@ export class ReportService {
         qualified: distinct.size >= 10 && attempts.size >= 2,
       }
     })
-    const weakest = evidence.every((domain) => domain.qualified)
-      ? [...evidence].sort((a, b) => a.score! - b.score! || a.domain - b.domain)[0]!.domain
-      : null
+    const weakest =
+      evidence.length > 0 && evidence.every((domain) => domain.qualified)
+        ? [...evidence].sort((a, b) => a.score! - b.score! || a.domain - b.domain)[0]!.domain
+        : null
     const daily = new Map<string, { questions: QuizQuestion[]; attempts: number }>()
     for (const quiz of completed) {
       const date = new Date(quiz.finishedAt!).toISOString().slice(0, 10)
@@ -173,16 +186,16 @@ export class ReportService {
       },
       focus: { domain: weakest, metric: 'score', domains: evidence },
       targetAttempts: attempts.filter((a) => a.passed !== null).length,
-      certification: 'CLF-C02',
+      ...scope,
       generatedAt: now,
       counts: counts(questions),
       passingAttempts: attempts.filter((a) => a.passed).length,
       attempts,
-      domains: domainNames.map((name, i) => ({
-        id: String(i + 1),
+      domains: domains.map(({ name, domain }) => ({
+        id: String(domain),
         name,
-        domain: i + 1,
-        counts: counts(questions.filter((q) => q.domain === i + 1)),
+        domain,
+        counts: counts(questions.filter((q) => q.domain === domain)),
       })),
       topics: topics(questions),
       confidence: ['Confident', 'Educated Guess', 'Unsure', 'Not recorded'].map((name) => ({

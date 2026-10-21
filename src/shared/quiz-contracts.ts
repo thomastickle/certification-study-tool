@@ -3,6 +3,8 @@ export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure'
 export type PracticeMode = 'quiz' | 'exam' | 'review'
 
 export type QuizOptions = {
+  provider?: string
+  certification?: string
   mode?: PracticeMode
   sourceFilter: 'mixed' | 'official' | 'third_party'
   sourceIds?: number[]
