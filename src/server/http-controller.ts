@@ -7,6 +7,7 @@ import { ApplicationError } from './errors.ts'
 import { ImportService } from './importer/import-service.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import { LibraryService } from './questions/library-service.ts'
+import { HomeService } from './home/home-service.ts'
 
 /** Prevent other websites from driving a local library through this server. */
 export function checkLocalRequest(request: IncomingMessage): void {
@@ -76,6 +77,7 @@ export function apiController(repository: LibraryRepository) {
   const reports = new ReportService(repository)
   const importer = new ImportService(repository)
   const library = new LibraryService(repository)
+  const home = new HomeService(repository)
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
       checkLocalRequest(request)
@@ -83,6 +85,14 @@ export function apiController(repository: LibraryRepository) {
       const conceptResponse = await conceptRoute(concepts, request, url, body)
       if (conceptResponse) {
         return send(response, conceptResponse.status, conceptResponse.value)
+      }
+      if (request.method === 'GET' && url.pathname === '/api/home') {
+        quizzes.expireDue()
+        return send(response, 200, home.get())
+      }
+      if (request.method === 'PUT' && url.pathname === '/api/certifications/earned') {
+        quizzes.expireDue()
+        return send(response, 200, home.setEarned(await body(request)))
       }
       if (request.method === 'GET' && url.pathname === '/api/reports') {
         quizzes.expireDue()

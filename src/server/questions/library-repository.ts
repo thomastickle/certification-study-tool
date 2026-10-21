@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { ConceptRepository, migrateConcepts } from '../concepts/concept-repository.ts'
 import { migrateQuizzes, QuizRepository } from '../quizzes/quiz-repository.ts'
+import { CertificationRepository, migrateCertifications } from '../home/certification-repository.ts'
 import type { JsonObject, QuestionPage, Source, StoredQuestion } from '../../shared/contracts.ts'
 
 export type SourceRecord = Omit<Source, 'questionCount'> & { metadata: JsonObject }
@@ -58,6 +59,11 @@ export class LibraryRepository {
     `)
     migrateQuizzes(this.db)
     migrateConcepts(this.db)
+    migrateCertifications(this.db)
+  }
+
+  certificationStore(): CertificationRepository {
+    return new CertificationRepository(this.db)
   }
 
   conceptStore(): ConceptRepository {

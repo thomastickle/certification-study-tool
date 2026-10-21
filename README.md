@@ -6,6 +6,9 @@ shows their contents, and deletes individual source occurrences or whole sources
 The library accepts question banks for different providers and certifications.
 Timed quizzes, exams, and performance reports currently target AWS CLF-C02;
 other certification practice modes are not yet implemented.
+Home groups imported certifications by provider with compact exam-readiness bars.
+The separate Certifications screen records earned credentials as stars without
+changing readiness. See [readiness rules and evidence](docs/readiness.md).
 The Reports page adds progress charts, domain and topic breakdowns, exam/quiz
 filters, saved answer review, and local Markdown exports. See
 [quiz behavior and reporting](docs/quizzes.md).
