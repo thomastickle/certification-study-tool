@@ -303,7 +303,7 @@ legacy snapshots as quizzes.
   Individual attempt reports include question-level answer evidence.
 
 Reports use saved session snapshots and survive bank changes or deletion.
-Deleting a question bank adds a **Question bank deleted** indicator to attempts
+Deleting a question bank adds a **Contains obsolete / deleted questions** indicator to attempts
 that drew questions from it, including mixed-bank and paused attempts. Results,
 history lists, individual reports, and newly generated Markdown exports identify
 the deleted bank. Home shows the count of affected completed attempts per
@@ -467,3 +467,8 @@ whose bank was deleted and no completed Due Reviews. Use the browser-only
 transpile/evaluate workflow above. The check verifies that lifetime deletion
 evidence remains visible in the empty state and that returning to all-time Master
 report does not claim affected attempts lie outside its filters.
+
+`bankDeletionHistoryLayoutCheck()` in the same file checks completed-history dot,
+text, and badge alignment. Run it at desktop and mobile widths with a completed
+quiz from a deleted bank. The longer badge wraps under the result text on narrow
+screens while preserving the dot column and avoiding horizontal scrolling.

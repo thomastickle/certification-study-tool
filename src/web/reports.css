@@ -513,6 +513,10 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+.attempt-title .deleted-bank-badge {
+  margin-top: 4px;
+}
 .attempt-title small,
 .attempt-score small {
   display: block;

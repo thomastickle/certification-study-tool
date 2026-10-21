@@ -152,14 +152,18 @@ export function CompletedResults({
                 correctCount={item.correctCount}
                 total={item.total}
               />
-              <time className="completed-result-date" dateTime={completedAt.toISOString()}>
-                {completedAt.toLocaleString()}
-              </time>
-              {' · '}
-              <span className="completed-result-score">
-                {score} · {item.correctCount ?? '—'}/{item.total} correct
+              <span className="completed-result-content">
+                <span className="completed-result-label">
+                  <time className="completed-result-date" dateTime={completedAt.toISOString()}>
+                    {completedAt.toLocaleString()}
+                  </time>
+                  {' · '}
+                  <span className="completed-result-score">
+                    {score} · {item.correctCount ?? '—'}/{item.total} correct
+                  </span>
+                </span>
+                <DeletedBankNotice names={item.deletedBankNames} compact />
               </span>
-              <DeletedBankNotice names={item.deletedBankNames} compact />
             </>
           )
           return (
@@ -173,6 +177,7 @@ export function CompletedResults({
                   <div className="completed-result-summary">{summary}</div>
                 ) : (
                   <a
+                    className="completed-result-summary"
                     href={`#result-${item.id}`}
                     onClick={(event) => {
                       event.preventDefault()

@@ -52,7 +52,8 @@ test('Home, Reports and individual reviews visibly explain retained evidence fro
     new LibraryService(repository).deleteSource(repository.sources()[0]!.id)
     const reportHtml = renderReport()
     assert.match(reportHtml, /1 attempt in this view uses deleted question banks/)
-    assert.match(reportHtml, /Question bank deleted/)
+    assert.match(reportHtml, /Contains obsolete \/ deleted questions/)
+    assert.match(reportHtml, /title="Question bank deleted: quiz-synthetic/)
     const homeHtml = renderToStaticMarkup(
       createElement(HomeDashboard, {
         summary: new HomeService(repository, () => now).get(),

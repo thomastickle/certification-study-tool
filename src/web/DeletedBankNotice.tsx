@@ -18,7 +18,7 @@ export function DeletedBankNotice({
         className="deleted-bank-badge"
         title={`${label}. Original saved questions retained after reimport.`}
       >
-        Question bank deleted
+        Contains obsolete / deleted questions
       </span>
     )
   }

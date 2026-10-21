@@ -477,7 +477,8 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
         {removal?.kind === 'sources' && (
           <p>
             Saved quizzes, exams, and reports stay available. Attempts that used this bank will show
-            a “Question bank deleted” indicator, even after reimport. Their scores still count.
+            a “Contains obsolete / deleted questions” indicator, even after reimport. Their scores
+            still count.
           </p>
         )}
         <div className="dialog-actions">
