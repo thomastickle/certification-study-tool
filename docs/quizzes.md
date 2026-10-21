@@ -370,3 +370,23 @@ suppression and selected source/type filters remain in force; unavailable
 alternates do not block otherwise eligible questions. Dedicated Due Review
 continues to select the actual due identities. Saved labels survive later group
 and source changes. See [reviewed concept groups](concepts.md).
+
+### Certification scope
+
+Quiz options accept optional `provider` and `certification` strings. Omitted fields default to
+`AWS` and `CLF-C02`, including historical snapshots without identity fields. New attempts persist
+both fields. `GET /api/quizzes`, `/api/quizzes/current`, and `/api/quizzes/due` accept the same
+query parameters. Recovery and paused-attempt conflicts apply to the full provider/certification
+pair and mode; starting another scope or mode preserves its unfinished work. Explicit source IDs
+must all belong to the requested pair.
+
+AWS CLF-C02 retains its mapped domain quotas. Other certifications use a generic 20-question
+quiz or 65-question exam, drawn without domain quotas and including unclassified questions.
+They require enough unique eligible questions; generic snapshots use domain `0` (Unclassified).
+Review uses the same scoped lifetime mastery schedule and selects up to 20 eligible due questions.
+Deleted questions remain overdue and count as unavailable only within their certification scope.
+
+`GET /api/reports` accepts the same pair alongside mode and time filters. Both lifetime mastery
+and selected report evidence belong to that pair. Non-CLF reports use neutral domain labels,
+without claiming CLF domain names or weights. Legacy mastery identities retain their original
+`mastery:v1` format and AWS CLF-C02 namespace.

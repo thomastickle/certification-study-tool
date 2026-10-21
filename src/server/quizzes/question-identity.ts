@@ -1,3 +1,4 @@
+import { certificationScope } from './certification-scope.ts'
 import type { StoredQuiz } from './quiz-repository.ts'
 import type { Question, Source } from '../../shared/contracts.ts'
 import { answerKey, digest, fingerprint, matchText } from '../importer/bank-tools.ts'
@@ -87,5 +88,6 @@ export function completedQuestionIdentity(quiz: StoredQuiz, index: number): stri
     return null
   }
   // All app-created legacy snapshots belong to AWS CLF-C02; no library lookup is safe here.
-  return identity(question, 'AWS', 'CLF-C02')
+  const scope = certificationScope(quiz.options)
+  return identity(question, scope.provider, scope.certification)
 }

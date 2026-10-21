@@ -32,7 +32,8 @@ export type ReportAttempt = {
 }
 
 export type StudyReport = {
-  certification: 'CLF-C02'
+  provider?: string
+  certification: string
   generatedAt: number
   counts: ReportCounts
   targetAttempts: number
