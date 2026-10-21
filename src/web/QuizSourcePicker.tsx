@@ -55,9 +55,20 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
     }
   }, [open])
 
-  const summary = selected.length
-    ? `${selected.length} ${selected.length === 1 ? 'bank' : 'banks'} selected`
-    : 'Choose question banks'
+  const selectedGroups = (['official', 'third_party'] as const).flatMap((kind) => {
+    const banks = sources.filter((source) => source.kind === kind && selected.includes(source.id))
+    if (!banks.length) {
+      return []
+    }
+    const label = kind === 'official' ? 'Official' : 'Third-party'
+    const count = banks.reduce((total, source) => total + source.questionCount, 0)
+    return [
+      {
+        kind,
+        summary: `${label} · ${banks.length} ${banks.length === 1 ? 'bank' : 'banks'} · ${count} ${count === 1 ? 'question' : 'questions'}`,
+      },
+    ]
+  })
   return (
     <fieldset className="quiz-source-picker" ref={root}>
       <legend>Question banks</legend>
@@ -71,7 +82,11 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
         disabled={!sources.length}
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <span>{summary}</span>
+        <span className="source-picker-summary">
+          {selectedGroups.length
+            ? selectedGroups.map((group) => <span key={group.kind}>{group.summary}</span>)
+            : 'Choose question banks'}
+        </span>
         <span aria-hidden="true">⌄</span>
       </button>
       {!sources.length && (

@@ -107,6 +107,41 @@ main {
   gap: 24px;
   margin-bottom: 28px;
 }
+.practice-heading {
+  display: block;
+}
+.practice-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+.practice-title-row h1 {
+  margin: 0;
+}
+.practice-certification {
+  flex: 1 1 240px;
+  min-width: 0;
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.completed-result-mode {
+  display: inline-block;
+  width: 3.25rem;
+  flex-shrink: 0;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+  background: var(--subtle);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
 .eyebrow {
   font-size: 10px;
   letter-spacing: 1.2px;
@@ -933,6 +968,10 @@ select {
   margin-top: 7px;
   text-align: left;
   font-weight: 400;
+}
+.source-picker-summary {
+  display: grid;
+  gap: 4px;
 }
 .source-picker-popover {
   position: absolute;

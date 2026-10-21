@@ -58,7 +58,6 @@ export function QuizPage({
     plural = 'due reviews'
   }
   const count = mode === 'exam' ? 65 : 20
-  const minutes = mode === 'exam' ? 90 : 20
   const [stage, setStage] = useState<Stage>('setup')
   const [options, setOptions] = useState<QuizOptions>({
     ...initialOptions,
@@ -677,27 +676,30 @@ export function QuizPage({
 
   const reviewIds = reviewQuestionIds(questions)
   let heading = title
-  if (stage === 'completed') heading = `${title} results`
-  else if (mode !== 'review' && onPresetChange) heading = 'Practice'
+  if (stage === 'completed' && view) {
+    const resultMode = view.options.mode ?? 'quiz'
+    const resultTitle = resultMode === 'exam' ? 'Exam' : 'Quiz'
+    heading = resultMode === 'review' ? 'Due Review results' : `${resultTitle} results`
+  } else if (mode !== 'review' && onPresetChange) {
+    heading = 'Practice'
+  }
 
   return (
     <main
       className={`quiz-page ${stage === 'question' || stage === 'review' || stage === 'paused' ? 'practice-session' : ''}`}
     >
       {stage !== 'question' && stage !== 'review' && stage !== 'paused' && (
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">TIMED STUDY SESSION</p>
+        <div className="page-heading practice-heading">
+          <p className="eyebrow">TIMED STUDY SESSION</p>
+          <div className="practice-title-row">
             <h1>{heading}</h1>
             <p className="practice-certification">
               {certification.provider} · {certification.name} · {certification.code}
             </p>
-            <p className="intro">
-              {mode === 'review'
-                ? 'Up to 20 due questions · 20 minutes · no quiz/exam pass target'
-                : `${count} questions · ${minutes} minutes · 80% practice target`}
-            </p>
           </div>
+          {mode === 'review' && (
+            <p className="intro">Up to 20 due questions · 20 minutes · no quiz/exam pass target</p>
+          )}
         </div>
       )}
       {error && (
@@ -781,79 +783,85 @@ export function QuizPage({
       )}
       {stage === 'setup' && (
         <>
-          {mode !== 'review' && onPresetChange && (
-            <PracticePresets
-              mode={mode}
-              disabled={busy}
-              onChange={onPresetChange}
-              autoFocus={focusPreset}
-            />
-          )}
-          {recoverable && (
-            <section className="quiz-panel recovery-panel">
-              <h2>
-                {recoverable.status === 'paused' && (
-                  <ResultIndicator status="paused" correctCount={null} total={recoverable.total} />
-                )}
-                {recoverable.status === 'paused' ? 'Paused' : 'In-progress'} {mode}
-              </h2>
-              <p>
-                Your saved answers are ready.{' '}
-                {recoverable.status === 'paused'
-                  ? 'The timer is stopped.'
-                  : 'The timer is still running.'}
-              </p>
-              <button
-                className="primary"
-                disabled={busy || recoveryLoading || recoveryFailed}
-                onClick={() => void loadAttempt(recoverable.id)}
-              >
-                Continue {mode}
-              </button>
-            </section>
-          )}
           {mode === 'review' && <DueReviewStatus key={stage} options={options} />}
-          {!recoverable && (
-            <section className="quiz-panel">
-              <h2>Set up your {mode}</h2>
-              <p>Choose the question banks for this {mode}.</p>
-              {(certification.provider !== 'AWS' || certification.code !== 'CLF-C02') &&
-                mode !== 'review' && (
-                  <p className="muted">
-                    These are timed practice presets, not this certification’s official exam format.
-                    Questions are sampled without exam-domain weighting.
-                  </p>
+          <section className="quiz-panel practice-setup">
+            <h2>Set up your {mode === 'review' ? 'review' : 'quiz'}</h2>
+            {mode !== 'review' && onPresetChange && (
+              <PracticePresets
+                mode={mode}
+                disabled={busy}
+                onChange={onPresetChange}
+                autoFocus={focusPreset}
+              />
+            )}
+            {recoverable && (
+              <section className="quiz-panel recovery-panel">
+                <h2>
+                  {recoverable.status === 'paused' && (
+                    <ResultIndicator
+                      status="paused"
+                      correctCount={null}
+                      total={recoverable.total}
+                    />
+                  )}
+                  {recoverable.status === 'paused' ? 'Paused' : 'In-progress'} {mode}
+                </h2>
+                <p>
+                  Your saved answers are ready.{' '}
+                  {recoverable.status === 'paused'
+                    ? 'The timer is stopped.'
+                    : 'The timer is still running.'}
+                </p>
+                <button
+                  className="primary"
+                  disabled={busy || recoveryLoading || recoveryFailed}
+                  onClick={() => void loadAttempt(recoverable.id)}
+                >
+                  Continue {mode}
+                </button>
+              </section>
+            )}
+            {!recoverable && (
+              <>
+                <p>Choose the question banks for this {mode}.</p>
+                {(certification.provider !== 'AWS' || certification.code !== 'CLF-C02') &&
+                  mode !== 'review' && (
+                    <p className="muted">
+                      These are timed practice presets, not this certification’s official exam
+                      format. Questions are sampled without exam-domain weighting.
+                    </p>
+                  )}
+                {sourcesLoading ? (
+                  <p role="status">Loading question banks…</p>
+                ) : (
+                  <QuizSourcePicker
+                    sources={sources}
+                    selected={options.sourceIds ?? []}
+                    onChange={(sourceIds) => {
+                      setOptions((current) => ({ ...current, sourceIds }))
+                      onSourceIdsChange?.(sourceIds)
+                    }}
+                  />
                 )}
-              {sourcesLoading ? (
-                <p role="status">Loading question banks…</p>
-              ) : (
-                <QuizSourcePicker
-                  sources={sources}
-                  selected={options.sourceIds ?? []}
-                  onChange={(sourceIds) => {
-                    setOptions((current) => ({ ...current, sourceIds }))
-                    onSourceIdsChange?.(sourceIds)
-                  }}
-                />
-              )}
-              <button
-                className="primary"
-                disabled={
-                  sourcesLoading ||
-                  recoveryLoading ||
-                  recoveredAttempt.current === undefined ||
-                  recoveryFailed ||
-                  uncertainStart.current ||
-                  !options.sourceIds?.length
-                }
-                onClick={() => void start()}
-              >
-                {mode === 'review'
-                  ? 'Start Due Review (up to 20 questions)'
-                  : `Start ${count}-question ${mode}`}
-              </button>
-            </section>
-          )}
+                <button
+                  className="primary"
+                  disabled={
+                    sourcesLoading ||
+                    recoveryLoading ||
+                    recoveredAttempt.current === undefined ||
+                    recoveryFailed ||
+                    uncertainStart.current ||
+                    !options.sourceIds?.length
+                  }
+                  onClick={() => void start()}
+                >
+                  {mode === 'review'
+                    ? 'Start Due Review (up to 20 questions)'
+                    : `Start ${count}-question ${mode}`}
+                </button>
+              </>
+            )}
+          </section>
           <CompletedResults
             certification={certification}
             mode={mode}
@@ -1166,7 +1174,9 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
         )}
         <AttemptTiming quiz={view} />
         <div className="quiz-actions">
-          <button onClick={onBack}>Back to {mode} history</button>
+          <button onClick={onBack}>
+            Back to {mode === 'review' ? 'review' : 'practice'} history
+          </button>
           <button onClick={() => void copyReport()}>Copy discussion report</button>
           <button onClick={downloadReport}>Download report</button>
         </div>

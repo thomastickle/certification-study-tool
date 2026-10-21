@@ -1,9 +1,9 @@
 import type { QuizSummary } from '../shared/quiz-contracts.ts'
 
 const bands = {
-  strong: 'Above 90%',
-  middle: '70–90%',
-  low: 'Below 70%',
+  strong: '90–100%',
+  middle: '70–89%',
+  low: '0–69%',
   paused: 'Paused',
   unknown: 'Score unavailable',
 } as const
@@ -20,7 +20,7 @@ export function ResultIndicator({
   } else if (correctCount !== null && total > 0) {
     const percent = (correctCount / total) * 100
     band = 'low'
-    if (percent > 90) {
+    if (percent >= 90) {
       band = 'strong'
     } else if (percent >= 70) {
       band = 'middle'

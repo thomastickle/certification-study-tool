@@ -68,7 +68,10 @@ export async function practicePresetsTest() {
     await preset('exam')
     await until(() => !button('Start 65-question exam').disabled, 'Exam setup not ready')
     assert(
-      document.querySelector('.intro')?.textContent?.includes('90 minutes'),
+      document
+        .querySelector('[value="exam"]')
+        ?.closest('label')
+        ?.textContent?.includes('90 minutes'),
       'Exam time changed',
     )
 
@@ -82,7 +85,10 @@ export async function practicePresetsTest() {
     button('Done').click()
     await until(() => !button('Start 20-question quiz').disabled, 'Quiz setup not ready')
     assert(
-      document.querySelector('.intro')?.textContent?.includes('20 minutes'),
+      document
+        .querySelector('[value="quiz"]')
+        ?.closest('label')
+        ?.textContent?.includes('20 minutes'),
       'Quiz time changed',
     )
 
