@@ -170,6 +170,34 @@ test('a same-day excellent retry does not hide a poor exam on that study day', (
   }
 })
 
+test('current mastery uses lifetime recovery while unfinished and future attempts supply no credit', () => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    repository.quizStore().save(homeExam('old-misses', 40, 0, 'exam-3'))
+    for (const age of [3, 2, 1]) {
+      repository.quizStore().save(homeExam(`exam-${age}`, age))
+    }
+    repository.quizStore().save(homeExam('future-misses', -1, 0, 'exam-2'))
+    for (const status of ['active', 'paused', 'abandoned'] as const) {
+      const quiz = homeExam(status, 0, 0, 'exam-1')
+      quiz.status = status
+      repository.quizStore().save(quiz)
+    }
+    const readiness = new HomeService(repository, () => homeNow).get().providers[0]!
+      .certifications[0]!.readiness
+    assert.equal(
+      readiness.mastery,
+      (130 / 195) * 100,
+      'one later success does not erase older miss-recovery requirements',
+    )
+    assert.equal(readiness.examAverage, 100)
+    assert.equal(readiness.score, 91)
+    assert.equal(readiness.status, 'yellow')
+  } finally {
+    repository.close()
+  }
+})
+
 test('broad, consistent recent exams make a single historical certification exam-ready', () => {
   const repository = new LibraryRepository(':memory:')
   try {

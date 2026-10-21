@@ -10,7 +10,9 @@ import type { HomeSummary } from '../src/shared/home-contracts.ts'
 
 const hooks = registerHooks({
   load(url, context, nextLoad) {
-    if (!url.startsWith('file:') || !url.endsWith('.tsx')) return nextLoad(url, context)
+    if (!url.startsWith('file:') || !url.endsWith('.tsx')) {
+      return nextLoad(url, context)
+    }
     return {
       format: 'module',
       shortCircuit: true,
@@ -78,6 +80,9 @@ test('home dashboard groups real tracks and explains readiness without exposing 
     )
     assert.match(html, /1 \/ 2 tracks exam-ready/)
     assert.equal((html.match(/class="provider-card"/g) ?? []).length, 1)
+    assert.match(html, /aria-label="AWS tracks exam-ready"/)
+    assert.match(html, /Mastery: 97%/)
+    assert.match(html, /Assessed exam average: 95%/)
     assert.match(html, /Cloud Practitioner/)
     assert.match(html, /CLF-C02/)
     assert.match(html, /96%/)

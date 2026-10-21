@@ -84,3 +84,11 @@ use the API's existing local Host/Origin protections.
 distinct coverage, exam variation, timing eligibility, same-day retries, and privacy.
 `tests/home-http.test.ts` exercises local HTTP access, validation, persistence,
 idempotency, deletion, and independence of earned status from readiness.
+
+For browser verification, prepare a new database with
+`node tests/seed-home.ts private/app/home-browser.sqlite3`, then run the server
+with that path and a separate port. Transpile and evaluate `homeDashboardTest()`
+from `tests/home.browser.ts` using the browser workflow in [quiz checks](quizzes.md#browser-regression-checks).
+It checks grouping, neutral unsupported tracks, earned stars, serialized writes,
+failed saves, unchanged readiness, and Home read retry against a real synthetic
+database. `workspaceNavigationTest()` covers the updated navigation independently.

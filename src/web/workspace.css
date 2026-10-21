@@ -631,12 +631,12 @@
   width: min(100%, 1040px);
   padding: 42px 32px 56px;
 }
-.home-heading {
+.home-page .home-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 16px !important;
+  margin-bottom: 16px;
 }
 .home-heading .intro {
   margin: 0;
@@ -685,7 +685,38 @@
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+}
+.provider-card .summary-progress {
+  height: 8px;
+  margin-bottom: 6px;
+}
+.provider-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+.provider-actions > div {
+  display: flex;
+  gap: 8px;
+}
+.provider-actions button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.readiness-method {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.readiness-method summary {
+  cursor: pointer;
 }
 .provider-heading > div {
   display: flex;
@@ -780,7 +811,7 @@
 .readiness-evidence {
   margin-top: 5px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
 }
 .readiness-evidence summary {
   width: fit-content;
@@ -874,6 +905,10 @@
   }
   .provider-card {
     padding-inline: 14px;
+  }
+  .provider-heading > div {
+    flex-wrap: wrap;
+    gap: 4px 10px;
   }
   .track-result {
     flex-direction: column;

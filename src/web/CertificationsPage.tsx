@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CertificationProgress, HomeSummary } from '../shared/home-contracts.ts'
 import { api } from './api.ts'
 
@@ -7,6 +7,7 @@ export function CertificationsPage() {
   const [summary, setSummary] = useState<HomeSummary>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState<string>()
+  const updating = useRef(false)
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
@@ -14,18 +15,26 @@ export function CertificationsPage() {
     setError('')
     api<HomeSummary>('/home')
       .then((result) => {
-        if (active) setSummary(result)
+        if (active) {
+          setSummary(result)
+        }
       })
       .catch((reason: unknown) => {
-        if (active)
+        if (active) {
           setError(reason instanceof Error ? reason.message : 'Could not load certifications.')
+        }
       })
     return () => {
       active = false
     }
   }, [attempt])
 
+  /** Serialize settings writes so an older aggregate response cannot overwrite a newer choice. */
   async function updateEarned(certification: CertificationProgress, earned: boolean) {
+    if (updating.current) {
+      return
+    }
+    updating.current = true
     const key = `${certification.provider}:${certification.code}`
     setPending(key)
     setError('')
@@ -42,11 +51,12 @@ export function CertificationsPage() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Could not update earned status.')
     } finally {
+      updating.current = false
       setPending(undefined)
     }
   }
 
-  if (error && !summary)
+  if (error && !summary) {
     return (
       <main className="home-page certifications-page">
         <section className="home-empty" role="alert">
@@ -56,12 +66,14 @@ export function CertificationsPage() {
         </section>
       </main>
     )
-  if (!summary)
+  }
+  if (!summary) {
     return (
       <main className="home-page certifications-page" aria-busy="true">
         <p>Loading certifications…</p>
       </main>
     )
+  }
 
   const certifications = summary.providers.flatMap((provider) => provider.certifications)
   return (
@@ -83,15 +95,14 @@ export function CertificationsPage() {
           <p>Import question banks to add certification tracks.</p>
         </section>
       ) : (
-        summary.providers.map((provider) => (
+        summary.providers.map((provider, index) => (
           <section
             className="management-card"
             key={provider.name}
-            aria-labelledby={`provider-${provider.name}`}
+            aria-labelledby={`certification-provider-${index}`}
           >
-            <h2 id={`provider-${provider.name}`}>{provider.name}</h2>
+            <h2 id={`certification-provider-${index}`}>{provider.name}</h2>
             {provider.certifications.map((certification) => {
-              const key = `${certification.provider}:${certification.code}`
               return (
                 <label className="earned-control" key={certification.code}>
                   <span>
@@ -101,7 +112,7 @@ export function CertificationsPage() {
                   <input
                     type="checkbox"
                     checked={certification.earned}
-                    disabled={pending === key}
+                    disabled={pending !== undefined}
                     aria-label={`Earned ${certification.name} (${certification.code})`}
                     onChange={(event) => {
                       void updateEarned(certification, event.currentTarget.checked)

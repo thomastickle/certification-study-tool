@@ -19,17 +19,21 @@ export function HomePage({ onNavigate, onPractice }: Props) {
     setError('')
     api<HomeSummary>('/home')
       .then((result) => {
-        if (active) setSummary(result)
+        if (active) {
+          setSummary(result)
+        }
       })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'Could not load readiness.')
+        if (active) {
+          setError(reason instanceof Error ? reason.message : 'Could not load readiness.')
+        }
       })
     return () => {
       active = false
     }
   }, [attempt])
 
-  if (error)
+  if (error) {
     return (
       <main className="home-page">
         <section className="home-empty" role="alert">
@@ -39,11 +43,13 @@ export function HomePage({ onNavigate, onPractice }: Props) {
         </section>
       </main>
     )
-  if (!summary)
+  }
+  if (!summary) {
     return (
       <main className="home-page" aria-busy="true">
         <p>Loading certification readiness…</p>
       </main>
     )
+  }
   return <HomeDashboard summary={summary} onNavigate={onNavigate} onPractice={onPractice} />
 }
