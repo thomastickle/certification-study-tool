@@ -1,3 +1,5 @@
+import { certificationScope, sameCertification } from './certification-scope.ts'
+import type { CertificationScope } from './certification-scope.ts'
 import { randomUUID } from 'node:crypto'
 import type {
   DueReviewSummary,
@@ -36,7 +38,10 @@ export class QuizService {
         store
           .unfinished()
           .some(
-            (q) => q.status === 'paused' && (q.options.mode ?? 'quiz') === (options.mode ?? 'quiz'),
+            (q) =>
+              q.status === 'paused' &&
+              sameCertification(q.options, options) &&
+              (q.options.mode ?? 'quiz') === (options.mode ?? 'quiz'),
           )
       ) {
         throw new ApplicationError(
@@ -46,10 +51,16 @@ export class QuizService {
       }
       // Starting again abandons only active attempts; explicitly paused work is preserved.
       for (const old of store.active()) {
+        if (
+          !sameCertification(old.options, options) ||
+          (old.options.mode ?? 'quiz') !== (options.mode ?? 'quiz')
+        ) {
+          continue
+        }
         if (old.deadline <= this.now()) this.finish(old)
         else store.remove(old.id)
       }
-      const completed = store.completed()
+      const completed = store.completed().filter((quiz) => sameCertification(quiz.options, options))
       const states = masteryHistory(completed).states
       const concepts = this.repository.conceptStore().all()
       const sources = this.repository.sources()
@@ -162,7 +173,12 @@ export class QuizService {
   /** Resolve lifetime obligations against both the whole library and requested pool. */
   private dueQuestions(options: QuizOptions) {
     const day = studyDay(this.now())
-    const states = masteryHistory(this.repository.quizStore().completed()).states
+    const states = masteryHistory(
+      this.repository
+        .quizStore()
+        .completed()
+        .filter((quiz) => sameCertification(quiz.options, options)),
+    ).states
     const due = [...states]
       .filter(([, state]) => state.dueDay !== null && state.dueDay <= day)
       .sort(([a, x], [b, y]) => x.dueDay!.localeCompare(y.dueDay!) || a.localeCompare(b))
@@ -203,10 +219,16 @@ export class QuizService {
   }
 
   /** Recover an unfinished attempt for this mode; overdue active attempts score normally. */
-  current(mode: PracticeMode): QuizView | null {
+  current(mode: PracticeMode, scope: CertificationScope = {}): QuizView | null {
+    const selectedScope = certificationScope(scope)
     return this.repository.quizStore().transaction(() => {
       for (const stored of this.repository.quizStore().unfinished()) {
-        if ((stored.options.mode ?? 'quiz') !== mode) continue
+        if (
+          (stored.options.mode ?? 'quiz') !== mode ||
+          !sameCertification(stored.options, selectedScope)
+        ) {
+          continue
+        }
         const quiz = this.load(stored.id)
         if (quiz.status === 'active' || quiz.status === 'paused') return this.view(quiz)
       }
@@ -268,11 +290,15 @@ export class QuizService {
     })
   }
 
-  recent(): QuizSummary[] {
+  recent(scope: CertificationScope = {}): QuizSummary[] {
+    const selectedScope = certificationScope(scope)
     return this.repository.quizStore().transaction(() => {
       for (const quiz of this.repository.quizStore().active())
         if (quiz.deadline <= this.now()) this.finish(quiz)
-      return this.repository.quizStore().recent()
+      const store = this.repository.quizStore()
+      return store
+        .recent()
+        .filter((quiz) => sameCertification(store.find(quiz.id)!.options, selectedScope))
     })
   }
 
@@ -402,6 +428,7 @@ export class QuizService {
     if (!input || typeof input !== 'object')
       throw new ApplicationError('Quiz options are required.')
     const o = input as QuizOptions
+    const scope = certificationScope(o)
     if (o.mode !== undefined && !['quiz', 'exam', 'review'].includes(o.mode)) {
       throw new ApplicationError('Choose a valid practice mode: quiz, exam or review.')
     }
@@ -416,8 +443,8 @@ export class QuizService {
           .sources()
           .filter(
             (s) =>
-              s.provider === 'AWS' &&
-              s.certification === 'CLF-C02' &&
+              s.provider === scope.provider &&
+              s.certification === scope.certification &&
               ['official', 'third_party'].includes(s.kind),
           )
           .map((s) => s.id),
@@ -429,11 +456,12 @@ export class QuizService {
         o.sourceIds.some((id) => !Number.isSafeInteger(id) || id < 1 || !eligible.has(id))
       ) {
         throw new ApplicationError(
-          'Select at least one available CLF-C02 source; source IDs must be unique positive integers.',
+          'Select at least one available source for this certification; source IDs must be unique positive integers.',
         )
       }
     }
     return {
+      ...scope,
       ...(o.mode === undefined ? {} : { mode: o.mode }),
       sourceFilter: o.sourceFilter,
       questionType: o.questionType,

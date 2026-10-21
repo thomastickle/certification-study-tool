@@ -1,3 +1,4 @@
+import { certificationScope, isClf } from './certification-scope.ts'
 import type { QuizOptions } from '../../shared/quiz-contracts.ts'
 import type { QuestionRecord } from '../questions/library-repository.ts'
 import type { Source } from '../../shared/contracts.ts'
@@ -28,14 +29,19 @@ export function selectQuestions(
   const sourceMap = new Map(sources.map((source) => [source.id, source]))
   const used = new Set<string>()
   const selected: { record: QuestionRecord; domain: number }[] = []
-  const quotas = options.mode === 'exam' ? examDomainQuotas : domainQuotas
+  const clf = isClf(options)
+  let quotas: readonly number[] = options.mode === 'exam' ? examDomainQuotas : domainQuotas
+  if (!clf) {
+    quotas = [options.mode === 'exam' ? 65 : 20]
+  }
   quotas.forEach((quota, index) => {
-    const pool = [...groups.values()].filter((q) => q.domain === index + 1)
-    if (pool.length < quota)
+    const pool = [...groups.values()].filter((q) => !clf || q.domain === index + 1)
+    if (pool.length < quota) {
       throw new ApplicationError(
-        `Domain ${index + 1} needs ${quota} unique mapped questions; only ${pool.length} match these filters. Choose broader filters or import more questions.`,
+        `${clf ? `Domain ${index + 1}` : 'This certification'} needs ${quota} unique ${clf ? 'mapped ' : ''}questions; only ${pool.length} match these filters. Choose broader filters or import more questions.`,
         422,
       )
+    }
     for (let i = 0; i < quota; i++) {
       const weights = pool.map((q) => (boosted.has(q.record.fingerprint) ? 3 : 1))
       let target = random() * weights.reduce((a, b) => a + b, 0)
@@ -81,15 +87,24 @@ export function eligibleQuestions(
   options: QuizOptions,
 ) {
   const sourceMap = new Map(sources.map((s) => [s.id, s]))
+  const scope = certificationScope(options)
   const groups = new Map<string, { record: QuestionRecord; domain: number }>()
   for (const record of questions) {
     const source = sourceMap.get(record.sourceId)
-    if (!source || source.provider !== 'AWS' || source.certification !== 'CLF-C02') continue
+    if (
+      !source ||
+      source.provider !== scope.provider ||
+      source.certification !== scope.certification
+    ) {
+      continue
+    }
     if (options.sourceIds && !options.sourceIds.includes(source.id)) continue
     if (options.sourceFilter !== 'mixed' && source.kind !== options.sourceFilter) continue
     if (options.questionType !== 'mixed' && record.data.type !== options.questionType) continue
-    const domain = examDomain(record.data)
-    if (!domain) continue
+    const domain = isClf(options) ? examDomain(record.data) : 0
+    if (domain === null) {
+      continue
+    }
     const previous = groups.get(record.fingerprint)
     if (previous && previous.record.answerKey !== record.answerKey)
       throw new ApplicationError(

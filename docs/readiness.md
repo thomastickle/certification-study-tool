@@ -6,10 +6,12 @@ credential. Multiple banks for the same exact provider/code form one track. The
 provider summary counts **exam-ready tracks**, not credentials earned. No catalog,
 discovery, credential verification, or recertification integration is included.
 
-Readiness currently supports **AWS CLF-C02** only, matching the practice engine and
-the saved-history namespace. Other imported tracks appear with a neutral,
-unsupported assessment. They never borrow CLF-C02 scores or its domain blueprint.
-Completed CLF-C02 history remains visible after banks are deleted. Aggregate API
+Readiness currently supports **AWS CLF-C02** only, the certification with a supported
+domain blueprint. Other imported tracks support generic practice and reports but
+appear with a neutral readiness assessment. They never borrow CLF-C02 scores or its
+domain blueprint. History and due counts use the exact provider/code pair; legacy
+snapshots without a saved scope retain their AWS CLF-C02 namespace. Completed
+history remains visible after banks are deleted. Aggregate API
 responses contain no questions, answers, keys, fingerprints, or internal identities.
 
 ## Initial scoring rule
@@ -68,6 +70,11 @@ preserve the distinction between insufficient evidence and poor performance.
 
 ## Earned credentials
 
+Home remains a global view while the header picker selects the study workspace.
+Click a track name or a named Practice/Review action to open that track's workspace.
+The same save/pause guard used by the picker protects recovered work, including
+when switching from Home after a reload. Bank choices remain separate per track.
+
 Open **Certifications** or **Manage certifications** to mark a tracked certification
 earned. This is a user report, displayed as a star beside the Home track name.
 It has no effect on readiness, mastery, scheduling, or the provider's exam-ready
@@ -92,3 +99,12 @@ from `tests/home.browser.ts` using the browser workflow in [quiz checks](quizzes
 It checks grouping, neutral unsupported tracks, earned stars, serialized writes,
 failed saves, unchanged readiness, and Home read retry against a real synthetic
 database. `workspaceNavigationTest()` covers the updated navigation independently.
+
+For the picker integration, seed a separate new database with
+`node tests/seed-home-integration.ts <new-path>` and run
+`homeCertificationIntegrationTest()` from `tests/home-certification.browser.ts`.
+It checks Home practice/review actions against another selected workspace, scoped
+banks, saved-answer recovery, failed-pause protection, and earned settings. The
+fixture's old generic questions deliberately remain due but unavailable in the
+current bank. The existing `certificationWorkspaceTest()` also covers picker
+search, reports, scoped practice, and suspension behavior.

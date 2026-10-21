@@ -4,6 +4,7 @@ import { domainNames, examDomainQuotas } from '../quizzes/domain-mapping.ts'
 import { completedEvidence, masteryHistory } from '../quizzes/mastery-history.ts'
 import { studyDay } from '../quizzes/mastery.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
+import { isClf } from '../quizzes/certification-scope.ts'
 
 export const readinessPolicy = {
   days: 30,
@@ -49,7 +50,7 @@ export function readinessScore(mastery: number, weakestDomain: number, exams: nu
 /** Assess only the supported blueprint using reliable completed snapshots, never live bank keys. */
 export function certificationReadiness(completed: StoredQuiz[], now: number): Readiness {
   const lifetime = completed.filter(
-    (quiz) => Number.isFinite(quiz.finishedAt) && quiz.finishedAt! <= now,
+    (quiz) => isClf(quiz.options) && Number.isFinite(quiz.finishedAt) && quiz.finishedAt! <= now,
   )
   const recent = lifetime.filter(
     (quiz) => quiz.finishedAt! >= now - readinessPolicy.days * 86400000,

@@ -86,7 +86,20 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
     assert.match(html, /<dialog\b/)
     assert.doesNotMatch(html, /<dialog[^>]*\sopen(?:=|\s|>)/)
     const { QuizPage } = await import('../src/web/QuizPage.tsx')
-    const setup = renderToStaticMarkup(createElement(QuizPage, { onRegisterLeave: () => {} }))
+    const setup = renderToStaticMarkup(
+      createElement(QuizPage, {
+        certification: {
+          provider: 'AWS',
+          code: 'CLF-C02',
+          name: 'Cloud Practitioner',
+          organization: 'Amazon Web Services',
+          platform: 'AWS',
+          level: 'Foundational',
+          aliases: ['Amazon'],
+        },
+        onRegisterLeave: () => {},
+      }),
+    )
     assert.doesNotMatch(setup, /Question format|<select\b/)
   } finally {
     hooks.deregister()

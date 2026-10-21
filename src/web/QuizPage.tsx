@@ -15,6 +15,7 @@ import { PracticeActions } from './PracticeActions.tsx'
 import { PracticePresets } from './PracticePresets.tsx'
 import { QuizSourcePicker } from './QuizSourcePicker.tsx'
 import { api } from './api.ts'
+import type { Certification } from './certifications.ts'
 import { AttemptTiming } from './AttemptTiming.tsx'
 import { quizReport } from '../shared/quiz-report.ts'
 import {
@@ -28,6 +29,7 @@ import {
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned' | 'paused'
 
 type Props = {
+  certification: Certification
   mode?: PracticeMode
   onRegisterLeave: (leave: () => Promise<boolean>) => void
   onPresetChange?: (mode: 'quiz' | 'exam') => void
@@ -39,6 +41,7 @@ type Props = {
 const initialOptions: QuizOptions = { sourceFilter: 'mixed', sourceIds: [], questionType: 'mixed' }
 
 export function QuizPage({
+  certification,
   mode = 'quiz',
   onRegisterLeave,
   onPresetChange,
@@ -55,7 +58,15 @@ export function QuizPage({
   const count = mode === 'exam' ? 65 : 20
   const minutes = mode === 'exam' ? 90 : 20
   const [stage, setStage] = useState<Stage>('setup')
-  const [options, setOptions] = useState(initialOptions)
+  const [options, setOptions] = useState<QuizOptions>({
+    ...initialOptions,
+    provider: certification.provider,
+    certification: certification.code,
+  })
+  const scopeQuery = new URLSearchParams({
+    provider: certification.provider,
+    certification: certification.code,
+  }).toString()
   const sourceSelection = useRef(initialSourceIds)
   const [sources, setSources] = useState<Source[]>([])
   const [sourcesLoading, setSourcesLoading] = useState(true)
@@ -219,7 +230,7 @@ export function QuizPage({
    * @throws {Error} If recovery is unavailable; the caller retains the uncertain start warning.
    */
   const recoverStartedAttempt = useCallback(async () => {
-    const next = await api<QuizView | null>(`/quizzes/current?mode=${mode}`)
+    const next = await api<QuizView | null>(`/quizzes/current?mode=${mode}&${scopeQuery}`)
     uncertainStart.current = false
     if (next) {
       updateView(next)
@@ -229,7 +240,7 @@ export function QuizPage({
       setStage('setup')
     }
     return next
-  }, [mode, updateView])
+  }, [mode, scopeQuery, updateView])
 
   /** Resolve setup recovery without replacing an opened attempt or newer local edits. */
   const recoverSetup = useCallback(() => {
@@ -244,7 +255,7 @@ export function QuizPage({
       pendingRecovery,
       (async () => {
         try {
-          const next = await api<QuizView | null>(`/quizzes/current?mode=${mode}`)
+          const next = await api<QuizView | null>(`/quizzes/current?mode=${mode}&${scopeQuery}`)
           if (revision === viewRevision.current) {
             recoveredAttempt.current = next
             setRecoverable(next)
@@ -268,7 +279,7 @@ export function QuizPage({
         }
       })(),
     )
-  }, [mode])
+  }, [mode, scopeQuery])
 
   function start() {
     if (
@@ -516,8 +527,8 @@ export function QuizPage({
         if (cancelled) return
         const eligible = items.filter(
           (source) =>
-            source.provider === 'AWS' &&
-            source.certification === 'CLF-C02' &&
+            source.provider === certification.provider &&
+            source.certification === certification.code &&
             ['official', 'third_party'].includes(source.kind) &&
             source.questionCount > 0,
         )
@@ -537,7 +548,7 @@ export function QuizPage({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [certification.provider, certification.code])
 
   useEffect(() => {
     if (stage !== 'setup') return
@@ -548,7 +559,7 @@ export function QuizPage({
         void recoverSetup()
       }
     })
-    api<QuizSummary[]>('/quizzes')
+    api<QuizSummary[]>(`/quizzes?${scopeQuery}`)
       .then((items) => {
         if (!cancelled) {
           setSummaries(items.filter((item) => item.status === 'completed'))
@@ -561,7 +572,7 @@ export function QuizPage({
     return () => {
       cancelled = true
     }
-  }, [stage, plural, recoverSetup])
+  }, [stage, plural, recoverSetup, scopeQuery])
 
   useEffect(() => {
     if (!notice) return
@@ -680,6 +691,9 @@ export function QuizPage({
           <div>
             <p className="eyebrow">TIMED STUDY SESSION</p>
             <h1>{heading}</h1>
+            <p className="practice-certification">
+              {certification.provider} · {certification.name} · {certification.code}
+            </p>
             <p className="intro">
               {mode === 'review'
                 ? 'Up to 20 due questions · 20 minutes · no quiz/exam pass target'
@@ -796,6 +810,13 @@ export function QuizPage({
             <section className="quiz-panel">
               <h2>Set up your {mode}</h2>
               <p>Choose the question banks for this {mode}.</p>
+              {(certification.provider !== 'AWS' || certification.code !== 'CLF-C02') &&
+                mode !== 'review' && (
+                  <p className="muted">
+                    These are timed practice presets, not this certification’s official exam format.
+                    Questions are sampled without exam-domain weighting.
+                  </p>
+                )}
               {sourcesLoading ? (
                 <p role="status">Loading question banks…</p>
               ) : (
@@ -831,7 +852,7 @@ export function QuizPage({
               <h2>Completed {plural}</h2>
               <button
                 onClick={() => {
-                  void api<QuizSummary[]>('/quizzes')
+                  void api<QuizSummary[]>(`/quizzes?${scopeQuery}`)
                     .then(setSummaries)
                     .catch((reason) => setError(String(reason.message)))
                 }}
@@ -1052,7 +1073,7 @@ function QuestionEditor({
   return (
     <article className="quiz-panel quiz-question">
       <div className="question-meta">
-        <span>Domain {question.domain}</span>
+        <span>{question.domain ? `Domain ${question.domain}` : 'Domain not mapped'}</span>
         <span>
           {question.sourceName} · {question.sourceKind === 'official' ? 'Official' : 'Third-party'}
         </span>
@@ -1156,7 +1177,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
             <p className={passed ? 'correct-text' : 'incorrect-text'}>
               <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
             </p>
-            <p>This is a practice target, not an AWS scaled score.</p>
+            <p>This is a practice target, not an official certification score.</p>
           </>
         )}
         {mode === 'review' && (
@@ -1188,7 +1209,8 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
               {question.flagged ? ' · Marked for review' : ''}
             </p>
             <p className="muted">
-              {question.sourceName} · {question.reference} · Domain {question.domain}
+              {question.sourceName} · {question.reference} ·{' '}
+              {question.domain ? `Domain ${question.domain}` : 'Domain not mapped'}
               {question.area ? ` · ${question.area}` : ''}
               {question.topic ? ` · ${question.topic}` : ''}
             </p>

@@ -76,7 +76,12 @@ test('home dashboard groups real tracks and explains readiness without exposing 
       ],
     }
     const html = renderToStaticMarkup(
-      createElement(HomeDashboard, { summary, onNavigate: () => {}, onPractice: () => {} }),
+      createElement(HomeDashboard, {
+        summary,
+        onNavigate: () => {},
+        onPractice: () => {},
+        onReview: () => {},
+      }),
     )
     assert.match(html, /1 \/ 2 tracks exam-ready/)
     assert.equal((html.match(/class="provider-card"/g) ?? []).length, 1)
@@ -139,6 +144,7 @@ test('home dashboard renders unsupported readiness neutrally without a score', a
         } satisfies HomeSummary,
         onNavigate: () => {},
         onPractice: () => {},
+        onReview: () => {},
       }),
     )
     assert.match(html, /Not yet supported/)

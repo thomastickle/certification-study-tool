@@ -82,6 +82,10 @@ export function apiController(repository: LibraryRepository) {
     try {
       checkLocalRequest(request)
       const url = new URL(request.url ?? '/', 'http://localhost')
+      const scope = {
+        provider: url.searchParams.get('provider') ?? undefined,
+        certification: url.searchParams.get('certification') ?? undefined,
+      }
       const conceptResponse = await conceptRoute(concepts, request, url, body)
       if (conceptResponse) {
         return send(response, conceptResponse.status, conceptResponse.value)
@@ -102,7 +106,7 @@ export function apiController(repository: LibraryRepository) {
           reports.get({
             mode: url.searchParams.get('mode'),
             days: url.searchParams.get('days'),
-            certification: url.searchParams.get('certification'),
+            ...scope,
           }),
         )
       }
@@ -112,6 +116,7 @@ export function apiController(repository: LibraryRepository) {
           response,
           200,
           quizzes.due({
+            ...scope,
             sourceFilter: url.searchParams.get('sourceFilter') ?? 'mixed',
             questionType: url.searchParams.get('questionType') ?? 'mixed',
             ...(ids === null ? {} : { sourceIds: ids.split(',').map(Number) }),
@@ -119,7 +124,7 @@ export function apiController(repository: LibraryRepository) {
         )
       }
       if (url.pathname === '/api/quizzes') {
-        if (request.method === 'GET') return send(response, 200, quizzes.recent())
+        if (request.method === 'GET') return send(response, 200, quizzes.recent(scope))
         if (request.method === 'POST')
           return send(response, 201, quizzes.start(await body(request)))
       }
@@ -127,7 +132,7 @@ export function apiController(repository: LibraryRepository) {
         const mode = url.searchParams.get('mode') ?? 'quiz'
         if (mode !== 'quiz' && mode !== 'exam' && mode !== 'review')
           throw new ApplicationError('Choose a valid practice mode.')
-        return send(response, 200, quizzes.current(mode))
+        return send(response, 200, quizzes.current(mode, scope))
       }
       const quizRoute = url.pathname.match(
         /^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon|pause|resume))?$/,

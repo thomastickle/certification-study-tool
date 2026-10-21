@@ -704,7 +704,21 @@
 }
 .provider-actions > div {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+.track-launch {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.track-launch:hover {
+  background: transparent;
+  color: var(--accent-hover);
+  text-decoration: underline;
 }
 .provider-actions button {
   padding: 6px 10px;

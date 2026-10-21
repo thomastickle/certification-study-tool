@@ -1,4 +1,8 @@
-import type { HomeSummary, ReadinessStatus } from '../shared/home-contracts.ts'
+import type {
+  CertificationProgress,
+  HomeSummary,
+  ReadinessStatus,
+} from '../shared/home-contracts.ts'
 import { readinessThresholds } from '../shared/home-contracts.ts'
 import { StudyIcon } from './StudyIcon.tsx'
 
@@ -7,7 +11,8 @@ export type HomeNavigation = 'practice' | 'review' | 'importer' | 'certification
 type Props = {
   summary: HomeSummary
   onNavigate: (page: HomeNavigation) => void
-  onPractice: (sourceIds: number[]) => void
+  onPractice: (track: CertificationProgress) => void
+  onReview: (track: CertificationProgress) => void
 }
 
 const readinessLabels: Record<ReadinessStatus, string> = {
@@ -24,7 +29,7 @@ function percent(value: number | null): string {
 }
 
 /** Show compact provider summaries and explain how each real track is progressing. */
-export function HomeDashboard({ summary, onNavigate, onPractice }: Props) {
+export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Props) {
   return (
     <main className="home-page">
       <div className="page-heading home-heading">
@@ -47,9 +52,9 @@ export function HomeDashboard({ summary, onNavigate, onPractice }: Props) {
       ) : (
         <section className="provider-list" aria-label="Certification readiness by provider">
           {summary.providers.map((provider) => {
-            const practice = provider.certifications.find(
-              (track) =>
-                track.provider === 'AWS' && track.code === 'CLF-C02' && track.sourceIds.length,
+            const practice = provider.certifications.find((track) => track.sourceIds.length)
+            const review = provider.certifications.find(
+              (track) => track.dueCount > 0 && track.sourceIds.length,
             )
             return (
               <article className="provider-card" key={provider.name}>
@@ -78,7 +83,19 @@ export function HomeDashboard({ summary, onNavigate, onPractice }: Props) {
                       <section className="track-row" key={certification.code}>
                         <div className="track-line">
                           <div className="track-name">
-                            <strong>{certification.name}</strong>
+                            <strong>
+                              {certification.sourceIds.length ? (
+                                <button
+                                  className="track-launch"
+                                  aria-label={`Practice ${certification.name} (${certification.code})`}
+                                  onClick={() => onPractice(certification)}
+                                >
+                                  {certification.name}
+                                </button>
+                              ) : (
+                                certification.name
+                              )}
+                            </strong>
                             <code>{certification.code}</code>
                             {certification.earned && (
                               <span
@@ -144,6 +161,11 @@ export function HomeDashboard({ summary, onNavigate, onPractice }: Props) {
                                 </li>
                               ))}
                           </ul>
+                          {certification.dueCount > 0 && certification.sourceIds.length > 0 && (
+                            <button onClick={() => onReview(certification)}>
+                              Review due ({certification.dueCount})
+                            </button>
+                          )}
                         </details>
                       </section>
                     )
@@ -153,11 +175,11 @@ export function HomeDashboard({ summary, onNavigate, onPractice }: Props) {
                   <span>{provider.dueCount} questions due for review</span>
                   <div>
                     {practice && (
-                      <button onClick={() => onPractice(practice.sourceIds)}>Practice</button>
+                      <button onClick={() => onPractice(practice)}>Practice {practice.code}</button>
                     )}
-                    {provider.dueCount > 0 && (
-                      <button className="quiet-button" onClick={() => onNavigate('review')}>
-                        Review due
+                    {review && (
+                      <button className="quiet-button" onClick={() => onReview(review)}>
+                        Review {review.code}
                       </button>
                     )}
                     {!practice && (

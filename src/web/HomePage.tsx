@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
-import type { HomeSummary } from '../shared/home-contracts.ts'
+import type { CertificationProgress, HomeSummary } from '../shared/home-contracts.ts'
 import { api } from './api.ts'
 import { HomeDashboard, type HomeNavigation } from './HomeDashboard.tsx'
 
 type Props = {
   onNavigate: (page: HomeNavigation) => void
-  onPractice: (sourceIds: number[]) => void
+  onPractice: (track: CertificationProgress) => void
+  onReview: (track: CertificationProgress) => void
 }
 
 /** Load current readiness for the workspace home screen with an explicit retry path. */
-export function HomePage({ onNavigate, onPractice }: Props) {
+export function HomePage({ onNavigate, onPractice, onReview }: Props) {
   const [summary, setSummary] = useState<HomeSummary>()
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -51,5 +52,12 @@ export function HomePage({ onNavigate, onPractice }: Props) {
       </main>
     )
   }
-  return <HomeDashboard summary={summary} onNavigate={onNavigate} onPractice={onPractice} />
+  return (
+    <HomeDashboard
+      summary={summary}
+      onNavigate={onNavigate}
+      onPractice={onPractice}
+      onReview={onReview}
+    />
+  )
 }

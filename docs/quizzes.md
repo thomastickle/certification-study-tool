@@ -1,6 +1,20 @@
 # Quiz and exam flow
 
-The start page identifies AWS Cloud Practitioner (CLF-C02) and opens Practice,
+The banner identifies the selected certification and opens a searchable picker.
+It lists certifications with eligible imported questions, grouped by organization,
+platform, and known level. Search matches partial words in names, codes, levels,
+and aliases (for example AWS/Amazon, Azure/Microsoft/MS, and GCP/Google).
+Aliases affect discovery only; stored provider and certification namespaces remain
+distinct. Unknown programs are listed without an invented level.
+
+The selection survives reloads and scopes Practice, Due Review, and Reports.
+Switching keeps the current destination and saves and pauses an unfinished session
+before changing scope; a failed save or pause retains the current certification.
+Question-bank choices are kept separately for each certification during the session.
+Imports refresh the picker automatically. The Importer remains the workspace-wide
+library so new certifications can be added there.
+
+The start page opens Practice,
 Due Review, and the question library. The collapsible sidebar keeps Reports as
 its own final destination. On desktop, drag the boundary to resize navigation or
 use its chevron button to collapse to an icon rail. The expanded width and collapse
@@ -224,9 +238,11 @@ untouched.
 
 Open **Reports** for a master view, or select **Quizzes** / **Exams** to filter
 saved results by practice mode. All time, 7-day, 30-day and 90-day views use the
-attempt's completion time; daily chart dates are UTC. CLF-C02 is the currently
-supported certification. Reports recognize the practice session `mode` field and
-treat legacy snapshots as quizzes.
+attempt's completion time; daily chart dates are UTC. Reports are scoped to the selected
+provider and certification. AWS CLF-C02 has configured domain mapping; other certifications
+show saved question/topic activity with “Domain mapping not configured” instead of domain
+coverage or focus rankings. Reports recognize the practice session `mode` field and treat
+legacy snapshots as quizzes.
 
 - **Correct-answer activity** counts every correct question appearance across the
   selected completed attempts. Repeat questions count each time; this is study
@@ -370,3 +386,24 @@ suppression and selected source/type filters remain in force; unavailable
 alternates do not block otherwise eligible questions. Dedicated Due Review
 continues to select the actual due identities. Saved labels survive later group
 and source changes. See [reviewed concept groups](concepts.md).
+
+### Certification scope
+
+Quiz options accept optional `provider` and `certification` strings. Omitted fields default to
+`AWS` and `CLF-C02`, including historical snapshots without identity fields. New attempts persist
+both fields. `GET /api/quizzes`, `/api/quizzes/current`, and `/api/quizzes/due` accept the same
+query parameters. Recovery and paused-attempt conflicts apply to the full provider/certification
+pair and mode; starting another scope or mode preserves its unfinished work. Explicit source IDs
+must all belong to the requested pair.
+
+AWS CLF-C02 retains its mapped domain quotas. Other certifications use a generic 20-question
+quiz or 65-question exam, drawn without domain quotas and including unclassified questions.
+They require enough unique eligible questions; generic snapshots use domain `0` (Unclassified).
+Review uses the same scoped lifetime mastery schedule and selects up to 20 eligible due questions.
+Deleted questions remain overdue and count as unavailable only within their certification scope.
+
+`GET /api/reports` accepts the same pair alongside mode and time filters. Both lifetime mastery
+and selected report evidence belong to that pair. Non-CLF reports show neutral saved-topic
+activity without domain coverage or focus rankings; no official domain mapping is inferred.
+Legacy mastery identities retain their original
+`mastery:v1` format and AWS CLF-C02 namespace.

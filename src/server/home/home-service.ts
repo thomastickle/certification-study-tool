@@ -4,6 +4,8 @@ import { certificationReadiness, emptyReadiness } from './readiness.ts'
 import { masteryHistory } from '../quizzes/mastery-history.ts'
 import { studyDay } from '../quizzes/mastery.ts'
 import { ApplicationError } from '../errors.ts'
+import { certificationScope, isClf } from '../quizzes/certification-scope.ts'
+import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 
 /** Supply the home screen with certification-level aggregates only. */
 export class HomeService {
@@ -57,23 +59,32 @@ export class HomeService {
         })
       }
     }
-    const clfKey = JSON.stringify(['AWS', 'CLF-C02'])
-    if (completed.length && !tracks.has(clfKey)) {
-      tracks.set(clfKey, {
-        provider: 'AWS',
-        code: 'CLF-C02',
-        name: 'Cloud Practitioner',
-        sourceIds: [],
-        earned: false,
-        dueCount: 0,
-        readiness: emptyReadiness(true),
-      })
+    const histories = new Map<string, StoredQuiz[]>()
+    for (const quiz of completed) {
+      const scope = certificationScope(quiz.options)
+      const key = JSON.stringify([scope.provider, scope.certification])
+      const history = histories.get(key) ?? []
+      history.push(quiz)
+      histories.set(key, history)
+      if (!tracks.has(key)) {
+        tracks.set(key, {
+          provider: scope.provider,
+          code: scope.certification,
+          name: isClf(scope) ? 'Cloud Practitioner' : scope.certification,
+          sourceIds: [],
+          earned: false,
+          dueCount: 0,
+          readiness: emptyReadiness(isClf(scope)),
+        })
+      }
     }
-    const clf = tracks.get(clfKey)
-    if (clf) {
-      clf.readiness = certificationReadiness(completed, now)
-      const day = studyDay(now)
-      clf.dueCount = [...masteryHistory(completed).states.values()].filter(
+    const day = studyDay(now)
+    for (const [key, track] of tracks) {
+      const history = histories.get(key) ?? []
+      if (isClf({ provider: track.provider, certification: track.code })) {
+        track.readiness = certificationReadiness(history, now)
+      }
+      track.dueCount = [...masteryHistory(history).states.values()].filter(
         (state) => state.dueDay !== null && state.dueDay <= day,
       ).length
     }

@@ -41,6 +41,53 @@ test('home groups real library certifications by provider, not one track per ban
   }
 })
 
+test('foreign completed history never creates Cloud Practitioner readiness or borrows its blueprint', () => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    for (const age of [3, 2, 1]) {
+      const exam = homeExam(`foreign-${age}`, age)
+      exam.options = { ...exam.options, provider: 'Other', certification: 'CLF-C02' }
+      repository.quizStore().save(exam)
+    }
+    const summary = new HomeService(repository, () => homeNow).get()
+    assert.deepEqual(
+      summary.providers.map((provider) => provider.name),
+      ['Other'],
+    )
+    const track = summary.providers[0]!.certifications[0]!
+    assert.equal(track.code, 'CLF-C02')
+    assert.equal(track.readiness.status, 'unsupported')
+    assert.equal(track.readiness.score, null)
+    assert.equal(track.dueCount, 0)
+  } finally {
+    repository.close()
+  }
+})
+
+test('Home isolates scores and due counts by the complete provider/certification pair', () => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    for (const age of [3, 2, 1]) {
+      repository.quizStore().save(homeExam(`clf-${age}`, age))
+    }
+    const service = new HomeService(repository, () => homeNow)
+    const clfBefore = service.get().providers[0]!.certifications[0]!.readiness
+    const foreign = homeExam('foreign-old', 10)
+    foreign.options = { ...foreign.options, provider: 'Other', certification: 'CLF-C02' }
+    repository.quizStore().save(foreign)
+    const summary = service.get()
+    const aws = summary.providers.find((provider) => provider.name === 'AWS')!
+    const other = summary.providers.find((provider) => provider.name === 'Other')!
+    assert.deepEqual(aws.certifications[0]!.readiness, clfBefore)
+    assert.equal(aws.dueCount, 0)
+    assert.ok(other, 'generic completed history survives missing/deleted sources')
+    assert.equal(other.dueCount, 65)
+    assert.equal(other.certifications[0]!.dueCount, 65)
+  } finally {
+    repository.close()
+  }
+})
+
 test('combined scores use the approved 90% green boundary and retain component gates', () => {
   for (const [mastery, domain, exams, score, status] of [
     [62, 55, [64, 67, 70], 62, 'red'],

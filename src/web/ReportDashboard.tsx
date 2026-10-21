@@ -180,6 +180,7 @@ export function ReportDashboard({
 }) {
   const [domainView, setDomainView] = useState<'summary' | 'detail'>('summary')
   const [historyPage, setHistoryPage] = useState(0)
+  const mappedDomains = (report.provider ?? 'AWS') === 'AWS' && report.certification === 'CLF-C02'
   const counts = report.counts
   const studied = report.domains.filter((domain) => domain.counts.total > 0)
   const weakest = report.domains.find((domain) => domain.domain === report.focus.domain)
@@ -215,16 +216,18 @@ export function ReportDashboard({
           </strong>
           <p>Quiz/exam only · at least 80% correct; Due Reviews excluded</p>
         </div>
-        <div>
-          <span className="stat-label">
-            Domains explored <span>◈</span>
-          </span>
-          <strong>
-            {studied.length}
-            <small> / 4 domains</small>
-          </strong>
-          <p>Completed question appearances</p>
-        </div>
+        {mappedDomains && (
+          <div>
+            <span className="stat-label">
+              Domains explored <span>◈</span>
+            </span>
+            <strong>
+              {studied.length}
+              <small> / 4 domains</small>
+            </strong>
+            <p>Completed question appearances</p>
+          </div>
+        )}
       </section>
       <section className="report-panel" aria-label="Unique coverage and lifetime mastery">
         <h2>Unique coverage and lifetime mastery</h2>
@@ -252,89 +255,132 @@ export function ReportDashboard({
           <span className="focus-icon" aria-hidden="true">
             ✧
           </span>
-          <p className="eyebrow">YOUR NEXT CHAPTER</p>
-          <h2>{weakest ? weakest.name : 'Insufficient evidence'}</h2>
-          <p>
-            {weakest
-              ? `Your lowest score is ${percent(weakest.counts.score)} here, based on ${weakest.counts.total} question appearances after all domains met the evidence requirement. A focused review is a useful next step.`
-              : 'Each supported domain needs at least 10 distinct answered questions across 2 completed attempts before comparing scores.'}
-          </p>
-          <div className="focus-footnote">
-            {weakest
-              ? `${weakest.counts.correct} correct · ${weakest.counts.incorrect} incorrect · ${weakest.counts.skipped} skipped`
-              : 'Broader practice builds useful comparison evidence.'}
-          </div>
-          <ul>
-            {report.focus.domains.map((domain) => (
-              <li key={domain.domain}>
-                Domain {domain.domain}: {domain.distinctAnswered}/10 distinct answered ·{' '}
-                {domain.completedAttempts}/2 completed attempts · {domain.answeredAppearances}{' '}
-                answered appearances
-              </li>
-            ))}
-          </ul>
-          <small>
-            Ranking uses score: correct / all question appearances, including skips. Repeated
-            questions and small samples can limit this suggestion. This is practice evidence, not an
-            official exam score or readiness prediction.
-          </small>
+          {mappedDomains ? (
+            <>
+              <p className="eyebrow">YOUR NEXT CHAPTER</p>
+              <h2>{weakest ? weakest.name : 'Insufficient evidence'}</h2>
+              <p>
+                {weakest
+                  ? `Your lowest score is ${percent(weakest.counts.score)} here, based on ${weakest.counts.total} question appearances after all domains met the evidence requirement. A focused review is a useful next step.`
+                  : 'Each supported domain needs at least 10 distinct answered questions across 2 completed attempts before comparing scores.'}
+              </p>
+              <div className="focus-footnote">
+                {weakest
+                  ? `${weakest.counts.correct} correct · ${weakest.counts.incorrect} incorrect · ${weakest.counts.skipped} skipped`
+                  : 'Broader practice builds useful comparison evidence.'}
+              </div>
+              <ul>
+                {report.focus.domains.map((domain) => (
+                  <li key={domain.domain}>
+                    Domain {domain.domain}: {domain.distinctAnswered}/10 distinct answered ·{' '}
+                    {domain.completedAttempts}/2 completed attempts · {domain.answeredAppearances}{' '}
+                    answered appearances
+                  </li>
+                ))}
+              </ul>
+              <small>
+                Ranking uses score: correct / all question appearances, including skips. Repeated
+                questions and small samples can limit this suggestion. This is practice evidence,
+                not an official exam score or readiness prediction.
+              </small>
+            </>
+          ) : (
+            <>
+              <h2>Domain mapping not configured</h2>
+              <p>
+                Question activity and saved topics are shown without mapped domain coverage or focus
+                recommendations for this certification.
+              </p>
+            </>
+          )}
         </aside>
       </div>
-      <section className="report-panel" aria-labelledby="domains-heading">
-        <div className="report-card-heading">
-          <div>
-            <p className="eyebrow">KNOW YOUR STRENGTHS</p>
-            <h2 id="domains-heading">A clearer view of every domain.</h2>
+      {mappedDomains ? (
+        <section className="report-panel" aria-labelledby="domains-heading">
+          <div className="report-card-heading">
+            <div>
+              <p className="eyebrow">KNOW YOUR STRENGTHS</p>
+              <h2 id="domains-heading">A clearer view of every domain.</h2>
+            </div>
+            <div className="report-segments" aria-label="Domain view">
+              <button
+                aria-pressed={domainView === 'summary'}
+                onClick={() => setDomainView('summary')}
+              >
+                Summary
+              </button>
+              <button
+                aria-pressed={domainView === 'detail'}
+                onClick={() => setDomainView('detail')}
+              >
+                Study details
+              </button>
+            </div>
           </div>
-          <div className="report-segments" aria-label="Domain view">
-            <button
-              aria-pressed={domainView === 'summary'}
-              onClick={() => setDomainView('summary')}
-            >
-              Summary
-            </button>
-            <button aria-pressed={domainView === 'detail'} onClick={() => setDomainView('detail')}>
-              Study details
-            </button>
-          </div>
-        </div>
-        <p className="report-muted">
-          Score uses all question appearances, including skips.{' '}
-          {report.targetAttempts > 0
-            ? 'The marker is the quiz/exam 80% practice target.'
-            : 'Due Reviews have no pass target.'}
-        </p>
-        {domainView === 'summary' ? (
-          <div className="domain-grid">
-            {report.domains.map((domain) => (
-              <article className="domain-card" key={domain.id}>
-                <div className="domain-card-top">
-                  <span className="domain-number">0{domain.domain}</span>
-                  <strong>{percent(domain.counts.score)}</strong>
-                </div>
-                <h3>{domain.name}</h3>
-                <div className="domain-meter">
-                  <span style={{ width: `${domain.counts.score ?? 0}%` }} />
-                  {report.targetAttempts > 0 && <i />}
-                </div>
-                <p>
-                  {domain.counts.total
-                    ? `${domain.counts.correct} of ${domain.counts.total} questions correct`
-                    : 'No questions in this domain yet'}
-                </p>
-                <span className="domain-note">
-                  {domain.counts.skipped} skipped · {domain.counts.total} appearances
-                </span>
-              </article>
-            ))}
-          </div>
-        ) : (
+          <p className="report-muted">
+            Score uses all question appearances, including skips.{' '}
+            {report.targetAttempts > 0
+              ? 'The marker is the quiz/exam 80% practice target.'
+              : 'Due Reviews have no pass target.'}
+          </p>
+          {domainView === 'summary' ? (
+            <div className="domain-grid">
+              {report.domains.map((domain) => (
+                <article className="domain-card" key={domain.id}>
+                  <div className="domain-card-top">
+                    <span className="domain-number">0{domain.domain}</span>
+                    <strong>{percent(domain.counts.score)}</strong>
+                  </div>
+                  <h3>{domain.name}</h3>
+                  <div className="domain-meter">
+                    <span style={{ width: `${domain.counts.score ?? 0}%` }} />
+                    {report.targetAttempts > 0 && <i />}
+                  </div>
+                  <p>
+                    {domain.counts.total
+                      ? `${domain.counts.correct} of ${domain.counts.total} questions correct`
+                      : 'No questions in this domain yet'}
+                  </p>
+                  <span className="domain-note">
+                    {domain.counts.skipped} skipped · {domain.counts.total} appearances
+                  </span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="report-table-scroll">
+              <table className="report-table">
+                <caption className="sr-only">Domain, study area and topic performance</caption>
+                <thead>
+                  <tr>
+                    <th>Domain / study area / topic</th>
+                    <th>Correct</th>
+                    <th>Incorrect</th>
+                    <th>Answered</th>
+                    <th>Skipped</th>
+                    <th>Score</th>
+                    <th>Accuracy on answered questions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.domains.map((domain) => (
+                    <DomainRows key={domain.id} report={report} domain={domain.domain} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="report-panel" aria-labelledby="topics-heading">
+          <h2 id="topics-heading">Question activity by saved topic</h2>
+          <p>Saved classifications do not represent official exam domains.</p>
           <div className="report-table-scroll">
             <table className="report-table">
-              <caption className="sr-only">Domain, study area and topic performance</caption>
+              <caption>Saved study areas and topics</caption>
               <thead>
                 <tr>
-                  <th>Domain / study area / topic</th>
+                  <th>Area · topic</th>
                   <th>Correct</th>
                   <th>Incorrect</th>
                   <th>Answered</th>
@@ -344,14 +390,22 @@ export function ReportDashboard({
                 </tr>
               </thead>
               <tbody>
-                {report.domains.map((domain) => (
-                  <DomainRows key={domain.id} report={report} domain={domain.domain} />
+                {report.topics.map((topic) => (
+                  <tr key={topic.id}>
+                    <th scope="row">{topic.name}</th>
+                    <td>{topic.counts.correct}</td>
+                    <td>{topic.counts.incorrect}</td>
+                    <td>{topic.counts.answered}</td>
+                    <td>{topic.counts.skipped}</td>
+                    <td>{percent(topic.counts.score)}</td>
+                    <td>{percent(topic.counts.accuracy)}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </section>
+      )}
       <div className="report-bottom-grid">
         <section className="report-panel confidence-panel" aria-labelledby="confidence-heading">
           <p className="eyebrow">CHECK YOUR INSTINCTS</p>
@@ -442,8 +496,8 @@ export function ReportDashboard({
       </div>
       <p className="report-method">
         Completed attempts only · Repeat questions count each time · Activity counts are not
-        unique-question mastery · Raw practice scores, not AWS scaled scores · All activity stays in
-        your local workspace
+        unique-question mastery · Raw practice scores, not official certification scores · All
+        activity stays in your local workspace
       </p>
     </>
   )

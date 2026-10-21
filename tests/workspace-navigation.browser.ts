@@ -29,9 +29,8 @@ export async function workspaceNavigationTest() {
     'Reports must be the last destination',
   )
   assert(
-    document.querySelector('[aria-label="All certifications"]')?.textContent?.trim() ===
-      'All certifications',
-    'Home should show an all-certifications context',
+    !!document.querySelector('button[aria-label="Current certification"]'),
+    'The workspace picker must remain available above the global Home metrics',
   )
 
   button('Home', nav).click()
