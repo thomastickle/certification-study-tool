@@ -31,7 +31,7 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
     `Score: ${percentage(report.counts.score)} (${report.counts.correct}/${report.counts.total} questions; skips count as misses)`,
     `Practice target met: ${report.passingAttempts}/${report.targetAttempts} quiz/exam attempts (80% of all questions correct)`,
     '',
-    'Completed attempts only. Repeat questions count each time. Correct-answer activity counts are not unique-question mastery. Raw practice scores are not official AWS scaled scores or readiness predictions.',
+    'Completed attempts only. Repeat questions count each time. Correct-answer activity counts are not unique-question mastery. Raw practice scores are not official certification scores or readiness predictions.',
     '',
     '## Unique-question coverage and lifetime mastery',
     '',

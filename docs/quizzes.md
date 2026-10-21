@@ -1,6 +1,20 @@
 # Quiz and exam flow
 
-The start page identifies AWS Cloud Practitioner (CLF-C02) and opens Practice,
+The banner identifies the selected certification and opens a searchable picker.
+It lists certifications with eligible imported questions, grouped by organization,
+platform, and known level. Search matches partial words in names, codes, levels,
+and aliases (for example AWS/Amazon, Azure/Microsoft/MS, and GCP/Google).
+Aliases affect discovery only; stored provider and certification namespaces remain
+distinct. Unknown programs are listed without an invented level.
+
+The selection survives reloads and scopes Practice, Due Review, and Reports.
+Switching keeps the current destination and saves and pauses an unfinished session
+before changing scope; a failed save or pause retains the current certification.
+Question-bank choices are kept separately for each certification during the session.
+Imports refresh the picker automatically. The Importer remains the workspace-wide
+library so new certifications can be added there.
+
+The start page opens Practice,
 Due Review, and the question library. The collapsible sidebar keeps Reports as
 its own final destination. On desktop, drag the boundary to resize navigation or
 use its chevron button to collapse to an icon rail. The expanded width and collapse

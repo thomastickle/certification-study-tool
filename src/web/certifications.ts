@@ -55,11 +55,11 @@ function normalizeProvider(provider: string): {
     }
   }
 
-  if (['azure', 'microsoft', 'ms'].includes(lower)) {
+  if (['azure', 'microsoft azure', 'microsoft', 'ms'].includes(lower)) {
     return { provider: 'Microsoft', aliases: ['Azure', 'Microsoft', 'MS'], platform: 'Azure' }
   }
 
-  if (['gcp', 'google cloud', 'google cloud platform'].includes(lower)) {
+  if (['gcp', 'google', 'google cloud', 'google cloud platform'].includes(lower)) {
     return {
       provider: 'Google Cloud',
       aliases: ['GCP', 'Google Cloud', 'Google Cloud Platform'],
@@ -70,7 +70,7 @@ function normalizeProvider(provider: string): {
   const microsoftPlatform = /^(microsoft)\s+(365|power platform|dynamics 365)/i.exec(normalized)
   if (microsoftPlatform) {
     const platform = microsoftPlatform[2]!.replace(/^365$/, 'Microsoft 365')
-    return { provider: 'Microsoft', aliases: ['Microsoft', platform], platform }
+    return { provider: 'Microsoft', aliases: ['Microsoft', 'MS', platform], platform }
   }
 
   return { provider: normalized, aliases: normalized ? [normalized] : [], platform: normalized }

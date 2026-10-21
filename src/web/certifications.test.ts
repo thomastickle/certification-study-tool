@@ -86,6 +86,25 @@ test('unknown certifications remain visible without an inferred level', () => {
   assert.equal(cert?.level, null)
 })
 
+test('full platform names support short provider aliases without losing their namespace', () => {
+  const certs = certificationsFromSources([
+    source({
+      provider: 'Microsoft Azure',
+      certification: 'AZ-900',
+      certificationName: 'Azure Fundamentals',
+    }),
+    source({ provider: 'Google', certification: 'CDL', certificationName: 'Cloud Digital Leader' }),
+    source({
+      provider: 'Microsoft 365',
+      certification: 'MS-900',
+      certificationName: 'Microsoft 365 Fundamentals',
+    }),
+  ])
+  assert.equal(filterCertifications(certs, 'ms azure')[0]?.provider, 'Microsoft Azure')
+  assert.equal(filterCertifications(certs, 'gcp')[0]?.provider, 'Google')
+  assert.equal(filterCertifications(certs, 'ms 365')[0]?.provider, 'Microsoft 365')
+})
+
 test('search uses case insensitive partial tokens across metadata and requires every token', () => {
   const [aws, azure] = certificationsFromSources([
     source(),

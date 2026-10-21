@@ -20,7 +20,7 @@ export function quizReport(quiz: QuizView): string {
   }
   const timing = quizTiming(quiz)
   const lines = [
-    `# CLF-C02 practice ${mode} report`,
+    `# ${quiz.options.certification ?? 'CLF-C02'} practice ${mode} report`,
     '',
     `${title}: ${quiz.id}`,
     `Started: ${new Date(quiz.startedAt).toISOString()}`,
@@ -35,7 +35,7 @@ export function quizReport(quiz: QuizView): string {
       ? 'Due Review · no quiz/exam pass target. Only correct + Confident passes a due retention check.'
       : `Result: ${result} — ${quiz.correctCount}/${quiz.total} (${score}). Practice target: 80%.`,
     `Score: ${score} (${quiz.correctCount}/${quiz.total} questions; skips count as misses)`,
-    'Practice targets are study aids, not official AWS scaled scores or exam-readiness predictions.',
+    'Practice targets are study aids, not official certification scores or exam-readiness predictions.',
     '',
     '## Scoring details',
     '',
@@ -65,7 +65,7 @@ export function quizReport(quiz: QuizView): string {
         ? [`Reviewed concepts: ${question.concepts.map((concept) => concept.name).join('; ')}`]
         : []),
       ...(question.variationNote ? [question.variationNote] : []),
-      `Exam domain: ${question.domain}; study area: ${question.area ?? 'Unclassified'}; topic: ${question.topic ?? 'Unclassified'}`,
+      `Exam domain: ${question.domain || 'Not mapped'}; study area: ${question.area ?? 'Unclassified'}; topic: ${question.topic ?? 'Unclassified'}`,
       '',
     )
   }

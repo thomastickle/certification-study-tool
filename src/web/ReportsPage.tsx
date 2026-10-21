@@ -4,6 +4,7 @@ import type { QuizView } from '../shared/quiz-contracts.ts'
 import { studyReportMarkdown } from '../shared/report-export.ts'
 import { quizReport } from '../shared/quiz-report.ts'
 import { api } from './api.ts'
+import type { Certification } from './certifications.ts'
 import { ReportDashboard } from './ReportDashboard.tsx'
 import { ReportAttemptReview } from './ReportAttemptReview.tsx'
 import './reports.css'
@@ -19,7 +20,7 @@ function download(text: string, filename: string): void {
 }
 
 /** Loads one consistent filtered report, cancelling superseded requests. */
-export function ReportsPage() {
+export function ReportsPage({ certification }: { certification: Certification }) {
   const [mode, setMode] = useState<ReportMode>('all')
   const [days, setDays] = useState('all')
   const [report, setReport] = useState<StudyReport>()
@@ -33,7 +34,13 @@ export function ReportsPage() {
     const controller = new AbortController()
     setReport(undefined)
     setError('')
-    api<StudyReport>(`/reports?mode=${mode}&days=${days}&certification=CLF-C02`, {
+    const query = new URLSearchParams({
+      mode,
+      days,
+      provider: certification.provider,
+      certification: certification.code,
+    })
+    api<StudyReport>(`/reports?${query}`, {
       signal: controller.signal,
     })
       .then((value) => {
@@ -47,7 +54,7 @@ export function ReportsPage() {
         }
       })
     return () => controller.abort()
-  }, [mode, days, retry])
+  }, [mode, days, retry, certification.provider, certification.code])
   useEffect(() => {
     if (!attemptId) {
       return
@@ -152,7 +159,9 @@ export function ReportsPage() {
             Show all practice
           </button>
         )}
-        <small>CLF-C02 is the currently supported certification.</small>
+        <small>
+          {certification.provider} · {certification.name} · {certification.code}
+        </small>
       </section>
     )
   }
@@ -172,15 +181,21 @@ export function ReportsPage() {
               ? 'The answers, the insights, and your next step forward.'
               : 'Find your rhythm. Know your strengths. Make your next study session count.'}
           </p>
+          <p>
+            {certification.provider} · {certification.name} · {certification.code}
+          </p>
         </div>
         <button
           className="report-export"
           disabled={attemptId ? !quiz : !report || !report.attempts.length}
           onClick={() => {
             if (attemptId && quiz) {
-              download(quizReport(quiz), `CLF-C02-${quiz.id}.md`)
+              download(quizReport(quiz), `${certification.code}-${quiz.id}.md`)
             } else if (report) {
-              download(studyReportMarkdown(report, scope), `CLF-C02-${mode}-report.md`)
+              download(
+                studyReportMarkdown(report, scope),
+                `${certification.code}-${mode}-report.md`,
+              )
             }
           }}
         >
@@ -218,12 +233,6 @@ export function ReportsPage() {
             ))}
           </div>
           <div className="report-filter-group">
-            <label>
-              Certification
-              <select aria-label="Certification" value="CLF-C02" onChange={() => {}}>
-                <option value="CLF-C02">AWS · CLF-C02</option>
-              </select>
-            </label>
             <label>
               Time range
               <select value={days} onChange={(event) => setDays(event.target.value)}>

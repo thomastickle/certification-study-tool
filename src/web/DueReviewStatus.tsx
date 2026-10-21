@@ -15,6 +15,10 @@ export function DueReviewStatus({ options }: { options: QuizOptions }) {
       sourceFilter: options.sourceFilter,
       questionType: options.questionType,
     })
+    if (options.provider && options.certification) {
+      query.set('provider', options.provider)
+      query.set('certification', options.certification)
+    }
     if (options.sourceIds?.length) {
       query.set('sourceIds', options.sourceIds.join(','))
     }

@@ -442,8 +442,8 @@ export function ReportDashboard({
       </div>
       <p className="report-method">
         Completed attempts only · Repeat questions count each time · Activity counts are not
-        unique-question mastery · Raw practice scores, not AWS scaled scores · All activity stays in
-        your local workspace
+        unique-question mastery · Raw practice scores, not official certification scores · All
+        activity stays in your local workspace
       </p>
     </>
   )
