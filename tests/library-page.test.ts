@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
+import type { Source } from '../src/shared/contracts.ts'
 
 test('importer renders page content without duplicating the application header', async () => {
   // Node strips TS but not TSX; compile JSX using the project's existing compiler.
@@ -48,26 +49,27 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
   try {
     const { QuizSourcePicker } = await import('../src/web/QuizSourcePicker.tsx')
     const base = { provider: 'AWS', certification: 'CLF-C02', certificationName: 'Synthetic exam' }
+    const sources: Source[] = [
+      {
+        ...base,
+        id: 1,
+        key: 'official',
+        name: 'Official sample',
+        kind: 'official',
+        questionCount: 65,
+      },
+      {
+        ...base,
+        id: 2,
+        key: 'third',
+        name: 'Third-party sample',
+        kind: 'third_party',
+        questionCount: 41,
+      },
+    ]
     const html = renderToStaticMarkup(
       createElement(QuizSourcePicker, {
-        sources: [
-          {
-            ...base,
-            id: 1,
-            key: 'official',
-            name: 'Official sample',
-            kind: 'official',
-            questionCount: 65,
-          },
-          {
-            ...base,
-            id: 2,
-            key: 'third',
-            name: 'Third-party sample',
-            kind: 'third_party',
-            questionCount: 41,
-          },
-        ],
+        sources,
         selected: [2],
         onChange: () => {},
       }),
@@ -81,7 +83,26 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
     assert.match(html, /Select all/)
     assert.match(html, />Clear</)
     assert.match(html, /aria-haspopup="dialog"/)
-    assert.match(html, /1 bank selected/)
+    const trigger = html.slice(html.indexOf('<button'), html.indexOf('</button>'))
+    assert.match(trigger, /Third-party · 1 bank · 41 questions/)
+    assert.doesNotMatch(trigger, /Official/)
+    const grouped = renderToStaticMarkup(
+      createElement(QuizSourcePicker, {
+        sources: [...sources, { ...sources[1]!, id: 3, questionCount: 19 }],
+        selected: [1, 2, 3],
+        onChange: () => {},
+      }),
+    )
+    const groupedTrigger = grouped.slice(grouped.indexOf('<button'), grouped.indexOf('</button>'))
+    assert.match(groupedTrigger, /Official · 1 bank · 65 questions/)
+    assert.match(groupedTrigger, /Third-party · 2 banks · 60 questions/)
+    const empty = renderToStaticMarkup(
+      createElement(QuizSourcePicker, { sources, selected: [], onChange: () => {} }),
+    )
+    assert.match(
+      empty.slice(empty.indexOf('<button'), empty.indexOf('</button>')),
+      /Choose question banks/,
+    )
     assert.match(html, /aria-expanded="false"/)
     assert.match(html, /<dialog\b/)
     assert.doesNotMatch(html, /<dialog[^>]*\sopen(?:=|\s|>)/)

@@ -86,7 +86,9 @@ for a 20-question practice quiz and **16 / 19 / 22 / 8** for a 65-question exam.
 attempt to reproduce AWS unscored items or scaled scoring.
 
 Quiz setup uses a compact multi-select dropdown on desktop and a modal bottom
-popup on phones. The collapsed control shows the selected-bank count. Inside,
+popup on phones. The collapsed control summarizes selected banks as Official and Third-party groups,
+with each group’s selected-bank count and total questions. These are bank totals,
+so duplicate questions across banks can be counted more than once. Inside,
 each available CLF-C02 bank has a checkbox and its total question count, grouped
 as Official or Third-party. Done or Escape closes the picker; desktop outside
 clicks also dismiss it. Choices apply immediately and survive dismissal. All banks start checked;

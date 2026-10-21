@@ -969,6 +969,10 @@ select {
   text-align: left;
   font-weight: 400;
 }
+.source-picker-summary {
+  display: grid;
+  gap: 4px;
+}
 .source-picker-popover {
   position: absolute;
   inset: auto;
