@@ -1,68 +1,49 @@
-import { StudyIcon } from './StudyIcon.tsx'
+import { useEffect, useState } from 'react'
+import type { HomeSummary } from '../shared/home-contracts.ts'
+import { api } from './api.ts'
+import { HomeDashboard, type HomeNavigation } from './HomeDashboard.tsx'
 
-type Props = { onNavigate: (page: 'practice' | 'review' | 'importer') => void }
+type Props = {
+  onNavigate: (page: HomeNavigation) => void
+  onPractice: (sourceIds: number[]) => void
+}
 
-const sessions = [
-  {
-    mode: 'practice',
-    name: 'Practice',
-    description: 'Choose a short quiz or a full-length exam.',
-    questions: '20 or 65 questions',
-    duration: '20 or 90 minutes',
-    action: 'Set up practice',
-  },
-  {
-    mode: 'review',
-    name: 'Due Review',
-    description: 'Revisit questions scheduled for another check.',
-    questions: 'Up to 20 questions',
-    duration: '20 minutes',
-    action: 'Set up review',
-  },
-] as const
+/** Load current readiness for the workspace home screen with an explicit retry path. */
+export function HomePage({ onNavigate, onPractice }: Props) {
+  const [summary, setSummary] = useState<HomeSummary>()
+  const [error, setError] = useState('')
+  const [attempt, setAttempt] = useState(0)
 
-/** Keep the starting screen focused on choosing the next study session. */
-export function HomePage({ onNavigate }: Props) {
-  return (
-    <main className="home-page">
-      <div className="page-heading">
-        <div>
-          <h1>Study workspace</h1>
-          <p className="intro">Start a quiz, take an exam, or revisit due questions.</p>
-        </div>
-      </div>
-      <section className="session-options" aria-label="Study sessions">
-        {sessions.map((session) => (
-          <article className="session-option" key={session.mode}>
-            <span className="session-icon">
-              <StudyIcon name={session.mode} />
-            </span>
-            <div className="session-description">
-              <h2>{session.name}</h2>
-              <p>{session.description}</p>
-              <div className="session-format">
-                <span>{session.questions}</span>
-                <span>{session.duration}</span>
-              </div>
-            </div>
-            <button onClick={() => onNavigate(session.mode)}>
-              {session.action}
-              <StudyIcon name="arrow" />
-            </button>
-          </article>
-        ))}
-      </section>
-      <div className="home-library">
-        <StudyIcon name="importer" />
-        <div>
-          <h2>Your question library</h2>
-          <p>Import question banks and manage your sources.</p>
-        </div>
-        <button onClick={() => onNavigate('importer')}>
-          Open library
-          <StudyIcon name="arrow" />
-        </button>
-      </div>
-    </main>
-  )
+  useEffect(() => {
+    let active = true
+    setError('')
+    api<HomeSummary>('/home')
+      .then((result) => {
+        if (active) setSummary(result)
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Could not load readiness.')
+      })
+    return () => {
+      active = false
+    }
+  }, [attempt])
+
+  if (error)
+    return (
+      <main className="home-page">
+        <section className="home-empty" role="alert">
+          <h1>Readiness could not load</h1>
+          <p>{error}</p>
+          <button onClick={() => setAttempt((value) => value + 1)}>Retry</button>
+        </section>
+      </main>
+    )
+  if (!summary)
+    return (
+      <main className="home-page" aria-busy="true">
+        <p>Loading certification readiness…</p>
+      </main>
+    )
+  return <HomeDashboard summary={summary} onNavigate={onNavigate} onPractice={onPractice} />
 }

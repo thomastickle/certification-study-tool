@@ -3,10 +3,11 @@ import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
 import { ReportsPage } from './ReportsPage.tsx'
 import { HomePage } from './HomePage.tsx'
+import { CertificationsPage } from './CertificationsPage.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { WorkspaceSidebar } from './WorkspaceSidebar.tsx'
 
-type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
+type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'certifications'
 
 /** Keep every workspace destination behind the existing practice suspension guard. */
 export function App() {
@@ -55,11 +56,17 @@ export function App() {
             Certification <span className="brand-secondary">Study Tool</span>
           </span>
         </button>
-        <div className="certification-label" role="group" aria-label="Current certification">
-          <span className="certification-provider">AWS</span>
-          <strong>Cloud Practitioner</strong>
-          <span className="certification-code">CLF-C02</span>
-        </div>
+        {page === 'home' || page === 'certifications' ? (
+          <div className="certification-label" role="group" aria-label="All certifications">
+            <strong>All certifications</strong>
+          </div>
+        ) : (
+          <div className="certification-label" role="group" aria-label="Current certification">
+            <span className="certification-provider">AWS</span>
+            <strong>Cloud Practitioner</strong>
+            <span className="certification-code">CLF-C02</span>
+          </div>
+        )}
         <span className="local-badge">
           <span aria-hidden="true" />
           Local workspace
@@ -76,6 +83,10 @@ export function App() {
           <HomePage
             onNavigate={(next) => {
               void navigate(next === 'practice' ? practiceMode : next)
+            }}
+            onPractice={(sourceIds) => {
+              setPracticeSourceIds(sourceIds)
+              void navigate(practiceMode)
             }}
           />
         )}
@@ -100,6 +111,7 @@ export function App() {
         )}
         {page === 'reports' && <ReportsPage />}
         {page === 'importer' && <LibraryPage />}
+        {page === 'certifications' && <CertificationsPage />}
       </div>
     </div>
   )
