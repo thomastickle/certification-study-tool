@@ -21,7 +21,8 @@ export async function resultDeletionCheck(lostRestore = false, staleRead = false
 
   function click(label: string) {
     const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-      (item) => item.textContent?.trim() === label && !item.disabled,
+      (item) =>
+        (item.getAttribute('aria-label') ?? item.textContent?.trim()) === label && !item.disabled,
     )
     assert(button, `Missing enabled ${label}`)
     button.click()
@@ -38,11 +39,20 @@ export async function resultDeletionCheck(lostRestore = false, staleRead = false
     const attemptId = first.id.replace('report-attempt-', '')
     first.click()
     await until(() => !!document.querySelector('.result-deletion'), 'Result did not load')
+    assert(document.querySelector('button[aria-label="Delete result"] svg'), 'Delete icon missing')
     click('Delete result')
     await until(
-      () => !!document.querySelector('.deleted-results button.danger'),
+      () =>
+        !![...document.querySelectorAll('.deleted-results button')].find(
+          (button) => button.getAttribute('aria-label') === 'Undo deletion',
+        ),
       'Recovery row did not load',
     )
+    assert(
+      document.querySelector('.deleted-results')?.textContent?.includes('Will be deleted on'),
+      'Deletion deadline missing',
+    )
+    assert(document.querySelector('button[aria-label="Undo deletion"] svg'), 'Undo icon missing')
     assert(!document.getElementById(`report-attempt-${attemptId}`), 'Deleted attempt still counted')
     if (staleRead) {
       const delayed = new Promise<void>((resolve) => {
@@ -75,19 +85,27 @@ export async function resultDeletionCheck(lostRestore = false, staleRead = false
       'Restored result missing from counted history',
     )
     assert(
-      !document.querySelector('.deleted-results button.danger'),
+      ![...document.querySelectorAll('.deleted-results button')].find(
+        (button) => button.getAttribute('aria-label') === 'Undo deletion',
+      ),
       'Restored result remains in recovery list',
     )
     if (staleRead) {
       releaseRead!()
       await new Promise((resolve) => setTimeout(resolve, 100))
       assert(
-        !document.querySelector('.deleted-results button.danger'),
+        ![...document.querySelectorAll('.deleted-results button')].find(
+          (button) => button.getAttribute('aria-label') === 'Undo deletion',
+        ),
         'Stale read reinserted restored row',
       )
     }
     assert(!lostRestore || restoreCommitted, 'Lost response was not exercised')
     assert(confirmations === 0, 'Deletion requested confirmation')
+    assert(
+      !document.body.innerText.includes('Delete permanently'),
+      'Unexpected permanent-delete button',
+    )
     return { lostRestore, staleRead, restored: attemptId, confirmations }
   } finally {
     releaseRead?.()

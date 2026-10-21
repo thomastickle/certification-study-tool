@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { DeletedQuizSummary, PracticeMode } from '../shared/quiz-contracts.ts'
 import type { Certification } from './certifications.ts'
+import { StudyIcon } from './StudyIcon.tsx'
 import { api } from './api.ts'
 
 /** Deletes immediately without confirmation; the recovery list owns undo. */
@@ -24,8 +25,15 @@ export function DeleteResultButton({ id, onDeleted }: { id: string; onDeleted: (
 
   return (
     <div className="result-deletion">
-      <button className="danger" disabled={busy} onClick={() => void remove()}>
-        {busy ? 'Deleting…' : 'Delete result'}
+      <button
+        className="danger result-icon-action"
+        aria-label="Delete result"
+        title="Delete result"
+        aria-busy={busy}
+        disabled={busy}
+        onClick={() => void remove()}
+      >
+        <StudyIcon name="trash" />
       </button>
       <p>Removes this attempt from stats and scheduling immediately. Undo within 48 hours.</p>
       {error && <p role="alert">{error}</p>}
@@ -70,24 +78,16 @@ export function DeletedResults({
     return () => controller.abort()
   }, [certification.provider, certification.code, refresh])
 
-  /** Refreshes recovery and counted history after either mutation, reporting failures inline. */
-  async function change(id: string, restore: boolean): Promise<void> {
+  /** Refreshes recovery and counted history after restoration, reporting failures inline. */
+  async function restore(id: string): Promise<void> {
     readRevision.current++
     setBusy(true)
     setError('')
     setNotice('')
     try {
-      if (restore) {
-        await api(`/quizzes/${id}/restore`, { method: 'POST' })
-      } else {
-        await api(`/quizzes/${id}?permanent=true`, { method: 'DELETE' })
-      }
+      await api(`/quizzes/${id}/restore`, { method: 'POST' })
       setItems((current) => current.filter((item) => item.id !== id))
-      setNotice(
-        restore
-          ? 'Result restored. Stats and scheduling now include it.'
-          : 'Result permanently deleted.',
-      )
+      setNotice('Result restored. Stats and scheduling now include it.')
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'Could not change this result.'
       setError(`${message} Refreshing history to check whether the change was saved.`)
@@ -108,8 +108,8 @@ export function DeletedResults({
         </button>
       </div>
       <p>
-        Excluded from all stats and scheduling. Undo within 48 hours, or delete permanently now.
-        Permanent deletion cannot be undone.
+        Excluded from all stats and scheduling. Undo within 48 hours. After that, results are
+        permanently deleted automatically.
       </p>
       {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
@@ -123,23 +123,25 @@ export function DeletedResults({
                 {new Date(item.finishedAt ?? item.startedAt).toLocaleString()}
               </strong>
               <p>
-                {item.correctCount}/{item.total} correct · Undo until{' '}
-                {new Date(item.purgeAt).toLocaleString()}
+                {item.correctCount}/{item.total} correct
+              </p>
+              <p className="deletion-deadline">
+                Will be deleted on{' '}
+                <time dateTime={new Date(item.purgeAt).toISOString()}>
+                  {new Date(item.purgeAt).toLocaleString()}
+                </time>
               </p>
             </div>
             <div className="actions">
               <button
+                className="result-icon-action"
+                aria-label="Undo deletion"
+                title="Undo deletion"
+                aria-busy={busy}
                 disabled={busy || Date.now() >= item.purgeAt}
-                onClick={() => void change(item.id, true)}
+                onClick={() => void restore(item.id)}
               >
-                Undo deletion
-              </button>
-              <button
-                className="danger"
-                disabled={busy}
-                onClick={() => void change(item.id, false)}
-              >
-                Delete permanently
+                <StudyIcon name="undo" />
               </button>
             </div>
           </li>

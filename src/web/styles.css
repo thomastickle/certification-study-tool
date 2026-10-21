@@ -1272,3 +1272,17 @@ select {
   flex-wrap: wrap;
   gap: 1rem;
 }
+
+.result-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.6rem;
+}
+
+.deletion-deadline {
+  font-weight: 600;
+  color: #92400e;
+}

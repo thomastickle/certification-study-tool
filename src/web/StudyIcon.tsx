@@ -1,4 +1,6 @@
 const paths = {
+  trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
+  undo: 'M9 4 3 10l6 6M3 10h11a7 7 0 0 1 7 7v3',
   home: 'M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9',
   practice: 'M8 3h8l4 4v14H4V3h4m8 0v5h4M8 12h8M8 16h5',
   quiz: 'M8 3h8l4 4v14H4V3h4m8 0v5h4M8 12h8M8 16h5',

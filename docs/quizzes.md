@@ -246,7 +246,10 @@ certification, provides **Undo deletion** for 48 hours from the original deletio
 Undo restores the original snapshot and completion time, and recalculates study evidence
 from the remaining history plus that restored attempt. Practice setup shows only its
 current mode; Reports shows all modes, independently of report time/mode filters.
-**Delete permanently** skips the remaining window and cannot be undone.
+Delete and undo use icon buttons with accessible labels and tooltips. Pending rows
+show “Will be deleted on” with their deletion date and time. The recovery list offers only Undo deletion; final deletion happens automatically after
+the window. The API retains `DELETE /api/quizzes/:id?permanent=true` for explicitly
+requested forced deletion, without a separate confirmation control in the UI.
 
 Deleted snapshots and their deadlines survive restarts and source deletion. Expired
 snapshots are purged by the server maintenance timer, on startup, and before deletion
