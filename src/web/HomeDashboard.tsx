@@ -1,4 +1,5 @@
 import type { HomeSummary, ReadinessStatus } from '../shared/home-contracts.ts'
+import { readinessThresholds } from '../shared/home-contracts.ts'
 import { StudyIcon } from './StudyIcon.tsx'
 
 export type HomeNavigation = 'practice' | 'review' | 'importer' | 'certifications'
@@ -176,8 +177,8 @@ export function HomeDashboard({ summary, onNavigate, onPractice }: Props) {
           <summary>How readiness works</summary>
           <p>
             The initial score blends 50% recent exam performance, 25% current mastery, and 25%
-            weakest-domain performance. Green also requires 95% in every component and each assessed
-            exam.
+            weakest-domain performance. Green also requires {readinessThresholds.ready}% in every
+            component and each assessed exam.
           </p>
           <p>
             Assessment needs 20 distinct answered questions per domain and varied, uninterrupted

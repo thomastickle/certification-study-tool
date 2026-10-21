@@ -83,6 +83,8 @@ test('home dashboard groups real tracks and explains readiness without exposing 
     assert.match(html, /aria-label="AWS tracks exam-ready"/)
     assert.match(html, /Mastery: 97%/)
     assert.match(html, /Assessed exam average: 95%/)
+    assert.match(html, /Green also requires 90% in every component/)
+    assert.doesNotMatch(html, /Green also requires 95%/)
     assert.match(html, /Cloud Practitioner/)
     assert.match(html, /CLF-C02/)
     assert.match(html, /96%/)

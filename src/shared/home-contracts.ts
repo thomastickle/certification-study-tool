@@ -1,5 +1,7 @@
 export type ReadinessStatus = 'insufficient' | 'unsupported' | 'red' | 'yellow' | 'green'
 
+export const readinessThresholds = { marginal: 80, ready: 90 } as const
+
 export type Readiness = {
   status: ReadinessStatus
   score: number | null

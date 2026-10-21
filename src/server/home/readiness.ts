@@ -1,4 +1,5 @@
 import type { Readiness } from '../../shared/home-contracts.ts'
+import { readinessThresholds } from '../../shared/home-contracts.ts'
 import { domainNames, examDomainQuotas } from '../quizzes/domain-mapping.ts'
 import { completedEvidence, masteryHistory } from '../quizzes/mastery-history.ts'
 import { studyDay } from '../quizzes/mastery.ts'
@@ -9,8 +10,7 @@ export const readinessPolicy = {
   questionsPerDomain: 20,
   examDays: 3,
   newQuestionsPerExam: 13,
-  marginal: 80,
-  ready: 95,
+  ...readinessThresholds,
 } as const
 
 /** Unsupported exams never inherit another certification's performance or blueprint. */
@@ -176,7 +176,7 @@ export function certificationReadiness(completed: StoredQuiz[], now: number): Re
   )
   if (result.score !== result.blendedScore) {
     result.reasons.push(
-      'Readiness stays below green until mastery, every domain, and each assessed exam reach 95%.',
+      `Readiness stays below green until mastery, every domain, and each assessed exam reach ${readinessPolicy.ready}%.`,
     )
   }
   return result

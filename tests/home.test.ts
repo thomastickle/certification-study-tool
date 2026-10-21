@@ -41,14 +41,20 @@ test('home groups real library certifications by provider, not one track per ban
   }
 })
 
-test('combined scores preserve the worked color boundaries and cap an optimistic blend', () => {
+test('combined scores use the approved 90% green boundary and retain component gates', () => {
   for (const [mastery, domain, exams, score, status] of [
     [62, 55, [64, 67, 70], 62, 'red'],
     [88, 80, [83, 87, 90], 85, 'yellow'],
     [98, 62, [96, 97, 98], 88, 'yellow'],
-    [98, 97, [86, 99, 100], 94, 'yellow'],
+    [98, 97, [86, 99, 100], 89, 'yellow'],
     [98, 96, [96, 97, 98], 97, 'green'],
     [80, 80, [80, 80, 80], 80, 'yellow'],
+    [89.9, 89.9, [89.9, 89.9, 89.9], 89, 'yellow'],
+    [90, 90, [90, 90, 90], 90, 'green'],
+    [92, 92, [92, 92, 92], 92, 'green'],
+    [89.9, 100, [100, 100, 100], 89, 'yellow'],
+    [100, 89.9, [100, 100, 100], 89, 'yellow'],
+    [100, 100, [89.9, 100, 100], 89, 'yellow'],
     [95, 95, [95, 95, 95], 95, 'green'],
     [79.9, 79.9, [79.9, 79.9, 79.9], 79, 'red'],
   ] as const) {
@@ -75,10 +81,38 @@ test('weak domains cap a high blended score and skips remain scored misses', () 
     // Skips reduce domain/exam scores but are outside the answered mastery denominator.
     assert.equal(readiness.mastery, 100)
     assert.equal(readiness.blendedScore, 96)
-    assert.equal(readiness.score, 94)
+    assert.equal(readiness.score, 89)
     assert.equal(readiness.status, 'yellow')
     assert.equal(readiness.domains[3]!.score, 87.5)
     assert.match(readiness.reasons.join(' '), /every domain/)
+    assert.match(readiness.reasons.join(' '), /reach 90%/)
+  } finally {
+    repository.close()
+  }
+})
+
+test('broad, consistent low-nineties performance now makes a track exam-ready', () => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    for (const [age, misses] of [
+      [3, [0, 1, 16, 35, 57]],
+      [2, [0, 16, 17, 35, 57]],
+      [1, [0, 16, 35, 36, 37]],
+    ] as const) {
+      const exam = homeExam(`low-nineties-${age}`, age)
+      for (const index of misses) {
+        exam.questions[index]!.selected = [1]
+        exam.questions[index]!.correct = false
+      }
+      exam.correctCount = 60
+      repository.quizStore().save(exam)
+    }
+    const aws = new HomeService(repository, () => homeNow).get().providers[0]!
+    const readiness = aws.certifications[0]!.readiness
+    assert.equal(readiness.score, 92)
+    assert.equal(readiness.status, 'green')
+    assert.equal(aws.ready, 1)
+    assert.ok(readiness.domains.every((domain) => domain.score! >= 90))
   } finally {
     repository.close()
   }
@@ -191,7 +225,7 @@ test('current mastery uses lifetime recovery while unfinished and future attempt
       'one later success does not erase older miss-recovery requirements',
     )
     assert.equal(readiness.examAverage, 100)
-    assert.equal(readiness.score, 91)
+    assert.equal(readiness.score, 89)
     assert.equal(readiness.status, 'yellow')
   } finally {
     repository.close()

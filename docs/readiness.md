@@ -58,8 +58,8 @@ The blended score is rounded down:
   using all reliable completed quiz, exam, and review appearances in that domain.
   Skips count as misses. One identity supplies at most one appearance per attempt.
 
-Red is below **80**, yellow is **80–94**, and green begins at **95**. Green additionally
-requires current mastery, every domain score, and each assessed exam score to reach 95. Otherwise cap readiness at 94, even if the blend is higher. Show the component
+Red is below **80**, yellow is **80–89**, and green begins at **90**. Green additionally
+requires current mastery, every domain score, and each assessed exam score to reach 90. Otherwise cap readiness at 89, even if the blend is higher. Show the component
 evidence and cap reason so the score can be explained.
 
 The weights, window, distinct coverage minimum, variation minimum, and green gate
