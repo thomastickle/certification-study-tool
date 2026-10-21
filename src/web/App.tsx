@@ -8,11 +8,13 @@ import { LibraryPage } from './LibraryPage.tsx'
 import { QuizPage } from './QuizPage.tsx'
 import { ReportsPage } from './ReportsPage.tsx'
 import { HomePage } from './HomePage.tsx'
+import { CertificationsPage } from './CertificationsPage.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { WorkspaceSidebar } from './WorkspaceSidebar.tsx'
 import { pauseCertificationAttempts } from './workspace-session.ts'
+import type { CertificationProgress } from '../shared/home-contracts.ts'
 
-type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
+type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'certifications'
 
 /** Keep every workspace destination behind the existing practice suspension guard. */
 export function App() {
@@ -61,8 +63,16 @@ export function App() {
   }, [refreshCertifications])
 
   /** Switch only after the current session has safely saved and paused. */
-  async function selectCertification(next: Certification) {
-    if (navigating.current || (selected && certificationKey(next) === certificationKey(selected))) {
+  async function selectCertification(
+    next: Certification,
+    studyPage?: 'quiz' | 'exam' | 'review',
+    sourceIds?: number[],
+  ) {
+    if (navigating.current) {
+      return
+    }
+    const switching = !selected || certificationKey(next) !== certificationKey(selected)
+    if (!switching && !studyPage) {
       return
     }
     navigating.current = true
@@ -74,7 +84,7 @@ export function App() {
       ) {
         return
       }
-      if (selected) {
+      if (selected && switching) {
         await pauseCertificationAttempts(selected)
       }
       selectedRef.current = next
@@ -83,6 +93,16 @@ export function App() {
         localStorage.setItem('study-certification', certificationKey(next))
       } catch {
         // Selection remains usable when storage is unavailable.
+      }
+      if (studyPage) {
+        if (sourceIds) {
+          setPracticeSources((current) => ({ ...current, [certificationKey(next)]: sourceIds }))
+        }
+        if (studyPage === 'quiz' || studyPage === 'exam') {
+          setPracticeMode(studyPage)
+        }
+        setFocusPreset(false)
+        setPage(studyPage)
       }
     } catch (reason) {
       const message =
@@ -93,6 +113,24 @@ export function App() {
     } finally {
       navigating.current = false
     }
+  }
+
+  /** Open a Home action in its named certification using the same safe switch as the picker. */
+  function studyTrack(track: CertificationProgress, mode: 'practice' | 'review') {
+    const target = certifications.find(
+      (certification) => certificationKey(certification) === certificationKey(track),
+    )
+    if (!target) {
+      setSelectionError(
+        'Import eligible question banks for this certification before starting practice or review.',
+      )
+      return
+    }
+    void selectCertification(
+      target,
+      mode === 'practice' ? practiceMode : 'review',
+      mode === 'practice' ? track.sourceIds : undefined,
+    )
   }
 
   const scopeKey = selected ? certificationKey(selected) : 'empty'
@@ -167,6 +205,8 @@ export function App() {
             onNavigate={(next) => {
               void navigate(next === 'practice' ? practiceMode : next)
             }}
+            onPractice={(track) => studyTrack(track, 'practice')}
+            onReview={(track) => studyTrack(track, 'review')}
           />
         )}
         {(page === 'quiz' || page === 'exam' || page === 'review') && selected && (
@@ -191,8 +231,9 @@ export function App() {
             }}
           />
         )}
+        {page === 'certifications' && <CertificationsPage />}
         {page === 'reports' && selected && <ReportsPage key={scopeKey} certification={selected} />}
-        {!selected && page !== 'home' && page !== 'importer' && (
+        {!selected && page !== 'home' && page !== 'importer' && page !== 'certifications' && (
           <main>
             <h1>
               {catalogLoading ? 'Loading certifications…' : 'Import a question bank to get started'}

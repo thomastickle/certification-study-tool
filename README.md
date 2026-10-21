@@ -4,8 +4,13 @@ A local study-question library with a React interface, TypeScript application
 services, and SQLite storage. This first slice imports version-2 JSON banks,
 shows their contents, and deletes individual source occurrences or whole sources.
 The library accepts question banks for different providers and certifications.
-Timed quizzes, exams, and performance reports currently target AWS CLF-C02;
-other certification practice modes are not yet implemented.
+Timed practice and performance reports follow the selected certification workspace.
+AWS CLF-C02 has domain mappings; other certifications use generic timed practice.
+Home groups imported certifications by provider with compact exam-readiness bars.
+Readiness assessment currently requires the AWS CLF-C02 domain blueprint; other
+tracks show neutral readiness while keeping their own practice and review history.
+The separate Certifications screen records earned credentials as stars without
+changing readiness. See [readiness rules and evidence](docs/readiness.md).
 The Reports page adds progress charts, domain and topic breakdowns, exam/quiz
 filters, saved answer review, and local Markdown exports. See
 [quiz behavior and reporting](docs/quizzes.md).

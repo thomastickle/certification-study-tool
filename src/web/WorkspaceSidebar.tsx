@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { StudyIcon } from './StudyIcon.tsx'
 
-export type Destination = 'home' | 'practice' | 'review' | 'reports' | 'importer'
+export type Destination = 'home' | 'practice' | 'review' | 'certifications' | 'importer' | 'reports'
 
 type Props = { destination: Destination; onNavigate: (destination: Destination) => void }
 
@@ -14,6 +14,7 @@ const links: { id: Destination; label: string }[] = [
   { id: 'home', label: 'Home' },
   { id: 'practice', label: 'Practice' },
   { id: 'review', label: 'Due Review' },
+  { id: 'certifications', label: 'Certifications' },
   { id: 'importer', label: 'Importer' },
   { id: 'reports', label: 'Reports' },
 ]
@@ -154,7 +155,7 @@ export function WorkspaceSidebar({ destination, onNavigate }: Props) {
               title={layout.collapsed ? link.label : undefined}
               onClick={() => onNavigate(link.id)}
             >
-              <StudyIcon name={link.id} />
+              <StudyIcon name={link.id === 'certifications' ? 'reports' : link.id} />
               <span>{link.label}</span>
             </button>
           ))}
