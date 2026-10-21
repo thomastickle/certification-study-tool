@@ -1328,7 +1328,6 @@ select {
   color: #b91c1c;
 }
 
-.completed-results a,
 .completed-result-summary {
   display: inline-grid;
   grid-template-columns: 12px minmax(0, 1fr);
@@ -1351,6 +1350,10 @@ select {
 
 .completed-results .completed-result-label {
   color: inherit;
+}
+
+.completed-results a.completed-result-label {
+  color: var(--accent);
 }
 
 .completed-results .completed-result-score {

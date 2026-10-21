@@ -90,7 +90,13 @@ export async function bankDeletionHistoryLayoutCheck(): Promise<string> {
     if (Math.abs(dot.top + dot.height / 2 - (date.top + date.height / 2)) > 1) {
       throw new Error('The result dot must align with the first line of result text.')
     }
-    const badge = row.querySelector('.deleted-bank-badge')?.getBoundingClientRect()
+    const badgeElement = row.querySelector('.deleted-bank-badge')
+    if (badgeElement?.closest('a, button, [role="link"]')) {
+      throw new Error(
+        'The deleted-question tag must be informational text outside the result link.',
+      )
+    }
+    const badge = badgeElement?.getBoundingClientRect()
     if (badge) {
       if (
         innerWidth >= 1000 &&

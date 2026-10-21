@@ -145,24 +145,14 @@ export function CompletedResults({
           if (item.total > 0 && item.correctCount !== null) {
             score = `${Math.round((item.correctCount / item.total) * 100)}% score`
           }
-          const summary = (
+          const label = (
             <>
-              <ResultIndicator
-                status={item.status}
-                correctCount={item.correctCount}
-                total={item.total}
-              />
-              <span className="completed-result-content">
-                <span className="completed-result-label">
-                  <time className="completed-result-date" dateTime={completedAt.toISOString()}>
-                    {completedAt.toLocaleString()}
-                  </time>
-                  {' · '}
-                  <span className="completed-result-score">
-                    {score} · {item.correctCount ?? '—'}/{item.total} correct
-                  </span>
-                </span>
-                <DeletedBankNotice names={item.deletedBankNames} compact />
+              <time className="completed-result-date" dateTime={completedAt.toISOString()}>
+                {completedAt.toLocaleString()}
+              </time>
+              {' · '}
+              <span className="completed-result-score">
+                {score} · {item.correctCount ?? '—'}/{item.total} correct
               </span>
             </>
           )
@@ -172,21 +162,29 @@ export function CompletedResults({
               data-result-id={item.id}
               className={pending ? 'pending-deletion' : ''}
             >
-              <div>
-                {pending ? (
-                  <div className="completed-result-summary">{summary}</div>
-                ) : (
-                  <a
-                    className="completed-result-summary"
-                    href={`#result-${item.id}`}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      onOpen(item.id)
-                    }}
-                  >
-                    {summary}
-                  </a>
-                )}
+              <div className="completed-result-summary">
+                <ResultIndicator
+                  status={item.status}
+                  correctCount={item.correctCount}
+                  total={item.total}
+                />
+                <span className="completed-result-content">
+                  {pending ? (
+                    <span className="completed-result-label">{label}</span>
+                  ) : (
+                    <a
+                      className="completed-result-label"
+                      href={`#result-${item.id}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        onOpen(item.id)
+                      }}
+                    >
+                      {label}
+                    </a>
+                  )}
+                  <DeletedBankNotice names={item.deletedBankNames} compact />
+                </span>
               </div>
               <div className="completed-result-actions">
                 {pending && (
