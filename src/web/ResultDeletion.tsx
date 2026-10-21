@@ -167,6 +167,11 @@ export function CompletedResults({
                   total={item.total}
                 />
                 <span className="completed-result-content">
+                  {mode !== 'review' && (
+                    <span className="completed-result-mode">
+                      {item.mode === 'exam' ? 'Exam' : 'Quiz'}
+                    </span>
+                  )}
                   {pending ? (
                     <span className="completed-result-label">{label}</span>
                   ) : (
@@ -180,11 +185,6 @@ export function CompletedResults({
                     >
                       {label}
                     </a>
-                  )}
-                  {mode !== 'review' && (
-                    <span className="completed-result-mode">
-                      {item.mode === 'exam' ? 'Exam' : 'Quiz'}
-                    </span>
                   )}
                   <DeletedBankNotice names={item.deletedBankNames} compact />
                 </span>
