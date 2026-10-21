@@ -681,9 +681,6 @@ select {
   font-variant-numeric: tabular-nums;
   font-size: 21px;
 }
-.quiz-status strong.urgent {
-  color: #a13e35;
-}
 .quiz-question h2 {
   font-size: 23px;
   line-height: 1.55;
@@ -1139,11 +1136,25 @@ select {
   background: #ffe0da;
   color: #98291e;
 }
-.quiz-status .timer.warning {
-  color: #805b00;
+.quiz-status .timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #000;
+  white-space: nowrap;
 }
-.quiz-status .timer.urgent {
-  color: #98291e;
+.timer-indicator {
+  flex: 0 0 12px;
+  inline-size: 12px;
+  block-size: 12px;
+  border-radius: 50%;
+  background: #237a45;
+}
+.timer.warning .timer-indicator {
+  background: #bf8000;
+}
+.timer.urgent .timer-indicator {
+  background: #c1362b;
 }
 .practice-session .review-list li.needs-review {
   background: #fff5ce;

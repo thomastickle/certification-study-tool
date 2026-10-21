@@ -142,6 +142,19 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       parseFloat(getComputedStyle(document.querySelector('.choice')!).fontSize) >= 16,
       'Answer text is too small',
     )
+
+    /** Check the persistent cue independently of the transient warning banner. */
+    function assertTimerIndicator(color: string, label: string) {
+      const timer = document.querySelector('.quiz-status .timer')!
+      const dot = timer.querySelector('.timer-indicator')
+      assert(dot, 'Timer is missing its persistent indicator')
+      assert(getComputedStyle(timer).color === 'rgb(0, 0, 0)', 'Timer text is not black')
+      assert(getComputedStyle(dot).backgroundColor === color, 'Timer indicator has wrong color')
+      assert(dot.getAttribute('aria-label') === label, 'Timer indicator has no accessible meaning')
+      assert(dot.getBoundingClientRect().width >= 10, 'Timer indicator is too small to notice')
+    }
+
+    assertTimerIndicator('rgb(35, 122, 69)', 'More than 10 minutes remaining')
     const questionTop = document.querySelector('.quiz-question')!.getBoundingClientRect().top
     const initialNow = originalNow()
     let clockNow = initialNow
@@ -159,6 +172,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       ) < 1,
       'Warning shifted the question',
     )
+    assertTimerIndicator('rgb(191, 128, 0)', '10 minutes or less remaining')
     assert(warningDismissals.length === 1, 'Warning did not schedule a 30-second dismissal')
     warningDismissals[0]!()
     await until(
@@ -171,6 +185,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       ) < 1,
       'Dismissing warning shifted question',
     )
+    assertTimerIndicator('rgb(191, 128, 0)', '10 minutes or less remaining')
     clockNow = initialNow + (attempt.deadline - attempt.serverNow) - 119_000
     await until(
       () =>
@@ -191,6 +206,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       () => document.querySelector('.timer-warning')?.classList.contains('pending') === true,
       'Final warning did not disappear',
     )
+    assertTimerIndicator('rgb(193, 54, 43)', '2 minutes or less remaining')
     return `${mode}: reading layout, final-question review, yellow attention, and stable warnings passed`
   } finally {
     Date.now = originalNow
