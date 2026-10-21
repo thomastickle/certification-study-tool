@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { DeletedQuizSummary, PracticeMode } from '../shared/quiz-contracts.ts'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DeletedQuizSummary, PracticeMode, QuizSummary } from '../shared/quiz-contracts.ts'
 import type { Certification } from './certifications.ts'
 import { StudyIcon } from './StudyIcon.tsx'
 import { api } from './api.ts'
@@ -41,111 +41,150 @@ export function DeleteResultButton({ id, onDeleted }: { id: string; onDeleted: (
   )
 }
 
-/** Keeps undo available across reloads, separately from counted practice history. */
-export function DeletedResults({
+/** Retain pending deletions in their original history, while excluding them from study evidence. */
+export function CompletedResults({
   certification,
   mode,
-  onChanged,
+  onOpen,
 }: {
   certification: Certification
-  mode?: PracticeMode
-  onChanged: () => void
+  mode: PracticeMode
+  onOpen: (id: string) => void
 }) {
-  const [items, setItems] = useState<DeletedQuizSummary[]>([])
-  const [busy, setBusy] = useState(false)
+  const [items, setItems] = useState<(QuizSummary | DeletedQuizSummary)[]>([])
+  const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [refresh, setRefresh] = useState(0)
-  const readRevision = useRef(0)
-  useEffect(() => {
-    const controller = new AbortController()
-    const revision = ++readRevision.current
-    const query = new URLSearchParams({
-      provider: certification.provider,
-      certification: certification.code,
-    })
-    api<DeletedQuizSummary[]>(`/quizzes/deleted?${query}`, { signal: controller.signal })
-      .then((value) => {
-        if (!controller.signal.aborted && revision === readRevision.current) {
-          setItems(value)
-        }
-      })
-      .catch((reason: unknown) => {
-        if (!controller.signal.aborted && revision === readRevision.current) {
-          setError(reason instanceof Error ? reason.message : 'Could not load deleted results.')
-        }
-      })
-    return () => controller.abort()
-  }, [certification.provider, certification.code, refresh])
+  const revision = useRef(0)
+  const request = useRef<AbortController | null>(null)
+  const query = new URLSearchParams({
+    provider: certification.provider,
+    certification: certification.code,
+  }).toString()
 
-  /** Refreshes recovery and counted history after restoration, reporting failures inline. */
-  async function restore(id: string): Promise<void> {
-    readRevision.current++
-    setBusy(true)
+  /** Read completed and pending snapshots together, rejecting superseded observations. */
+  const refresh = useCallback(async () => {
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
+    const currentRevision = ++revision.current
+    try {
+      const [completed, deleted] = await Promise.all([
+        api<QuizSummary[]>(`/quizzes?${query}`, { signal: controller.signal }),
+        api<DeletedQuizSummary[]>(`/quizzes/deleted?${query}`, { signal: controller.signal }),
+      ])
+      if (!controller.signal.aborted && currentRevision === revision.current) {
+        setItems(
+          [...completed, ...deleted]
+            .filter((item) => (item.mode ?? 'quiz') === mode)
+            .sort((a, b) => b.startedAt - a.startedAt || b.id.localeCompare(a.id)),
+        )
+      }
+    } catch (reason) {
+      if (!controller.signal.aborted && currentRevision === revision.current) {
+        setError(reason instanceof Error ? reason.message : 'Could not load results.')
+      }
+    }
+  }, [query, mode])
+
+  useEffect(() => {
+    void refresh()
+    return () => {
+      request.current?.abort()
+    }
+  }, [refresh])
+
+  /** Reconcile both lists even when a mutation response is lost after the server commits. */
+  async function change(item: QuizSummary): Promise<void> {
+    request.current?.abort()
+    revision.current++
+    setBusy(item.id)
     setError('')
     setNotice('')
     try {
-      await api(`/quizzes/${id}/restore`, { method: 'POST' })
-      setItems((current) => current.filter((item) => item.id !== id))
-      setNotice('Result restored. Stats and scheduling now include it.')
+      if (item.status === 'deleted') {
+        await api(`/quizzes/${item.id}/restore`, { method: 'POST' })
+        setNotice('Result restored. Stats and scheduling now include it.')
+      } else {
+        await api(`/quizzes/${item.id}`, { method: 'DELETE' })
+        setNotice('Result marked for deletion. Stats and scheduling now exclude it.')
+      }
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'Could not change this result.'
       setError(`${message} Refreshing history to check whether the change was saved.`)
     } finally {
-      setBusy(false)
-      setRefresh((value) => value + 1)
-      onChanged()
+      await refresh()
+      setBusy(null)
     }
   }
 
-  const visible = items.filter((item) => !mode || (item.mode ?? 'quiz') === mode)
+  let plural = mode === 'exam' ? 'exams' : 'quizzes'
+  if (mode === 'review') {
+    plural = 'due reviews'
+  }
   return (
-    <section className="quiz-panel deleted-results" aria-label="Recently deleted results">
+    <section className="quiz-panel completed-results" aria-label={`Completed ${plural}`}>
       <div className="section-heading">
-        <h2>Recently deleted results</h2>
-        <button disabled={busy} onClick={() => setRefresh((value) => value + 1)}>
-          Refresh deleted results
+        <h2>Completed {plural}</h2>
+        <button
+          disabled={busy !== null}
+          onClick={() => {
+            setError('')
+            void refresh()
+          }}
+        >
+          Refresh results
         </button>
       </div>
-      <p>
-        Excluded from all stats and scheduling. Undo within 48 hours. After that, results are
-        permanently deleted automatically.
-      </p>
-      {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
-      {!visible.length && <p className="muted">No results pending deletion.</p>}
+      {notice && <p role="status">{notice}</p>}
+      {!items.length && <p className="muted">No completed {plural} yet.</p>}
       <ul className="history-list">
-        {visible.map((item) => (
-          <li key={item.id}>
-            <div>
-              <strong>
-                {(item.mode ?? 'quiz').toUpperCase()} ·{' '}
-                {new Date(item.finishedAt ?? item.startedAt).toLocaleString()}
-              </strong>
-              <p>
-                {item.correctCount}/{item.total} correct
-              </p>
-              <p className="deletion-deadline">
-                Will be deleted on{' '}
-                <time dateTime={new Date(item.purgeAt).toISOString()}>
-                  {new Date(item.purgeAt).toLocaleString()}
-                </time>
-              </p>
-            </div>
-            <div className="actions">
+        {items.map((item) => {
+          const pending = item.status === 'deleted' && 'purgeAt' in item
+          const label = `${new Date(item.finishedAt ?? item.startedAt).toLocaleString()} · ${item.correctCount ?? 0}/${item.total}`
+          return (
+            <li
+              key={item.id}
+              data-result-id={item.id}
+              className={pending ? 'pending-deletion' : ''}
+            >
+              <div>
+                {pending ? (
+                  <span>{label}</span>
+                ) : (
+                  <a
+                    href={`#result-${item.id}`}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      onOpen(item.id)
+                    }}
+                  >
+                    {label}
+                  </a>
+                )}
+                {pending && (
+                  <p className="deletion-deadline">
+                    Will be deleted on{' '}
+                    <time dateTime={new Date(item.purgeAt).toISOString()}>
+                      {new Date(item.purgeAt).toLocaleString()}
+                    </time>
+                  </p>
+                )}
+              </div>
               <button
-                className="result-icon-action"
-                aria-label="Undo deletion"
-                title="Undo deletion"
-                aria-busy={busy}
-                disabled={busy || Date.now() >= item.purgeAt}
-                onClick={() => void restore(item.id)}
+                className={`result-icon-action ${pending ? '' : 'danger'}`}
+                aria-label={pending ? 'Undo deletion' : 'Delete result'}
+                title={pending ? 'Undo deletion' : 'Delete result'}
+                disabled={busy !== null || (pending && Date.now() >= item.purgeAt)}
+                aria-busy={busy === item.id}
+                onClick={() => void change(item)}
               >
-                <StudyIcon name="undo" />
+                <StudyIcon name={pending ? 'undo' : 'trash'} />
               </button>
-            </div>
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

@@ -3,7 +3,7 @@ import type { StudyReport, ReportMode } from '../shared/report-contracts.ts'
 import type { QuizView } from '../shared/quiz-contracts.ts'
 import { studyReportMarkdown } from '../shared/report-export.ts'
 import { quizReport } from '../shared/quiz-report.ts'
-import { DeleteResultButton, DeletedResults } from './ResultDeletion.tsx'
+import { DeleteResultButton } from './ResultDeletion.tsx'
 import { api } from './api.ts'
 import type { Certification } from './certifications.ts'
 import { ReportDashboard } from './ReportDashboard.tsx'
@@ -264,12 +264,6 @@ export function ReportsPage({ certification }: { certification: Certification })
         )}
       </div>
       {reportContent()}
-      {!attemptId && (
-        <DeletedResults
-          certification={certification}
-          onChanged={() => setRetry((value) => value + 1)}
-        />
-      )}
     </main>
   )
 }

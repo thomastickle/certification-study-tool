@@ -241,15 +241,18 @@ It immediately removes the attempt from completed history, reports, home readine
 mastery, Due Review, and question-selection history. Source banks and other attempts
 are unchanged. No confirmation dialog is required.
 
-**Recently deleted results**, available in Practice setup and Reports for the selected
-certification, provides **Undo deletion** for 48 hours from the original deletion.
-Undo restores the original snapshot and completion time, and recalculates study evidence
-from the remaining history plus that restored attempt. Practice setup shows only its
-current mode; Reports shows all modes, independently of report time/mode filters.
-Delete and undo use icon buttons with accessible labels and tooltips. Pending rows
-show “Will be deleted on” with their deletion date and time. The recovery list offers only Undo deletion; final deletion happens automatically after
-the window. The API retains `DELETE /api/quizzes/:id?permanent=true` for explicitly
-requested forced deletion, without a separate confirmation control in the UI.
+The completed-results list in Practice setup retains pending deletions in place. Normal
+rows show a clickable date and score for review, with a trash icon on the right. Pending
+rows show the original date and score, “Will be deleted on” with the deadline, and an undo
+icon on the right. There is no separate recently-deleted section or confirmation button.
+The list is scoped to the selected certification and practice mode. Results deleted from
+Reports can also be restored from the matching Practice setup (or Due Review setup).
+
+Undo is available for 48 hours from the original deletion. It restores the original
+snapshot and completion time, and recalculates study evidence. Pending rows remain
+excluded from all stats and scheduling. Icons have accessible labels and tooltips.
+The API retains `DELETE /api/quizzes/:id?permanent=true` for explicitly requested forced
+deletion; final deletion otherwise happens automatically after the window.
 
 Deleted snapshots and their deadlines survive restarts and source deletion. Expired
 snapshots are purged by the server maintenance timer, on startup, and before deletion
@@ -436,3 +439,7 @@ Run it only against disposable populated data, using `(false, false)` for normal
 `(true, false)` for a committed restore with a lost response, and `(false, true)` for
 an older recovery-list response arriving after undo. It checks completed-history
 exclusion/restoration and the absence of confirmation dialogs.
+
+`setupResultActionsCheck()` in `tests/result-deletion.browser.ts` verifies the setup
+review link, inline delete/undo icons, retained pending row with its deadline, and
+restoration followed by opening the result.
