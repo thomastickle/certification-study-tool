@@ -266,7 +266,6 @@ export function ReportsPage({ certification }: { certification: Certification })
       {reportContent()}
       {!attemptId && (
         <DeletedResults
-          key={retry}
           certification={certification}
           onChanged={() => setRetry((value) => value + 1)}
         />

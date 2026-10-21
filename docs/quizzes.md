@@ -427,3 +427,9 @@ and selected report evidence belong to that pair. Non-CLF reports show neutral s
 activity without domain coverage or focus rankings; no official domain mapping is inferred.
 Legacy mastery identities retain their original
 `mastery:v1` format and AWS CLF-C02 namespace.
+
+`tests/result-deletion.browser.ts` exports `resultDeletionCheck(lostRestore, staleRead)`.
+Run it only against disposable populated data, using `(false, false)` for normal undo,
+`(true, false)` for a committed restore with a lost response, and `(false, true)` for
+an older recovery-list response arriving after undo. It checks completed-history
+exclusion/restoration and the absence of confirmation dialogs.

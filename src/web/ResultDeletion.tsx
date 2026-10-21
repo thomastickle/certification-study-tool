@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DeletedQuizSummary, PracticeMode } from '../shared/quiz-contracts.ts'
 import type { Certification } from './certifications.ts'
 import { api } from './api.ts'
@@ -48,21 +48,22 @@ export function DeletedResults({
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [refresh, setRefresh] = useState(0)
+  const readRevision = useRef(0)
   useEffect(() => {
     const controller = new AbortController()
+    const revision = ++readRevision.current
     const query = new URLSearchParams({
       provider: certification.provider,
       certification: certification.code,
     })
-    setError('')
     api<DeletedQuizSummary[]>(`/quizzes/deleted?${query}`, { signal: controller.signal })
       .then((value) => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && revision === readRevision.current) {
           setItems(value)
         }
       })
       .catch((reason: unknown) => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && revision === readRevision.current) {
           setError(reason instanceof Error ? reason.message : 'Could not load deleted results.')
         }
       })
@@ -71,6 +72,7 @@ export function DeletedResults({
 
   /** Refreshes recovery and counted history after either mutation, reporting failures inline. */
   async function change(id: string, restore: boolean): Promise<void> {
+    readRevision.current++
     setBusy(true)
     setError('')
     setNotice('')
@@ -86,11 +88,13 @@ export function DeletedResults({
           ? 'Result restored. Stats and scheduling now include it.'
           : 'Result permanently deleted.',
       )
-      onChanged()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not change this result.')
+      const message = reason instanceof Error ? reason.message : 'Could not change this result.'
+      setError(`${message} Refreshing history to check whether the change was saved.`)
     } finally {
       setBusy(false)
+      setRefresh((value) => value + 1)
+      onChanged()
     }
   }
 
