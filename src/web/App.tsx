@@ -10,6 +10,7 @@ import { ReportsPage } from './ReportsPage.tsx'
 import { HomePage } from './HomePage.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { WorkspaceSidebar } from './WorkspaceSidebar.tsx'
+import { pauseCertificationAttempts } from './workspace-session.ts'
 
 type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer'
 
@@ -22,6 +23,7 @@ export function App() {
   const [selected, setSelected] = useState<Certification | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
+  const [selectionError, setSelectionError] = useState('')
   const selectedRef = useRef<Certification | null>(null)
   const [focusPreset, setFocusPreset] = useState(false)
   const destination = page === 'quiz' || page === 'exam' ? 'practice' : page
@@ -64,12 +66,16 @@ export function App() {
       return
     }
     navigating.current = true
+    setSelectionError('')
     try {
       if (
         (page === 'quiz' || page === 'exam' || page === 'review') &&
         !(await leaveQuiz.current())
       ) {
         return
+      }
+      if (selected) {
+        await pauseCertificationAttempts(selected)
       }
       selectedRef.current = next
       setSelected(next)
@@ -78,6 +84,12 @@ export function App() {
       } catch {
         // Selection remains usable when storage is unavailable.
       }
+    } catch (reason) {
+      const message =
+        reason instanceof Error ? reason.message : 'Could not suspend the previous attempt.'
+      setSelectionError(
+        `${message} Your certification has not changed. Retry the selection to pause saved work safely.`,
+      )
     } finally {
       navigating.current = false
     }
@@ -139,6 +151,11 @@ export function App() {
         }}
       />
       <div className="workspace-content">
+        {selectionError && (
+          <div className="message error" role="alert">
+            {selectionError}
+          </div>
+        )}
         {catalogError && (
           <div className="message error" role="alert">
             {catalogError}{' '}
