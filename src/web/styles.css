@@ -1417,3 +1417,24 @@ select {
   display: inline-flex;
   align-items: center;
 }
+.deleted-bank-badge {
+  display: inline-block;
+  margin: 0.2rem 0.4rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #c6b58a;
+  border-radius: 0.35rem;
+  background: #fff6df;
+  color: #66501c;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.deleted-bank-notice {
+  padding: 0.65rem 0.8rem;
+  border-left: 3px solid #b69a53;
+  background: #fff6df;
+  color: #66501c;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}

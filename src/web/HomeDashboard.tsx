@@ -129,6 +129,15 @@ export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Pro
                         >
                           <span style={{ width: `${readiness.score ?? 0}%` }} />
                         </div>
+                        {Boolean(certification.deletedBankAttemptCount) && (
+                          <p className="deleted-bank-notice">
+                            {certification.deletedBankAttemptCount} saved{' '}
+                            {certification.deletedBankAttemptCount === 1
+                              ? 'attempt uses'
+                              : 'attempts use'}{' '}
+                            deleted question banks. Still included in readiness and study history.
+                          </p>
+                        )}
                         <details className="readiness-evidence">
                           <summary>Readiness details</summary>
                           <ul>

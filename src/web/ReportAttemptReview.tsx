@@ -1,4 +1,5 @@
 import { ConceptLabels } from './ConceptLabels.tsx'
+import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 import { AttemptTiming } from './AttemptTiming.tsx'
 import { useState } from 'react'
 import type { QuizView } from '../shared/quiz-contracts.ts'
@@ -49,6 +50,7 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
   const score = quiz.total ? (quiz.correctCount! / quiz.total) * 100 : null
   return (
     <>
+      <DeletedBankNotice names={quiz.deletedBankNames} />
       <section className="attempt-summary report-panel">
         <div>
           <p className="eyebrow">

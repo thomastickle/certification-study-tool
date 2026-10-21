@@ -303,6 +303,22 @@ legacy snapshots as quizzes.
   Individual attempt reports include question-level answer evidence.
 
 Reports use saved session snapshots and survive bank changes or deletion.
+Deleting a question bank adds a **Question bank deleted** indicator to attempts
+that drew questions from it, including mixed-bank and paused attempts. Results,
+history lists, individual reports, and newly generated Markdown exports identify
+the deleted bank. Home shows the count of affected completed attempts per
+certification; Reports counts them within the selected mode/date filters and
+also warns when affected lifetime mastery evidence lies outside those filters.
+These attempts still contribute to scores, mastery, Due Review, and readiness.
+Reimporting a bank does not remove the historical indicator or alter saved answers.
+Pending result deletions remain excluded; restoring one retains its bank indicator.
+
+New attempts save the bank ID for each drawn question. Legacy snapshots are
+matched at bank deletion using saved certification, bank name/type, question
+reference, and selected bank IDs when available. Ambiguous matches stay unknown,
+including across subsequent deletions. Banks deleted before this feature cannot
+be reliably reconstructed, so their old attempts are not retroactively marked.
+
 Active, paused, and abandoned attempts do not contribute; expired attempts are scored
 before reports are read. The report API returns aggregate evidence and attempt
 summaries without internal mastery fingerprints or question answer keys. All

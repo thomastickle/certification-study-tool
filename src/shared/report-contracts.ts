@@ -20,6 +20,7 @@ export type ReportBreakdown = {
 }
 
 export type ReportAttempt = {
+  deletedBankNames?: string[]
   id: string
   mode: 'quiz' | 'exam' | 'review'
   startedAt: number
@@ -32,6 +33,8 @@ export type ReportAttempt = {
 }
 
 export type StudyReport = {
+  deletedBankAttemptCount?: number
+  deletedBankLifetimeAttemptCount?: number
   provider?: string
   certification: string
   generatedAt: number

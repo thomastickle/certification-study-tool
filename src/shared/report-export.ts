@@ -60,6 +60,16 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
     `${report.counts.correct} correct, ${report.counts.incorrect} incorrect, ${report.counts.skipped} skipped`,
     `Score: ${percentage(report.counts.score)} (${report.counts.correct}/${report.counts.total} questions; skips count as misses)`,
     `Practice target met: ${report.passingAttempts}/${report.targetAttempts} quiz/exam attempts (80% of all questions correct)`,
+    ...(report.deletedBankAttemptCount
+      ? [
+          `${report.deletedBankAttemptCount} completed attempt(s) in this view used deleted question banks. Original saved questions and scores still count after reimport.`,
+        ]
+      : []),
+    ...(report.deletedBankLifetimeAttemptCount
+      ? [
+          `Lifetime mastery includes ${report.deletedBankLifetimeAttemptCount} completed attempt(s) that used deleted question banks, including attempts outside these filters.`,
+        ]
+      : []),
     '',
     'Completed attempts only. Repeat questions count each time. Correct-answer activity counts are not unique-question mastery. Raw practice scores are not official certification scores or readiness predictions.',
     '',
@@ -106,7 +116,7 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
     '',
     ...report.attempts.map(
       (attempt) =>
-        `- ${new Date(attempt.finishedAt).toISOString()} · ${attempt.mode} · Score: ${attempt.counts.correct}/${attempt.counts.total} (${percentage(attempt.counts.score)}) · ${attemptResult(attempt.passed)} · ${timingSummary(attempt.timing)} · ${attempt.id}`,
+        `- ${new Date(attempt.finishedAt).toISOString()} · ${attempt.mode} · Score: ${attempt.counts.correct}/${attempt.counts.total} (${percentage(attempt.counts.score)}) · ${attemptResult(attempt.passed)} · ${timingSummary(attempt.timing)} · ${attempt.id}${attempt.deletedBankNames?.length ? ` · Question bank deleted: ${cell(attempt.deletedBankNames.join(', '))}` : ''}`,
     ),
     '',
   ]

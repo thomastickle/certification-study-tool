@@ -14,6 +14,7 @@ export type Readiness = {
 }
 
 export type CertificationProgress = {
+  deletedBankAttemptCount?: number
   provider: string
   code: string
   name: string

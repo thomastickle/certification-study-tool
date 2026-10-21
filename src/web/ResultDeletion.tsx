@@ -4,6 +4,7 @@ import type { Certification } from './certifications.ts'
 import { ResultIndicator, ResultLegend } from './ResultIndicator.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { api } from './api.ts'
+import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 
 /** Deletes immediately without confirmation; the recovery list owns undo. */
 export function DeleteResultButton({ id, onDeleted }: { id: string; onDeleted: () => void }) {
@@ -158,6 +159,7 @@ export function CompletedResults({
               <span className="completed-result-score">
                 {score} · {item.correctCount ?? '—'}/{item.total} correct
               </span>
+              <DeletedBankNotice names={item.deletedBankNames} compact />
             </>
           )
           return (
