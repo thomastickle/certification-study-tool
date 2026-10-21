@@ -172,7 +172,11 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       ) < 1,
       'Warning shifted the question',
     )
-    assertTimerIndicator('rgb(191, 128, 0)', '10 minutes or less remaining')
+    assert(
+      getComputedStyle(document.querySelector('.timer-warning')!).color === 'rgb(0, 0, 0)',
+      'Flash notification text is not black',
+    )
+    assertTimerIndicator('rgb(255, 215, 0)', '10 minutes or less remaining')
     assert(warningDismissals.length === 1, 'Warning did not schedule a 30-second dismissal')
     warningDismissals[0]!()
     await until(
@@ -185,7 +189,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       ) < 1,
       'Dismissing warning shifted question',
     )
-    assertTimerIndicator('rgb(191, 128, 0)', '10 minutes or less remaining')
+    assertTimerIndicator('rgb(255, 215, 0)', '10 minutes or less remaining')
     clockNow = initialNow + (attempt.deadline - attempt.serverNow) - 119_000
     await until(
       () =>
@@ -199,6 +203,10 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
         document.querySelector('.quiz-question')!.getBoundingClientRect().top - questionTop,
       ) < 1,
       'Urgent warning shifted the question',
+    )
+    assert(
+      getComputedStyle(document.querySelector('.timer-warning')!).color === 'rgb(0, 0, 0)',
+      'Urgent flash notification text is not black',
     )
     assert(warningDismissals[1], 'Final warning did not schedule its own dismissal')
     warningDismissals[1]!()

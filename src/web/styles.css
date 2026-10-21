@@ -1130,11 +1130,11 @@ select {
 }
 .timer-warning.warning {
   background: #fff0b3;
-  color: #715000;
+  color: #000;
 }
 .timer-warning.urgent {
   background: #ffe0da;
-  color: #98291e;
+  color: #000;
 }
 .quiz-status .timer {
   display: inline-flex;
@@ -1151,7 +1151,7 @@ select {
   background: #237a45;
 }
 .timer.warning .timer-indicator {
-  background: #bf8000;
+  background: #ffd700;
 }
 .timer.urgent .timer-indicator {
   background: #c1362b;
