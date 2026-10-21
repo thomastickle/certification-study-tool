@@ -4,6 +4,7 @@ import type { Certification } from './certifications.ts'
 import { ResultIndicator, ResultLegend } from './ResultIndicator.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { api } from './api.ts'
+import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 
 /** Deletes immediately without confirmation; the recovery list owns undo. */
 export function DeleteResultButton({ id, onDeleted }: { id: string; onDeleted: () => void }) {
@@ -144,13 +145,8 @@ export function CompletedResults({
           if (item.total > 0 && item.correctCount !== null) {
             score = `${Math.round((item.correctCount / item.total) * 100)}% score`
           }
-          const summary = (
+          const label = (
             <>
-              <ResultIndicator
-                status={item.status}
-                correctCount={item.correctCount}
-                total={item.total}
-              />
               <time className="completed-result-date" dateTime={completedAt.toISOString()}>
                 {completedAt.toLocaleString()}
               </time>
@@ -166,20 +162,29 @@ export function CompletedResults({
               data-result-id={item.id}
               className={pending ? 'pending-deletion' : ''}
             >
-              <div>
-                {pending ? (
-                  <div className="completed-result-summary">{summary}</div>
-                ) : (
-                  <a
-                    href={`#result-${item.id}`}
-                    onClick={(event) => {
-                      event.preventDefault()
-                      onOpen(item.id)
-                    }}
-                  >
-                    {summary}
-                  </a>
-                )}
+              <div className="completed-result-summary">
+                <ResultIndicator
+                  status={item.status}
+                  correctCount={item.correctCount}
+                  total={item.total}
+                />
+                <span className="completed-result-content">
+                  {pending ? (
+                    <span className="completed-result-label">{label}</span>
+                  ) : (
+                    <a
+                      className="completed-result-label"
+                      href={`#result-${item.id}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        onOpen(item.id)
+                      }}
+                    >
+                      {label}
+                    </a>
+                  )}
+                  <DeletedBankNotice names={item.deletedBankNames} compact />
+                </span>
               </div>
               <div className="completed-result-actions">
                 {pending && (

@@ -53,6 +53,14 @@ export class QuizRepository {
       .run(quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
   }
 
+  /** Include unfinished and recoverable results when recording library provenance changes. */
+  snapshots(): StoredQuiz[] {
+    return this.db
+      .prepare('SELECT data FROM quiz_sessions')
+      .all()
+      .map((row) => JSON.parse(String(row.data)))
+  }
+
   /** Discard an unfinished snapshot without recording a result or changing mastery. */
   remove(id: string): void {
     this.db.prepare('DELETE FROM quiz_sessions WHERE id = ?').run(id)

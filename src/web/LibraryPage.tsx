@@ -474,6 +474,13 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
             : 'This removes only this source’s copy of the question.'}{' '}
           Your original JSON files stay untouched. This cannot be undone here.
         </p>
+        {removal?.kind === 'sources' && (
+          <p>
+            Saved quizzes, exams, and reports stay available. Attempts that used this bank will show
+            a “Contains obsolete / deleted questions” indicator, even after reimport. Their scores
+            still count.
+          </p>
+        )}
         <div className="dialog-actions">
           <button disabled={busy} onClick={() => setRemoval(undefined)} autoFocus>
             Cancel

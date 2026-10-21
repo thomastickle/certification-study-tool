@@ -19,6 +19,8 @@ export type QuizAnswer = {
 }
 
 export type QuizQuestion = QuizAnswer & {
+  /** Drawn bank occurrence. Undefined is legacy; null is unresolved legacy provenance. */
+  sourceId?: number | null
   question: string
   type: 'single_select' | 'multi_select'
   selectCount: number
@@ -36,6 +38,8 @@ export type QuizQuestion = QuizAnswer & {
 }
 
 export type QuizSummary = {
+  /** Historical bank deletions remain recorded even after reimport. */
+  deletedBankNames?: string[]
   mode?: PracticeMode
   id: string
   status: 'active' | 'paused' | 'completed' | 'abandoned' | 'deleted'

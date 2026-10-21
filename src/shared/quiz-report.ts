@@ -36,6 +36,11 @@ export function quizReport(quiz: QuizView): string {
       : `Result: ${result} — ${quiz.correctCount}/${quiz.total} (${score}). Practice target: 80%.`,
     `Score: ${score} (${quiz.correctCount}/${quiz.total} questions; skips count as misses)`,
     'Practice targets are study aids, not official certification scores or exam-readiness predictions.',
+    ...(quiz.deletedBankNames?.length
+      ? [
+          `Question bank deleted: ${quiz.deletedBankNames.join(', ')}. Original saved questions and scores retained after reimport.`,
+        ]
+      : []),
     '',
     '## Scoring details',
     '',

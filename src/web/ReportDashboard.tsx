@@ -2,6 +2,7 @@ import { timingSummary } from '../shared/quiz-timing.ts'
 import { useState } from 'react'
 import { progressChart } from './report-state.ts'
 import type { ReportCounts, StudyReport } from '../shared/report-contracts.ts'
+import { DeletedBankNotice, DeletedBankLifetimeNotice } from './DeletedBankNotice.tsx'
 
 /** Formats an absent measurement separately from a measured zero. */
 export function percent(value: number | null): string {
@@ -186,6 +187,16 @@ export function ReportDashboard({
   const weakest = report.domains.find((domain) => domain.domain === report.focus.domain)
   return (
     <>
+      {Boolean(report.deletedBankAttemptCount) && (
+        <p className="deleted-bank-notice">
+          {report.deletedBankAttemptCount}{' '}
+          {report.deletedBankAttemptCount === 1
+            ? 'attempt in this view uses'
+            : 'attempts in this view use'}{' '}
+          deleted question banks. Original saved questions and scores still count after reimport.
+        </p>
+      )}
+      <DeletedBankLifetimeNotice report={report} />
       <section className="report-stats" aria-label="Performance summary">
         <div>
           <span className="stat-label">
@@ -462,6 +473,7 @@ export function ReportDashboard({
                     })}{' '}
                     UTC · {timingSummary(attempt.timing)}
                   </small>
+                  <DeletedBankNotice names={attempt.deletedBankNames} compact />
                 </span>
                 <span className="attempt-score">
                   <strong>{percent(attempt.counts.score)}</strong>

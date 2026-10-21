@@ -131,6 +131,7 @@ export class QuizService {
           correct: answers.flatMap((a, i) => (a.correct ? [i] : [])),
         })
         quiz.questions.push({
+          sourceId: record.sourceId,
           questionId: quiz.questions.length,
           question: record.data.question,
           type: record.data.type,
@@ -301,6 +302,10 @@ export class QuizService {
       return store
         .recent()
         .filter((quiz) => sameCertification(store.find(quiz.id)!.options, selectedScope))
+        .map((quiz) => ({
+          ...quiz,
+          deletedBankNames: store.find(quiz.id)!.deletedBankNames ?? [],
+        }))
     })
   }
 
@@ -371,6 +376,7 @@ export class QuizService {
   /** Keep recovery lists limited to attempt metadata. */
   private deletedSummary(quiz: StoredQuiz): DeletedQuizSummary {
     return {
+      deletedBankNames: quiz.deletedBankNames ?? [],
       id: quiz.id,
       status: 'deleted',
       mode: quiz.options.mode ?? 'quiz',

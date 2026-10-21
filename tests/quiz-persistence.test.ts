@@ -49,7 +49,11 @@ test('migration preserves v1 library IDs/content; saved results survive reopen a
     repository.close()
     repository = new LibraryRepository(path)
     try {
-      assert.deepEqual(new QuizService(repository, () => 1000).get(quiz.id), result)
+      // Bank deletion adds provenance; every original answer, score and timing field survives.
+      assert.deepEqual(new QuizService(repository, () => 1000).get(quiz.id), {
+        ...result,
+        deletedBankNames: ['quiz-synthetic'],
+      })
       assert.equal(new QuizService(repository).recent().length, 1)
       assert.equal(repository.quizStore().boosts().size, 0)
     } finally {

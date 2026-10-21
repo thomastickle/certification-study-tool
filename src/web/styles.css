@@ -1328,11 +1328,32 @@ select {
   color: #b91c1c;
 }
 
-.completed-results a,
 .completed-result-summary {
-  display: inline-block;
+  display: inline-grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  column-gap: 8px;
   font-size: 16px;
   line-height: 1.5;
+}
+
+.completed-result-summary > .result-indicator {
+  margin: 6px 0 0;
+}
+
+.completed-results .completed-result-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  color: inherit;
+}
+
+.completed-results .completed-result-label {
+  color: inherit;
+}
+
+.completed-results a.completed-result-label {
+  color: var(--accent);
 }
 
 .completed-results .completed-result-score {
@@ -1416,4 +1437,25 @@ select {
 .result-legend li {
   display: inline-flex;
   align-items: center;
+}
+.deleted-bank-badge,
+.history-list .deleted-bank-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid #c6b58a;
+  border-radius: 0.35rem;
+  background: #fff6df;
+  color: #66501c;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.deleted-bank-notice {
+  padding: 0.65rem 0.8rem;
+  border-left: 3px solid #b69a53;
+  background: #fff6df;
+  color: #66501c;
+  font-size: 0.85rem;
+  line-height: 1.5;
 }

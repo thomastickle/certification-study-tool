@@ -1,4 +1,5 @@
 import { DeleteResultButton, CompletedResults } from './ResultDeletion.tsx'
+import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 import { ResultIndicator } from './ResultIndicator.tsx'
 import { ConceptLabels } from './ConceptLabels.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -1145,6 +1146,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   return (
     <>
       <DeleteResultButton id={view.id} onDeleted={onBack} />
+      <DeletedBankNotice names={view.deletedBankNames} />
       <section className="quiz-panel result-score">
         <p className="eyebrow">{mode.toUpperCase()} COMPLETE</p>
         <h2>

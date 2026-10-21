@@ -97,6 +97,7 @@ export class ReportService {
       .sort((a, b) => b.finishedAt! - a.finishedAt! || b.id.localeCompare(a.id))
     const questions = completed.flatMap((quiz) => quiz.questions)
     const attempts = completed.map((quiz) => ({
+      deletedBankNames: quiz.deletedBankNames ?? [],
       id: quiz.id,
       mode: quiz.mode ?? quiz.options.mode ?? 'quiz',
       startedAt: quiz.startedAt,
@@ -175,6 +176,9 @@ export class ReportService {
       daily.set(date, day)
     }
     return {
+      deletedBankAttemptCount: completed.filter((quiz) => quiz.deletedBankNames?.length).length,
+      deletedBankLifetimeAttemptCount: lifetime.filter((quiz) => quiz.deletedBankNames?.length)
+        .length,
       unique: {
         encountered: identities.size,
         answered: answered.size,

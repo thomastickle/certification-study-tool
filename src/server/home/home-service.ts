@@ -81,6 +81,7 @@ export class HomeService {
     const day = studyDay(now)
     for (const [key, track] of tracks) {
       const history = histories.get(key) ?? []
+      track.deletedBankAttemptCount = history.filter((quiz) => quiz.deletedBankNames?.length).length
       if (isClf({ provider: track.provider, certification: track.code })) {
         track.readiness = certificationReadiness(history, now)
       }
