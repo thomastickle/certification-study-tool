@@ -38,7 +38,12 @@ const microsoftPlatformPrefixes: Array<[string, string]> = [
   ['MB-', 'Dynamics 365'],
 ]
 
-function normalizeProvider(provider: string): { provider: string; aliases: string[]; platform: string } {
+/** Normalizes display and search metadata without changing backend identity. */
+function normalizeProvider(provider: string): {
+  provider: string
+  aliases: string[]
+  platform: string
+} {
   const normalized = provider.trim()
   const lower = normalized.toLowerCase()
 
@@ -71,11 +76,16 @@ function normalizeProvider(provider: string): { provider: string; aliases: strin
   return { provider: normalized, aliases: normalized ? [normalized] : [], platform: normalized }
 }
 
+/** Derives optional catalog metadata from the imported certification. */
 function detailsFor(provider: string, code: string, name: string): CertificationDetails {
-  const upperCode = code.toUpperCase()
+  const upperCode = code.trim().toUpperCase()
   const identity = normalizeProvider(provider)
   if (identity.provider === 'Amazon Web Services') {
-    return { organization: identity.provider, platform: identity.platform, level: amazonCodes[upperCode] ?? null }
+    return {
+      organization: identity.provider,
+      platform: identity.platform,
+      level: amazonCodes[upperCode] ?? null,
+    }
   }
 
   if (identity.provider === 'Google Cloud') {
@@ -86,11 +96,19 @@ function detailsFor(provider: string, code: string, name: string): Certification
   if (identity.provider === 'Microsoft') {
     let platform = identity.platform
     let level = azureCodes[upperCode] ?? null
-    if (/^(AZ|DP|AI|SC)-/.test(upperCode)) platform = 'Azure'
+    if (/^(AZ|DP|AI|SC)-/.test(upperCode)) {
+      platform = 'Azure'
+    }
     if (/^(MS|PL|MB)-/.test(upperCode)) {
-      const prefix = microsoftPlatformPrefixes.find(([candidate]) => upperCode.startsWith(candidate))
-      if (prefix) platform = prefix[1]
-      if (upperCode.endsWith('-900')) level = 'Fundamentals'
+      const prefix = microsoftPlatformPrefixes.find(([candidate]) =>
+        upperCode.startsWith(candidate),
+      )
+      if (prefix) {
+        platform = prefix[1]
+      }
+      if (upperCode.endsWith('-900')) {
+        level = 'Fundamentals'
+      }
     }
     return { organization: 'Microsoft', platform, level }
   }
@@ -108,14 +126,18 @@ export function certificationsFromSources(sources: Source[]): Certification[] {
   const certifications = new Map<string, Certification>()
 
   for (const source of sources) {
-    if (source.questionCount <= 0 || !['official', 'third_party'].includes(source.kind)) continue
+    if (source.questionCount <= 0 || !['official', 'third_party'].includes(source.kind)) {
+      continue
+    }
     const identity = normalizeProvider(source.provider)
-    const code = source.certification.trim()
-    const key = certificationKey({ provider: identity.provider, code })
-    if (!code || certifications.has(key)) continue
+    const code = source.certification
+    const key = certificationKey({ provider: source.provider, code })
+    if (!code.trim() || certifications.has(key)) {
+      continue
+    }
 
     certifications.set(key, {
-      provider: identity.provider,
+      provider: source.provider,
       code,
       name: source.certificationName,
       ...detailsFor(source.provider, code, source.certificationName),
@@ -133,7 +155,9 @@ export function certificationsFromSources(sources: Source[]): Certification[] {
 /** Filters certifications where every query token occurs in the searchable metadata. */
 export function filterCertifications(certs: Certification[], query: string): Certification[] {
   const tokens = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean)
-  if (!tokens.length) return certs
+  if (!tokens.length) {
+    return certs
+  }
 
   return certs.filter((cert) => {
     const metadata = [
