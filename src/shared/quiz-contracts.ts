@@ -38,7 +38,7 @@ export type QuizQuestion = QuizAnswer & {
 export type QuizSummary = {
   mode?: PracticeMode
   id: string
-  status: 'active' | 'paused' | 'completed' | 'abandoned'
+  status: 'active' | 'paused' | 'completed' | 'abandoned' | 'deleted'
   startedAt: number
   deadline: number
   finishedAt: number | null
@@ -70,3 +70,5 @@ export type DueReviewSummary = {
   unavailable: number
   oldestDay: string | null
 }
+
+export type DeletedQuizSummary = QuizSummary & { deletedAt: number; purgeAt: number }

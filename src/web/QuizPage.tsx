@@ -1,3 +1,5 @@
+import { DeleteResultButton, CompletedResults } from './ResultDeletion.tsx'
+import { ResultIndicator } from './ResultIndicator.tsx'
 import { ConceptLabels } from './ConceptLabels.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
@@ -6,7 +8,6 @@ import type {
   QuizAnswer,
   QuizOptions,
   QuizQuestion,
-  QuizSummary,
   QuizView,
 } from '../shared/quiz-contracts.ts'
 import type { Source } from '../shared/contracts.ts'
@@ -74,7 +75,6 @@ export function QuizPage({
   const [recoveryLoading, setRecoveryLoading] = useState(true)
   const [recoveryFailed, setRecoveryFailed] = useState(false)
   const [view, setView] = useState<QuizView>()
-  const [summaries, setSummaries] = useState<QuizSummary[]>([])
   const [questionIndex, setQuestionIndex] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [notice, setNotice] = useState('')
@@ -559,16 +559,6 @@ export function QuizPage({
         void recoverSetup()
       }
     })
-    api<QuizSummary[]>(`/quizzes?${scopeQuery}`)
-      .then((items) => {
-        if (!cancelled) {
-          setSummaries(items.filter((item) => item.status === 'completed'))
-        }
-      })
-      .catch((reason) => {
-        if (!cancelled && !uncertainStart.current)
-          setError(reason instanceof Error ? reason.message : `Could not load ${plural} history.`)
-      })
     return () => {
       cancelled = true
     }
@@ -801,6 +791,9 @@ export function QuizPage({
           {recoverable && (
             <section className="quiz-panel recovery-panel">
               <h2>
+                {recoverable.status === 'paused' && (
+                  <ResultIndicator status="paused" correctCount={null} total={recoverable.total} />
+                )}
                 {recoverable.status === 'paused' ? 'Paused' : 'In-progress'} {mode}
               </h2>
               <p>
@@ -860,39 +853,11 @@ export function QuizPage({
               </button>
             </section>
           )}
-          <section className="quiz-panel">
-            <div className="section-heading">
-              <h2>Completed {plural}</h2>
-              <button
-                onClick={() => {
-                  void api<QuizSummary[]>(`/quizzes?${scopeQuery}`)
-                    .then(setSummaries)
-                    .catch((reason) => setError(String(reason.message)))
-                }}
-              >
-                Refresh results
-              </button>
-            </div>
-            {!summaries.some(
-              (item) => item.status === 'completed' && (item.mode ?? 'quiz') === mode,
-            ) ? (
-              <p className="muted">No completed {plural} yet.</p>
-            ) : (
-              <ul className="history-list">
-                {summaries
-                  .filter((item) => item.status === 'completed' && (item.mode ?? 'quiz') === mode)
-                  .map((item) => (
-                    <li key={item.id}>
-                      <span>
-                        {new Date(item.finishedAt ?? item.startedAt).toLocaleString()} ·{' '}
-                        {item.correctCount ?? 0}/{item.total}
-                      </span>
-                      <button onClick={() => void loadAttempt(item.id)}>Review results</button>
-                    </li>
-                  ))}
-              </ul>
-            )}
-          </section>
+          <CompletedResults
+            certification={certification}
+            mode={mode}
+            onOpen={(id) => void loadAttempt(id)}
+          />
         </>
       )}
       {stage === 'loading' && (
@@ -1179,6 +1144,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
 
   return (
     <>
+      <DeleteResultButton id={view.id} onDeleted={onBack} />
       <section className="quiz-panel result-score">
         <p className="eyebrow">{mode.toUpperCase()} COMPLETE</p>
         <h2>

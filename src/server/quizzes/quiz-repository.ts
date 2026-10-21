@@ -3,7 +3,11 @@ import { completedQuestionIdentity } from './question-identity.ts'
 import type { DatabaseSync } from 'node:sqlite'
 import type { QuizSummary, QuizView } from '../../shared/quiz-contracts.ts'
 
-export type StoredQuiz = QuizView & { keys: { fingerprint: string; correct: number[] }[] }
+export type StoredQuiz = QuizView & {
+  keys: { fingerprint: string; correct: number[] }[]
+  deletedAt?: number
+  purgeAt?: number
+}
 
 export function migrateQuizzes(db: DatabaseSync): void {
   if (Number(db.prepare('PRAGMA user_version').get()?.user_version) !== 1) return
@@ -52,6 +56,23 @@ export class QuizRepository {
   /** Discard an unfinished snapshot without recording a result or changing mastery. */
   remove(id: string): void {
     this.db.prepare('DELETE FROM quiz_sessions WHERE id = ?').run(id)
+  }
+
+  /** Recoverable snapshots never participate in completed history queries. */
+  deleted(): StoredQuiz[] {
+    return this.db
+      .prepare("SELECT data FROM quiz_sessions WHERE status = 'deleted'")
+      .all()
+      .map((row) => JSON.parse(String(row.data)))
+  }
+
+  /** Remove expired snapshots, including after the application has been offline. */
+  purgeDeleted(now: number): void {
+    this.db
+      .prepare(
+        "DELETE FROM quiz_sessions WHERE status = 'deleted' AND json_extract(data, '$.purgeAt') <= ?",
+      )
+      .run(now)
   }
 
   recent(): QuizSummary[] {

@@ -134,11 +134,24 @@ export function apiController(repository: LibraryRepository) {
           throw new ApplicationError('Choose a valid practice mode.')
         return send(response, 200, quizzes.current(mode, scope))
       }
+      if (request.method === 'GET' && url.pathname === '/api/quizzes/deleted') {
+        return send(response, 200, quizzes.deletedResults(scope))
+      }
       const quizRoute = url.pathname.match(
-        /^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon|pause|resume))?$/,
+        /^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon|pause|resume|restore))?$/,
       )
       if (quizRoute) {
         const id = quizRoute[1]!
+        if (request.method === 'DELETE' && !quizRoute[2]) {
+          const permanent = url.searchParams.get('permanent')
+          if (permanent !== null && permanent !== 'true' && permanent !== 'false') {
+            throw new ApplicationError('Choose a valid permanent deletion option.')
+          }
+          return send(response, 200, quizzes.deleteResult(id, permanent === 'true'))
+        }
+        if (request.method === 'POST' && quizRoute[2] === 'restore') {
+          return send(response, 200, quizzes.restoreResult(id))
+        }
         if (request.method === 'GET' && !quizRoute[2]) return send(response, 200, quizzes.get(id))
         if (request.method === 'PUT' && quizRoute[2] === 'answers')
           return send(response, 200, quizzes.save(id, await body(request)))

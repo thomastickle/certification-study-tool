@@ -3,6 +3,7 @@ import type { CertificationScope } from './certification-scope.ts'
 import { randomUUID } from 'node:crypto'
 import type {
   DueReviewSummary,
+  DeletedQuizSummary,
   PauseCause,
   PracticeMode,
   QuizAnswer,
@@ -277,6 +278,7 @@ export class QuizService {
   }
 
   expireDue(): void {
+    this.repository.quizStore().purgeDeleted(this.now())
     if (
       !this.repository
         .quizStore()
@@ -302,6 +304,86 @@ export class QuizService {
     })
   }
 
+  /** List only recoverable deletions in this certification, without answer content. */
+  deletedResults(scope: CertificationScope = {}): DeletedQuizSummary[] {
+    const store = this.repository.quizStore()
+    store.purgeDeleted(this.now())
+    return store
+      .deleted()
+      .filter((quiz) => sameCertification(quiz.options, scope))
+      .sort((a, b) => b.deletedAt! - a.deletedAt! || a.id.localeCompare(b.id))
+      .map((quiz) => this.deletedSummary(quiz))
+  }
+
+  /**
+   * Exclude a completed attempt immediately; retries retain the original 48-hour deadline.
+   * @throws {ApplicationError} If the attempt is unfinished.
+   */
+  deleteResult(id: string, permanent = false): DeletedQuizSummary | null {
+    const store = this.repository.quizStore()
+    store.purgeDeleted(this.now())
+    return store.transaction(() => {
+      const quiz = store.find(id)
+      if (!quiz) {
+        return null
+      }
+      if (quiz.status !== 'completed' && quiz.status !== 'deleted') {
+        throw new ApplicationError('Only completed results can be deleted.', 409)
+      }
+      if (permanent) {
+        store.remove(id)
+        return null
+      }
+      if (quiz.status !== 'deleted') {
+        quiz.status = 'deleted'
+        quiz.deletedAt = this.now()
+        quiz.purgeAt = quiz.deletedAt + 48 * 60 * 60 * 1000
+        store.save(quiz)
+      }
+      return this.deletedSummary(quiz)
+    })
+  }
+
+  /**
+   * Restore the original evidence and timestamps, never creating a new attempt.
+   * @throws {ApplicationError} If the result has expired or is not pending deletion.
+   */
+  restoreResult(id: string): QuizView {
+    const store = this.repository.quizStore()
+    // Purge before the transaction so a failed restore cannot roll back expiry.
+    store.purgeDeleted(this.now())
+    return store.transaction(() => {
+      const quiz = store.find(id)
+      if (!quiz) {
+        throw new ApplicationError('Quiz not found.', 404)
+      }
+      if (quiz.status !== 'deleted') {
+        throw new ApplicationError('This result is not pending deletion.', 409)
+      }
+      quiz.status = 'completed'
+      delete quiz.deletedAt
+      delete quiz.purgeAt
+      store.save(quiz)
+      return this.view(quiz)
+    })
+  }
+
+  /** Keep recovery lists limited to attempt metadata. */
+  private deletedSummary(quiz: StoredQuiz): DeletedQuizSummary {
+    return {
+      id: quiz.id,
+      status: 'deleted',
+      mode: quiz.options.mode ?? 'quiz',
+      startedAt: quiz.startedAt,
+      deadline: quiz.deadline,
+      finishedAt: quiz.finishedAt,
+      total: quiz.total,
+      correctCount: quiz.correctCount,
+      deletedAt: quiz.deletedAt!,
+      purgeAt: quiz.purgeAt!,
+    }
+  }
+
   save(id: string, input: unknown): QuizView {
     return this.change(id, input, 'save')
   }
@@ -316,6 +398,9 @@ export class QuizService {
       // Abandonment must not trigger expiry/grading as a side effect of loading.
       const quiz = store.find(id)
       if (!quiz) return null
+      if (quiz.status === 'deleted') {
+        return null
+      }
       if (quiz.status !== 'completed') {
         store.remove(id)
         quiz.status = 'abandoned'
@@ -377,7 +462,7 @@ export class QuizService {
 
   private load(id: string, time = this.now()): StoredQuiz {
     const quiz = this.repository.quizStore().find(id)
-    if (!quiz) throw new ApplicationError('Quiz not found.', 404)
+    if (!quiz || quiz.status === 'deleted') throw new ApplicationError('Quiz not found.', 404)
     if (quiz.status === 'active' && quiz.deadline <= time) this.finish(quiz)
     return quiz
   }

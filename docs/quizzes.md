@@ -234,6 +234,32 @@ Development browser verification uses a disposable synthetic database under
 `private/verification/`, leaving private question banks and the user's library
 untouched.
 
+## Deleting completed results
+
+**Delete result** is available in completed Practice results and individual Reports.
+It immediately removes the attempt from completed history, reports, home readiness,
+mastery, Due Review, and question-selection history. Source banks and other attempts
+are unchanged. No confirmation dialog is required.
+
+The completed-results list in Practice setup retains pending deletions in place. Normal
+rows show a clickable date and score for review, with a trash icon on the right. Pending
+rows show the original date and score, “Will be deleted on” with the deadline, and an undo
+icon on the right. There is no separate recently-deleted section or confirmation button.
+The list is scoped to the selected certification and practice mode. Results deleted from
+Reports can also be restored from the matching Practice setup (or Due Review setup).
+
+Undo is available for 48 hours from the original deletion. It restores the original
+snapshot and completion time, and recalculates study evidence. Pending rows remain
+excluded from all stats and scheduling. Icons have accessible labels and tooltips.
+The API retains `DELETE /api/quizzes/:id?permanent=true` for explicitly requested forced
+deletion; final deletion otherwise happens automatically after the window.
+
+Deleted snapshots and their deadlines survive restarts and source deletion. Expired
+snapshots are purged by the server maintenance timer, on startup, and before deletion
+management operations. While the app is stopped, cleanup waits until it runs again;
+restoration is rejected at or after the deadline. Downloaded Markdown reports remain
+outside the app and are unaffected.
+
 ## Reports
 
 Open **Reports** for a master view, or select **Quizzes** / **Exams** to filter
@@ -407,3 +433,13 @@ and selected report evidence belong to that pair. Non-CLF reports show neutral s
 activity without domain coverage or focus rankings; no official domain mapping is inferred.
 Legacy mastery identities retain their original
 `mastery:v1` format and AWS CLF-C02 namespace.
+
+`tests/result-deletion.browser.ts` exports `resultDeletionCheck(lostRestore, staleRead)`.
+Run it only against disposable populated data, using `(false, false)` for normal undo,
+`(true, false)` for a committed restore with a lost response, and `(false, true)` for
+an older recovery-list response arriving after undo. It checks completed-history
+exclusion/restoration and the absence of confirmation dialogs.
+
+`setupResultActionsCheck()` in `tests/result-deletion.browser.ts` verifies the setup
+review link, inline delete/undo icons, retained pending row with its deadline, and
+restoration followed by opening the result.

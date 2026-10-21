@@ -3,6 +3,7 @@ import type { StudyReport, ReportMode } from '../shared/report-contracts.ts'
 import type { QuizView } from '../shared/quiz-contracts.ts'
 import { studyReportMarkdown } from '../shared/report-export.ts'
 import { quizReport } from '../shared/quiz-report.ts'
+import { DeleteResultButton } from './ResultDeletion.tsx'
 import { api } from './api.ts'
 import type { Certification } from './certifications.ts'
 import { ReportDashboard } from './ReportDashboard.tsx'
@@ -115,7 +116,19 @@ export function ReportsPage({ certification }: { certification: Certification })
     }
     if (attemptId) {
       if (quiz) {
-        return <ReportAttemptReview key={quiz.id} quiz={quiz} />
+        return (
+          <>
+            <DeleteResultButton
+              id={quiz.id}
+              onDeleted={() => {
+                setAttemptId(null)
+                setQuiz(undefined)
+                setRetry((value) => value + 1)
+              }}
+            />
+            <ReportAttemptReview key={quiz.id} quiz={quiz} />
+          </>
+        )
       }
       return (
         <div className="report-load-state" role="status">
