@@ -29,28 +29,30 @@ export async function workspaceNavigationTest() {
     'Reports must be the last destination',
   )
   assert(
-    document
-      .querySelector('[aria-label="Current certification"]')
-      ?.textContent?.includes('Cloud Practitioner'),
-    'Current certification is missing',
-  )
-  assert(
-    document
-      .querySelector('[aria-label="Current certification"]')
-      ?.textContent?.includes('CLF-C02'),
-    'Certification code is missing',
+    document.querySelector('[aria-label="All certifications"]')?.textContent?.trim() ===
+      'All certifications',
+    'Home should show an all-certifications context',
   )
 
   button('Home', nav).click()
   await until(() => !!document.querySelector('.home-page'), 'Home did not open')
   assert(!document.querySelector('main .report-stats'), 'Reports are mixed into the home screen')
 
+  button('Certifications', nav).click()
+  await until(() => !!document.querySelector('.certifications-page'), 'Certifications did not open')
+  assert(
+    nav.querySelector('[aria-current="page"]')?.textContent?.trim() === 'Certifications',
+    'Certifications navigation selection is incorrect',
+  )
+
+  button('Home', nav).click()
+  await until(() => !!document.querySelector('.home-page'), 'Home did not reopen')
   for (const destination of [
-    { action: 'Set up practice', label: 'Practice', target: '.quiz-page' },
-    { action: 'Set up review', label: 'Due Review', target: '.quiz-page' },
-    { action: 'Open library', label: 'Importer', target: '.library-page' },
+    { label: 'Practice', target: '.quiz-page' },
+    { label: 'Due Review', target: '.quiz-page' },
+    { label: 'Importer', target: '.library-page' },
   ]) {
-    button(destination.action, document.querySelector('main')!).click()
+    button(destination.label, nav).click()
     await until(
       () => !!document.querySelector(destination.target),
       `${destination.label} did not open`,
