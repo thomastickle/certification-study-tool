@@ -61,6 +61,14 @@ test('bank deletion flags actual quiz/exam provenance without changing evidence,
     assert.equal(report.deletedBankAttemptCount, 1)
     assert.match(quizReport(quizzes.get(quiz.id)), /Question bank deleted: quiz-synthetic/)
     assert.match(studyReportMarkdown(report, 'All time'), /Question bank deleted: quiz-synthetic/)
+    assert.doesNotMatch(
+      studyReportMarkdown(report, 'All time'),
+      /including attempts outside these filters/,
+    )
+    assert.match(
+      studyReportMarkdown(new ReportService(repository, () => now).get({ mode: 'exam' }), 'Exams'),
+      /Lifetime mastery includes 1 completed attempt\(s\) that used deleted question banks, including attempts outside these filters/,
+    )
     assert.equal(
       new ReportService(repository, () => now).get({ mode: 'exam' }).deletedBankAttemptCount,
       0,

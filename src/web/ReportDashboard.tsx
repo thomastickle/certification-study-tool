@@ -2,7 +2,7 @@ import { timingSummary } from '../shared/quiz-timing.ts'
 import { useState } from 'react'
 import { progressChart } from './report-state.ts'
 import type { ReportCounts, StudyReport } from '../shared/report-contracts.ts'
-import { DeletedBankNotice } from './DeletedBankNotice.tsx'
+import { DeletedBankNotice, DeletedBankLifetimeNotice } from './DeletedBankNotice.tsx'
 
 /** Formats an absent measurement separately from a measured zero. */
 export function percent(value: number | null): string {
@@ -196,15 +196,7 @@ export function ReportDashboard({
           deleted question banks. Original saved questions and scores still count after reimport.
         </p>
       )}
-      {(report.deletedBankLifetimeAttemptCount ?? 0) > (report.deletedBankAttemptCount ?? 0) && (
-        <p className="deleted-bank-notice">
-          Lifetime mastery includes {report.deletedBankLifetimeAttemptCount}{' '}
-          {report.deletedBankLifetimeAttemptCount === 1
-            ? 'attempt that used'
-            : 'attempts that used'}{' '}
-          deleted question banks, including attempts outside these filters.
-        </p>
-      )}
+      <DeletedBankLifetimeNotice report={report} />
       <section className="report-stats" aria-label="Performance summary">
         <div>
           <span className="stat-label">

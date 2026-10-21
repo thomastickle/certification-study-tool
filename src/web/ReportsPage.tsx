@@ -8,6 +8,7 @@ import { api } from './api.ts'
 import type { Certification } from './certifications.ts'
 import { ReportDashboard } from './ReportDashboard.tsx'
 import { ReportAttemptReview } from './ReportAttemptReview.tsx'
+import { DeletedBankLifetimeNotice } from './DeletedBankNotice.tsx'
 import './reports.css'
 
 /** Downloads a local Markdown artifact without sending study results anywhere. */
@@ -259,6 +260,7 @@ export function ReportsPage({ certification }: { certification: Certification })
         </div>
       )}
       <div hidden={!!attemptId || !!error}>
+        {report && report.attempts.length === 0 && <DeletedBankLifetimeNotice report={report} />}
         {report && report.attempts.length > 0 && (
           <ReportDashboard key={`${mode}-${days}`} report={report} onOpenAttempt={openAttempt} />
         )}

@@ -65,7 +65,7 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
           `${report.deletedBankAttemptCount} completed attempt(s) in this view used deleted question banks. Original saved questions and scores still count after reimport.`,
         ]
       : []),
-    ...(report.deletedBankLifetimeAttemptCount
+    ...((report.deletedBankLifetimeAttemptCount ?? 0) > (report.deletedBankAttemptCount ?? 0)
       ? [
           `Lifetime mastery includes ${report.deletedBankLifetimeAttemptCount} completed attempt(s) that used deleted question banks, including attempts outside these filters.`,
         ]

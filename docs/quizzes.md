@@ -459,3 +459,11 @@ exclusion/restoration and the absence of confirmation dialogs.
 `setupResultActionsCheck()` in `tests/result-deletion.browser.ts` verifies the setup
 review link, inline delete/undo icons, retained pending row with its deadline, and
 restoration followed by opening the result.
+
+`bankDeletionReportCheck()` in `tests/bank-deletion.browser.ts` exercises the actual
+Reports page through an empty Due Reviews filter and back to Master report. Run
+with AWS CLF-C02 selected in a disposable library containing completed attempts
+whose bank was deleted and no completed Due Reviews. Use the browser-only
+transpile/evaluate workflow above. The check verifies that lifetime deletion
+evidence remains visible in the empty state and that returning to all-time Master
+report does not claim affected attempts lie outside its filters.
