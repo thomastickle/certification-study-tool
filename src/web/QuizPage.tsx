@@ -677,6 +677,13 @@ export function QuizPage({
     void saveAnswers(updatedQuestions.map(answerPayload))
   }
 
+  let timerIndicatorLabel = 'More than 10 minutes remaining'
+  if (secondsLeft <= 120) {
+    timerIndicatorLabel = '2 minutes or less remaining'
+  } else if (secondsLeft <= 600) {
+    timerIndicatorLabel = '10 minutes or less remaining'
+  }
+
   const reviewIds = reviewQuestionIds(questions)
   let heading = title
   if (stage === 'completed') heading = `${title} results`
@@ -745,8 +752,14 @@ export function QuizPage({
             </span>
             <strong
               className={`timer ${secondsLeft <= 600 ? 'warning' : ''} ${secondsLeft <= 120 ? 'urgent' : ''}`}
-              aria-label="Time remaining"
             >
+              <span
+                className="timer-indicator"
+                role="img"
+                aria-label={timerIndicatorLabel}
+                title={timerIndicatorLabel}
+              />
+              <span className="sr-only">Time remaining: </span>
               {formatTime(secondsLeft)}
             </strong>
             <button disabled={busy || secondsLeft === 0} onClick={() => void changePause('pause')}>
