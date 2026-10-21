@@ -1370,8 +1370,3 @@ select {
     flex: 1 1 auto;
   }
 }
-
-.completed-results .pending-deletion .completed-result-summary,
-.completed-results .pending-deletion .completed-result-score {
-  color: #dc2626;
-}
