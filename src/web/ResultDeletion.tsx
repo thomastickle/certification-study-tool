@@ -54,7 +54,6 @@ export function CompletedResults({
   const [items, setItems] = useState<(QuizSummary | DeletedQuizSummary)[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const revision = useRef(0)
   const request = useRef<AbortController | null>(null)
   const query = new URLSearchParams({
@@ -100,14 +99,11 @@ export function CompletedResults({
     revision.current++
     setBusy(item.id)
     setError('')
-    setNotice('')
     try {
       if (item.status === 'deleted') {
         await api(`/quizzes/${item.id}/restore`, { method: 'POST' })
-        setNotice('Result restored. Stats and scheduling now include it.')
       } else {
         await api(`/quizzes/${item.id}`, { method: 'DELETE' })
-        setNotice('Result marked for deletion. Stats and scheduling now exclude it.')
       }
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'Could not change this result.'
@@ -137,7 +133,6 @@ export function CompletedResults({
         </button>
       </div>
       {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
       {!items.length && <p className="muted">No completed {plural} yet.</p>}
       <ul className="history-list">
         {items.map((item) => {
@@ -189,7 +184,7 @@ export function CompletedResults({
                   </p>
                 )}
                 <button
-                  className={`result-icon-action ${pending ? '' : 'result-icon-delete'}`}
+                  className="result-icon-action result-icon-delete"
                   aria-label={pending ? 'Undo deletion' : 'Delete result'}
                   title={pending ? 'Undo deletion' : 'Delete result'}
                   disabled={busy !== null || (pending && Date.now() >= item.purgeAt)}

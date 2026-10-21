@@ -1286,7 +1286,7 @@ select {
 
 .deletion-deadline {
   font-weight: 600;
-  color: #92400e;
+  color: #dc2626;
 }
 
 .completed-results .history-list li {
@@ -1321,11 +1321,11 @@ select {
 }
 
 .result-icon-delete {
-  color: #a12d28;
+  color: #dc2626;
 }
 
 .result-icon-delete:hover {
-  color: #7f211d;
+  color: #b91c1c;
 }
 
 .completed-results a,
@@ -1369,4 +1369,9 @@ select {
   .completed-result-actions {
     flex: 1 1 auto;
   }
+}
+
+.completed-results .pending-deletion .completed-result-summary,
+.completed-results .pending-deletion .completed-result-score {
+  color: #dc2626;
 }
