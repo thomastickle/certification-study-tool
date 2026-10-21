@@ -1337,7 +1337,7 @@ select {
 
 .completed-results .completed-result-score {
   color: var(--ink);
-  font-size: 14px;
+  font-size: inherit;
   font-weight: 600;
 }
 
@@ -1369,4 +1369,51 @@ select {
   .completed-result-actions {
     flex: 1 1 auto;
   }
+}
+
+.result-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: baseline;
+}
+
+.result-indicator-strong {
+  background: #16a34a;
+}
+
+.result-indicator-middle {
+  background: #eab308;
+}
+
+.result-indicator-low {
+  background: #dc2626;
+}
+
+.result-indicator-paused {
+  background: #2563eb;
+}
+
+.result-indicator-unknown {
+  background: #64748b;
+}
+
+.result-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.result-legend li {
+  display: inline-flex;
+  align-items: center;
 }

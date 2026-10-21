@@ -1,4 +1,5 @@
 import { DeleteResultButton, CompletedResults } from './ResultDeletion.tsx'
+import { ResultIndicator } from './ResultIndicator.tsx'
 import { ConceptLabels } from './ConceptLabels.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
@@ -790,6 +791,9 @@ export function QuizPage({
           {recoverable && (
             <section className="quiz-panel recovery-panel">
               <h2>
+                {recoverable.status === 'paused' && (
+                  <ResultIndicator status="paused" correctCount={null} total={recoverable.total} />
+                )}
                 {recoverable.status === 'paused' ? 'Paused' : 'In-progress'} {mode}
               </h2>
               <p>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DeletedQuizSummary, PracticeMode, QuizSummary } from '../shared/quiz-contracts.ts'
 import type { Certification } from './certifications.ts'
+import { ResultIndicator, ResultLegend } from './ResultIndicator.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { api } from './api.ts'
 
@@ -132,6 +133,7 @@ export function CompletedResults({
           Refresh results
         </button>
       </div>
+      <ResultLegend />
       {error && <p role="alert">{error}</p>}
       {!items.length && <p className="muted">No completed {plural} yet.</p>}
       <ul className="history-list">
@@ -144,6 +146,11 @@ export function CompletedResults({
           }
           const summary = (
             <>
+              <ResultIndicator
+                status={item.status}
+                correctCount={item.correctCount}
+                total={item.total}
+              />
               <time className="completed-result-date" dateTime={completedAt.toISOString()}>
                 {completedAt.toLocaleString()}
               </time>
