@@ -1,3 +1,4 @@
+import { DeleteResultButton, DeletedResults } from './ResultDeletion.tsx'
 import { ConceptLabels } from './ConceptLabels.tsx'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
@@ -57,6 +58,7 @@ export function QuizPage({
   }
   const count = mode === 'exam' ? 65 : 20
   const minutes = mode === 'exam' ? 90 : 20
+  const [historyRevision, setHistoryRevision] = useState(0)
   const [stage, setStage] = useState<Stage>('setup')
   const [options, setOptions] = useState<QuizOptions>({
     ...initialOptions,
@@ -572,7 +574,7 @@ export function QuizPage({
     return () => {
       cancelled = true
     }
-  }, [stage, plural, recoverSetup, scopeQuery])
+  }, [stage, plural, recoverSetup, scopeQuery, historyRevision])
 
   useEffect(() => {
     if (!notice) return
@@ -860,6 +862,11 @@ export function QuizPage({
               </button>
             </section>
           )}
+          <DeletedResults
+            certification={certification}
+            mode={mode}
+            onChanged={() => setHistoryRevision((value) => value + 1)}
+          />
           <section className="quiz-panel">
             <div className="section-heading">
               <h2>Completed {plural}</h2>
@@ -1179,6 +1186,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
 
   return (
     <>
+      <DeleteResultButton id={view.id} onDeleted={onBack} />
       <section className="quiz-panel result-score">
         <p className="eyebrow">{mode.toUpperCase()} COMPLETE</p>
         <h2>

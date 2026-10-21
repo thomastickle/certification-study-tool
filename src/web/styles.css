@@ -1255,3 +1255,20 @@ select {
 .concept-member {
   overflow-wrap: anywhere;
 }
+
+.result-deletion {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 0.75rem;
+}
+
+.result-deletion p,
+.deleted-results li p {
+  margin-bottom: 0;
+}
+
+.deleted-results .history-list li {
+  flex-wrap: wrap;
+  gap: 1rem;
+}

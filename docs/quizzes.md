@@ -234,6 +234,26 @@ Development browser verification uses a disposable synthetic database under
 `private/verification/`, leaving private question banks and the user's library
 untouched.
 
+## Deleting completed results
+
+**Delete result** is available in completed Practice results and individual Reports.
+It immediately removes the attempt from completed history, reports, home readiness,
+mastery, Due Review, and question-selection history. Source banks and other attempts
+are unchanged. No confirmation dialog is required.
+
+**Recently deleted results**, available in Practice setup and Reports for the selected
+certification, provides **Undo deletion** for 48 hours from the original deletion.
+Undo restores the original snapshot and completion time, and recalculates study evidence
+from the remaining history plus that restored attempt. Practice setup shows only its
+current mode; Reports shows all modes, independently of report time/mode filters.
+**Delete permanently** skips the remaining window and cannot be undone.
+
+Deleted snapshots and their deadlines survive restarts and source deletion. Expired
+snapshots are purged by the server maintenance timer, on startup, and before deletion
+management operations. While the app is stopped, cleanup waits until it runs again;
+restoration is rejected at or after the deadline. Downloaded Markdown reports remain
+outside the app and are unaffected.
+
 ## Reports
 
 Open **Reports** for a master view, or select **Quizzes** / **Exams** to filter
