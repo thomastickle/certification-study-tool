@@ -130,6 +130,9 @@ main {
 }
 .completed-result-mode {
   display: inline-block;
+  width: 3.25rem;
+  flex-shrink: 0;
+  text-align: center;
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 2px 7px;
