@@ -112,7 +112,10 @@ export async function certificationWorkspaceTest() {
     'Practice start did not become ready',
   )
   startButton()!.click()
-  await until(() => !!document.querySelector('.answer-choices input'), 'Attempt did not start')
+  await until(
+    () => !!document.querySelector('.answer-choices input:enabled'),
+    'Attempt did not become ready for answers',
+  )
   document.querySelector<HTMLInputElement>('.answer-choices input')!.click()
   await until(
     () => document.querySelector('main')?.textContent?.includes('Saved') ?? false,
