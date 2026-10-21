@@ -238,9 +238,11 @@ untouched.
 
 Open **Reports** for a master view, or select **Quizzes** / **Exams** to filter
 saved results by practice mode. All time, 7-day, 30-day and 90-day views use the
-attempt's completion time; daily chart dates are UTC. CLF-C02 is the currently
-supported certification. Reports recognize the practice session `mode` field and
-treat legacy snapshots as quizzes.
+attempt's completion time; daily chart dates are UTC. Reports are scoped to the selected
+provider and certification. AWS CLF-C02 has configured domain mapping; other certifications
+show saved question/topic activity with “Domain mapping not configured” instead of domain
+coverage or focus rankings. Reports recognize the practice session `mode` field and treat
+legacy snapshots as quizzes.
 
 - **Correct-answer activity** counts every correct question appearance across the
   selected completed attempts. Repeat questions count each time; this is study
@@ -401,6 +403,7 @@ Review uses the same scoped lifetime mastery schedule and selects up to 20 eligi
 Deleted questions remain overdue and count as unavailable only within their certification scope.
 
 `GET /api/reports` accepts the same pair alongside mode and time filters. Both lifetime mastery
-and selected report evidence belong to that pair. Non-CLF reports use neutral domain labels,
-without claiming CLF domain names or weights. Legacy mastery identities retain their original
+and selected report evidence belong to that pair. Non-CLF reports show neutral saved-topic
+activity without domain coverage or focus rankings; no official domain mapping is inferred.
+Legacy mastery identities retain their original
 `mastery:v1` format and AWS CLF-C02 namespace.

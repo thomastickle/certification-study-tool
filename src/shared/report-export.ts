@@ -21,6 +21,36 @@ function attemptResult(passed: boolean | null): string {
 
 /** Creates a portable local report with explicit scoring denominators. */
 export function studyReportMarkdown(report: StudyReport, scope: string): string {
+  const mappedDomains = (report.provider ?? 'AWS') === 'AWS' && report.certification === 'CLF-C02'
+  let focusLines = [
+    'Domain mapping not configured. Domain coverage and focus recommendations are unavailable for this certification.',
+  ]
+  const domainLines: string[] = []
+  if (mappedDomains) {
+    focusLines = [
+      report.focus.domain === null
+        ? 'Insufficient evidence: every supported domain needs at least 10 distinct answered questions across 2 completed attempts.'
+        : `Focus: Domain ${report.focus.domain}, ranked by score (correct / all appearances, including skips).`,
+      'Starting product heuristic, not a statistical confidence or exam-readiness guarantee.',
+      '| Domain | Distinct answered (10 needed) | Completed attempts (2 needed) | Answered appearances | Total appearances | Score |',
+      '| --- | ---: | ---: | ---: | ---: | ---: |',
+      ...report.focus.domains.map(
+        (d) =>
+          `| ${d.domain} | ${d.distinctAnswered} | ${d.completedAttempts} | ${d.answeredAppearances} | ${d.totalAppearances} | ${percentage(d.score)} |`,
+      ),
+    ]
+    domainLines.push(
+      '## Domain details',
+      '',
+      '| Domain | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |',
+      '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+      ...report.domains.map(
+        (domain) =>
+          `| ${domain.name} | ${domain.counts.correct} | ${domain.counts.incorrect} | ${domain.counts.answered} | ${domain.counts.skipped} | ${percentage(domain.counts.score)} | ${percentage(domain.counts.accuracy)} |`,
+      ),
+      '',
+    )
+  }
   const lines = [
     `# ${report.certification} study report`,
     '',
@@ -41,37 +71,24 @@ export function studyReportMarkdown(report: StudyReport, scope: string): string 
     '',
     '## Focus recommendation evidence',
     '',
-    report.focus.domain === null
-      ? 'Insufficient evidence: every supported domain needs at least 10 distinct answered questions across 2 completed attempts.'
-      : `Focus: Domain ${report.focus.domain}, ranked by score (correct / all appearances, including skips).`,
-    'Starting product heuristic, not a statistical confidence or exam-readiness guarantee.',
-    '| Domain | Distinct answered (10 needed) | Completed attempts (2 needed) | Answered appearances | Total appearances | Score |',
-    '| --- | ---: | ---: | ---: | ---: | ---: |',
-    ...report.focus.domains.map(
-      (d) =>
-        `| ${d.domain} | ${d.distinctAnswered} | ${d.completedAttempts} | ${d.answeredAppearances} | ${d.totalAppearances} | ${percentage(d.score)} |`,
-    ),
+    ...focusLines,
     '',
     '## Scoring details',
     '',
     `Accuracy on answered questions: ${percentage(report.counts.accuracy)} (${report.counts.answered} answered · ${report.counts.skipped} skipped)`,
     '',
-    '## Domain details',
-    '',
-    '| Domain | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |',
-    '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
-    ...report.domains.map(
-      (domain) =>
-        `| ${domain.name} | ${domain.counts.correct} | ${domain.counts.incorrect} | ${domain.counts.answered} | ${domain.counts.skipped} | ${percentage(domain.counts.score)} | ${percentage(domain.counts.accuracy)} |`,
-    ),
-    '',
+    ...domainLines,
     '## Study areas and topics',
     '',
-    '| Domain | Area · topic | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |',
-    '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+    mappedDomains
+      ? '| Domain | Area · topic | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |'
+      : '| Area · topic | Correct | Incorrect | Answered | Skipped | Score | Accuracy on answered questions |',
+    mappedDomains
+      ? '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |'
+      : '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
     ...report.topics.map(
       (topic) =>
-        `| ${topic.domain} | ${cell(topic.name)} | ${topic.counts.correct} | ${topic.counts.incorrect} | ${topic.counts.answered} | ${topic.counts.skipped} | ${percentage(topic.counts.score)} | ${percentage(topic.counts.accuracy)} |`,
+        `| ${mappedDomains ? `${topic.domain} | ` : ''}${cell(topic.name)} | ${topic.counts.correct} | ${topic.counts.incorrect} | ${topic.counts.answered} | ${topic.counts.skipped} | ${percentage(topic.counts.score)} | ${percentage(topic.counts.accuracy)} |`,
     ),
     '',
     '## Daily score and activity (UTC)',
