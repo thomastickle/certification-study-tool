@@ -115,7 +115,7 @@ export async function setupRecoveryCheck(
       : null
     window.fetch = async (input, init) => {
       const url = String(input)
-      if (url === `/api/quizzes/current?mode=${mode}`) {
+      if (url.startsWith(`/api/quizzes/current?mode=${mode}&`)) {
         readStarted = true
         recoveryReads++
         if (['pending', 'pending-failure', 'history-pending'].includes(outcome) || historyReturn) {
@@ -139,14 +139,14 @@ export async function setupRecoveryCheck(
     }
     if (outcome === 'history-pending' || historyReturn) {
       await until(
-        () => document.body.innerText.includes('Review results'),
+        () => !!document.querySelector('.completed-results a'),
         'Completed history did not load',
       )
-      click('Review results')
+      document.querySelector<HTMLAnchorElement>('.completed-results a')!.click()
       await until(() => !!document.querySelector('.result-score'), 'Completed result did not load')
     }
     if (historyReturn) {
-      click(`Back to ${mode} history`)
+      click('Back to practice history')
       await until(() => !document.querySelector('.result-score'), 'History did not reopen')
       release()
       if (failRead) {

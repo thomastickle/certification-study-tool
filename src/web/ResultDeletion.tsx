@@ -77,7 +77,7 @@ export function CompletedResults({
       if (!controller.signal.aborted && currentRevision === revision.current) {
         setItems(
           [...completed, ...deleted]
-            .filter((item) => (item.mode ?? 'quiz') === mode)
+            .filter((item) => (mode === 'review' ? item.mode === 'review' : item.mode !== 'review'))
             .sort((a, b) => b.startedAt - a.startedAt || b.id.localeCompare(a.id)),
         )
       }
@@ -116,14 +116,12 @@ export function CompletedResults({
     }
   }
 
-  let plural = mode === 'exam' ? 'exams' : 'quizzes'
-  if (mode === 'review') {
-    plural = 'due reviews'
-  }
+  const heading = mode === 'review' ? 'Completed due reviews' : 'Completed'
+  const plural = mode === 'review' ? 'due reviews' : 'quizzes or exams'
   return (
-    <section className="quiz-panel completed-results" aria-label={`Completed ${plural}`}>
+    <section className="quiz-panel completed-results" aria-label={heading}>
       <div className="section-heading">
-        <h2>Completed {plural}</h2>
+        <h2>{heading}</h2>
         <button
           disabled={busy !== null}
           onClick={() => {
@@ -182,6 +180,11 @@ export function CompletedResults({
                     >
                       {label}
                     </a>
+                  )}
+                  {mode !== 'review' && (
+                    <span className="completed-result-mode">
+                      {item.mode === 'exam' ? 'Exam' : 'Quiz'}
+                    </span>
                   )}
                   <DeletedBankNotice names={item.deletedBankNames} compact />
                 </span>

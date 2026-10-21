@@ -20,12 +20,13 @@ test('result indicators label exact score boundaries, missing evidence, and paus
   try {
     const { ResultIndicator } = await import('./ResultIndicator.tsx')
     for (const [correctCount, total, label] of [
-      [0, 20, 'Below 70%'],
-      [6999, 10000, 'Below 70%'],
-      [70, 100, '70–90%'],
-      [90, 100, '70–90%'],
-      [9001, 10000, 'Above 90%'],
-      [20, 20, 'Above 90%'],
+      [0, 20, '0–69%'],
+      [6999, 10000, '0–69%'],
+      [70, 100, '70–89%'],
+      [8999, 10000, '70–89%'],
+      [90, 100, '90–100%'],
+      [9001, 10000, '90–100%'],
+      [20, 20, '90–100%'],
       [null, 20, 'Score unavailable'],
       [0, 0, 'Score unavailable'],
     ] as const) {

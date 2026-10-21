@@ -23,10 +23,17 @@ larger steps), Home to collapse, End for maximum width, and Enter to toggle.
 Mobile keeps the compact labeled navigation. Practice provides Quiz and Exam presets
 in one setup workflow. Switching presets keeps
 the chosen question banks and uses the same save-and-pause guard as navigation.
-Each preset retains its own saved attempt and completed history; presets cannot
-change an attempt that is already open. Due Review remains separate. Completed results
-and local Markdown discussion reports are available within each practice mode
-and through the Reports page.
+The presets live inside “Set up your quiz”; the page heading shows the selected
+certification on the right, without repeating question counts or durations.
+Each preset retains its own saved attempt; presets cannot change an attempt that is
+already open. Both presets share one “Completed” history with Quiz and Exam markers,
+including pending deletions and undo. Opening an older result retains its original
+attempt type and returns to the same setup preset. Due Review keeps a separate history.
+Result indicators use red for scores below 70% (0–69%), yellow from 70% to below 90%
+(70–89%), and green from 90% through 100%. Exact saved counts determine the band;
+rounded display percentages do not change it. These bands are separate from the
+80% practice pass target. Local Markdown discussion reports remain available from
+results and through the Reports page.
 
 A CLF-C02 quiz has 20 questions and a server-owned 20-minute deadline. An exam
 has **65 questions and a 90-minute deadline**. Both modes share the same bank
@@ -472,3 +479,10 @@ report does not claim affected attempts lie outside its filters.
 text, and badge alignment. Run it at desktop and mobile widths with a completed
 quiz from a deleted bank. The longer badge wraps under the result text on narrow
 screens while preserving the dot column and avoiding horizontal scrolling.
+
+`tests/practice-history.browser.ts` exports `practiceHistoryTest()` for a disposable
+populated AWS CLF-C02 workspace. It creates quiz/exam results and checks the shared
+history, type markers, setup placement, compact header, and cross-preset result navigation.
+Bundle it with its helper before evaluating in the browser; it soft-deletes its own
+fixtures afterward. `practicePresetsTest()` also checks counts, durations, bank selection,
+keyboard focus, and independent recovery with the presets inside setup.
