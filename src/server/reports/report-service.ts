@@ -138,8 +138,8 @@ export class ReportService {
       ? domainNames.map((name, index) => ({ domain: index + 1, name }))
       : [...new Set(questions.map((q) => q.domain))]
           .sort((a, b) => a - b)
-          .map((domain) => ({ domain, name: domain === 0 ? 'Unclassified' : `Domain ${domain}` }))
-    const evidence = domains.map(({ domain }) => {
+          .map((domain) => ({ domain, name: 'Unclassified' }))
+    const evidence = (isClf(scope) ? domains : []).map(({ domain }) => {
       const distinct = new Set<string>()
       const attempts = new Set<string>()
       for (const quiz of completed) {
