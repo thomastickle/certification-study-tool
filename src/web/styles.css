@@ -1335,11 +1335,6 @@ select {
   line-height: 1.5;
 }
 
-.completed-result-date,
-.completed-results .completed-result-score {
-  display: block;
-}
-
 .completed-results .completed-result-score {
   color: var(--ink);
   font-size: 14px;
@@ -1350,5 +1345,28 @@ select {
   .result-icon-action {
     min-width: 44px;
     min-height: 44px;
+  }
+}
+
+.completed-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.completed-results .deletion-deadline {
+  margin: 0;
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  .completed-results .history-list li {
+    flex-wrap: wrap;
+  }
+
+  .completed-result-actions {
+    flex: 1 1 auto;
   }
 }

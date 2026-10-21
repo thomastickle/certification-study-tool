@@ -152,6 +152,7 @@ export function CompletedResults({
               <time className="completed-result-date" dateTime={completedAt.toISOString()}>
                 {completedAt.toLocaleString()}
               </time>
+              {' · '}
               <span className="completed-result-score">
                 {score} · {item.correctCount ?? '—'}/{item.total} correct
               </span>
@@ -177,6 +178,8 @@ export function CompletedResults({
                     {summary}
                   </a>
                 )}
+              </div>
+              <div className="completed-result-actions">
                 {pending && (
                   <p className="deletion-deadline">
                     Will be deleted on{' '}
@@ -185,17 +188,17 @@ export function CompletedResults({
                     </time>
                   </p>
                 )}
+                <button
+                  className={`result-icon-action ${pending ? '' : 'result-icon-delete'}`}
+                  aria-label={pending ? 'Undo deletion' : 'Delete result'}
+                  title={pending ? 'Undo deletion' : 'Delete result'}
+                  disabled={busy !== null || (pending && Date.now() >= item.purgeAt)}
+                  aria-busy={busy === item.id}
+                  onClick={() => void change(item)}
+                >
+                  <StudyIcon name={pending ? 'undo' : 'trash'} />
+                </button>
               </div>
-              <button
-                className={`result-icon-action ${pending ? '' : 'result-icon-delete'}`}
-                aria-label={pending ? 'Undo deletion' : 'Delete result'}
-                title={pending ? 'Undo deletion' : 'Delete result'}
-                disabled={busy !== null || (pending && Date.now() >= item.purgeAt)}
-                aria-busy={busy === item.id}
-                onClick={() => void change(item)}
-              >
-                <StudyIcon name={pending ? 'undo' : 'trash'} />
-              </button>
             </li>
           )
         })}
