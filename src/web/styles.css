@@ -1124,15 +1124,16 @@ select {
 .review-legend-swatch {
   width: 14px;
   height: 14px;
-  border: 1px solid;
+  border: 3px solid;
   border-radius: 3px;
 }
 .practice-session .review-list li {
   display: block;
   min-width: 0;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 3px solid var(--border);
   border-radius: 7px;
+  background: #fff;
 }
 .practice-session .review-tile {
   display: flex;
@@ -1147,7 +1148,7 @@ select {
   text-align: left;
 }
 .practice-session .review-tile:hover {
-  background: #ffffff40;
+  background: var(--subtle);
 }
 .practice-session .review-tile .review-number {
   color: var(--ink);
@@ -1156,6 +1157,7 @@ select {
 .practice-session .review-tile-heading {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   width: 100%;
   white-space: nowrap;
@@ -1166,7 +1168,8 @@ select {
 .practice-session .review-tile-mark {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   height: 18px;
 }
@@ -1250,25 +1253,44 @@ select {
 }
 .practice-session .review-list li.review-partial,
 .review-legend .review-partial {
-  background: #fff5ce;
-  border-color: #d3ae43;
+  border-color: #b88a00;
 }
 .practice-session .review-list li.review-unanswered,
 .review-legend .review-unanswered {
-  background: #fde4e2;
   border-color: #bd4339;
 }
 .practice-session .review-list li.review-answered,
 .review-legend .review-answered {
-  background: #e0f2e5;
   border-color: #39834f;
 }
-.practice-session .review-list .review-flag {
+.review-confidence-dot {
+  display: inline-block;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #62718a;
+  border-radius: 50%;
+  background: transparent;
+}
+.review-confidence-dot[data-confidence='Confident'] {
+  border-color: #237a45;
+  background: #237a45;
+}
+.review-confidence-dot[data-confidence='Educated Guess'] {
+  border-color: #b88a00;
+  background: #e0aa00;
+}
+.review-confidence-dot[data-confidence='Unsure'] {
+  border-color: #c1362b;
+  background: #c1362b;
+}
+.practice-session .review-list .review-flag,
+.review-legend .review-flag {
   color: #b42318;
   flex: 0 0 16px;
   font-size: 18px;
   line-height: 1;
-  text-align: right;
+  text-align: center;
   font-weight: 700;
 }
 

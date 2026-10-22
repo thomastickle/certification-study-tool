@@ -31,6 +31,8 @@ import {
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned' | 'paused'
 
+const reviewAnswerLabels = { unanswered: 'Not Answered', partial: 'Partial', answered: 'Answered' }
+
 type Props = {
   certification: Certification
   mode?: PracticeMode
@@ -916,16 +918,40 @@ export function QuizPage({
             <p>Select a question to return to it.</p>
             <ul className="review-legend" aria-label="Answer completion colors">
               <li>
+                <strong>Border:</strong>
+              </li>
+              <li>
                 <span className="review-legend-swatch review-unanswered" aria-hidden="true" />
-                Unanswered
+                Not Answered
               </li>
               <li>
                 <span className="review-legend-swatch review-partial" aria-hidden="true" />
-                Partially answered
+                Partial
               </li>
               <li>
                 <span className="review-legend-swatch review-answered" aria-hidden="true" />
-                Fully answered
+                Answered
+              </li>
+            </ul>
+            <ul className="review-legend" aria-label="Confidence icons">
+              <li>
+                <strong>Confidence:</strong>
+              </li>
+              {['Confident', 'Educated Guess', 'Unsure', 'Not Recorded'].map((confidence) => (
+                <li key={confidence}>
+                  <span
+                    className="review-confidence-dot"
+                    data-confidence={confidence}
+                    aria-hidden="true"
+                  />
+                  {confidence}
+                </li>
+              ))}
+              <li>
+                <span className="review-flag" aria-hidden="true">
+                  ⚑
+                </span>
+                Marked for review
               </li>
             </ul>
             <ul className="review-list">
@@ -941,11 +967,16 @@ export function QuizPage({
                   >
                     <span className="review-tile-heading">
                       <span className="review-number">{index + 1}.</span>{' '}
-                      <span className="review-confidence">
-                        {question.confidence ?? 'Not Recorded'}
-                      </span>
+                      <span>{reviewAnswerLabels[reviewAnswerState(question)]}</span>
                     </span>
                     <span className="review-tile-mark">
+                      <span
+                        className="review-confidence-dot"
+                        data-confidence={question.confidence ?? 'Not Recorded'}
+                        role="img"
+                        aria-label={question.confidence ?? 'Not Recorded'}
+                        title={question.confidence ?? 'Not Recorded'}
+                      />
                       {question.flagged && (
                         <span
                           className="review-flag"

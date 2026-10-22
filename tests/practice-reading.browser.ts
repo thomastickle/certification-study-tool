@@ -111,20 +111,36 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       'Question title still has a separate button border',
     )
     assert(
-      tiles[1]!.querySelector('.review-confidence')?.textContent?.trim() === 'Not Recorded',
+      tiles[1]!.querySelector('.review-confidence-dot')?.getAttribute('aria-label') ===
+        'Not Recorded',
       'Unset confidence label is wrong',
     )
     assert(
       tiles[0]!.querySelector('.review-tile-heading')?.textContent?.trim().replace(/\s+/g, ' ') ===
-        '1. Confident',
-      'Tile should show only its number and confidence on the first row',
+        '1. Answered',
+      'Tile should show its number and completion on the first row',
     )
     const legend = document.querySelector('[aria-label="Answer completion colors"]')
     assert(
-      legend?.textContent?.includes('Unanswered') &&
-        legend.textContent.includes('Partially answered') &&
-        legend.textContent.includes('Fully answered'),
+      legend?.textContent?.includes('Not Answered') &&
+        legend.textContent.includes('Partial') &&
+        legend.textContent.includes('Answered'),
       'Completion color legend is missing',
+    )
+    assert(getComputedStyle(tiles[0]!).borderTopWidth === '3px', 'Completion border should be bold')
+    assert(
+      getComputedStyle(tiles[0]!).backgroundColor === 'rgb(255, 255, 255)',
+      'Tile background should be neutral',
+    )
+    assert(
+      tiles[0]!.querySelector('.review-confidence-dot')?.getAttribute('aria-label') === 'Confident',
+      'Confidence icon should have a label',
+    )
+    assert(
+      document
+        .querySelector('[aria-label="Confidence icons"]')
+        ?.textContent?.includes('Not Recorded'),
+      'Confidence legend is missing',
     )
     click(`Question ${total}`)
     await until(
@@ -143,7 +159,10 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     )
     finalButton.click()
     await until(() => !!document.querySelector('.review-list'), 'Final button did not open review')
-    assert(!document.querySelector('.review-flag'), 'Unflagged answers displayed a review flag')
+    assert(
+      !document.querySelector('.review-list .review-flag'),
+      'Unflagged answers displayed a review flag',
+    )
     assert(
       document
         .querySelector('.review-list')
@@ -172,6 +191,17 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
         const heading = first.querySelector('.review-tile-heading')!.getBoundingClientRect()
         const flag = first.querySelector('.review-flag')!.getBoundingClientRect()
         assert(flag.top >= heading.bottom, 'Review flag should be on the second row')
+        const ball = first.querySelector('.review-confidence-dot')!.getBoundingClientRect()
+        const combinedCenter = (ball.left + flag.right) / 2
+        const tile = first.getBoundingClientRect()
+        assert(
+          Math.abs(combinedCenter - (tile.left + tile.right) / 2) < 1,
+          'Confidence and flag should be centered together',
+        )
+        assert(
+          Math.abs((ball.top + ball.bottom) / 2 - (flag.top + flag.bottom) / 2) < 1,
+          'Confidence and flag should share one line',
+        )
       }
       click('Question 1')
       await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')

@@ -58,17 +58,18 @@ Review answers and opens answer review. Answers, confidence, and flags save
 immediately, without a lock-in step.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
-scroll containers. The review grid uses compact, equal-size clickable tiles. Each tile starts with its
-number and confidence (for example, **1. Confident**). Confidence reads Confident,
-Educated Guess, Unsure, or Not Recorded. A reserved second row shows a small
-accessible red flag only for explicit
-Mark for Review selections. Only those selections count as flagged.
-Tile color depends only on answer completion: red for unanswered, yellow for
-partially answered multiple-select questions, and green for fully answered questions.
-A color legend above the grid explains these completion states.
-Confidence and flags do not change the completion color. Clearing a flag removes it
-regardless of confidence. The tile's accessible name includes selection count,
-confidence, and review status.
+scroll containers. The review grid uses compact, equal-size clickable tiles with neutral
+backgrounds and bold completion borders. The first row shows the number and status,
+for example **1. Answered**. Red borders mean **Not Answered**, yellow borders mean
+**Partial** (an incomplete multiple-select answer), and green borders mean **Answered**.
+The second row centers a confidence ball beside a red flag when manually marked:
+green for Confident, yellow for Educated Guess, red for Unsure, and hollow gray for
+Not Recorded. Icons include accessible names and hover labels. Separate completion
+and confidence legends explain the borders, balls, and review flag.
+Only explicit Mark for Review selections count as flagged. Confidence and flags do
+not change the completion border. Clearing a flag removes it regardless of confidence.
+The tile's accessible name includes question number, selection count, confidence,
+and review status.
 
 Each question supports its original single/multiple selection count, optional
 confidence (Confident, Educated Guess, Unsure), and a Mark for Review checkbox. The review
