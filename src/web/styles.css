@@ -1105,7 +1105,7 @@ select {
 }
 .practice-session .review-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
   gap: 8px;
 }
 .practice-session .review-list li {
@@ -1141,6 +1141,9 @@ select {
   gap: 6px;
   width: 100%;
   white-space: nowrap;
+}
+.practice-session .review-list .review-confidence {
+  font-size: 13px;
 }
 .paused-panel {
   text-align: center;

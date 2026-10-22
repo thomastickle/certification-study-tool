@@ -930,7 +930,9 @@ export function QuizPage({
                   >
                     <span className="review-question-title">Question {index + 1}</span>
                     <span className="review-tile-details">
-                      <span>{question.confidence ?? 'Not Recorded'}</span>
+                      <span className="review-confidence">
+                        {question.confidence ?? 'Not Recorded'}
+                      </span>
                       {question.flagged && (
                         <span
                           className="review-flag"
