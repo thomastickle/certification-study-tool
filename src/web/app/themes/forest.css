@@ -1,5 +1,6 @@
 /* Forest changes the palette while sharing semantic status and chart colors. */
-:root[data-palette='forest'] {
+:root[data-palette='forest'],
+.palette-preview[data-palette='forest'] {
   --ink: light-dark(#223c33, #e0eee7);
   --muted: light-dark(#567466, #a1bbae);
   --border: light-dark(#d7e5dc, #355247);

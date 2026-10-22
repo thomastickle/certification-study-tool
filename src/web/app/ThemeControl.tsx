@@ -30,20 +30,26 @@ export function ThemeControl({
           <option value="dark">Dark</option>
         </select>
       </label>
-      <label className="theme-control">
-        <span>Palette</span>
-        <select
-          value={palette}
-          onChange={(event) => {
-            const next = event.target.value as Palette
-            onPaletteChange(next)
-          }}
-        >
-          <option value="blue">Blue</option>
-          <option value="forest">Forest</option>
-          <option value="violet">Violet</option>
-        </select>
-      </label>
+      <fieldset className="palette-picker">
+        <legend>Palette</legend>
+        <div className="palette-options">
+          {(['blue', 'forest', 'violet'] as const).map((value) => (
+            <label key={value} className="palette-option">
+              <input
+                type="radio"
+                name="palette"
+                value={value}
+                checked={palette === value}
+                onChange={() => onPaletteChange(value)}
+              />
+              <span className="palette-preview" data-palette={value} aria-hidden="true">
+                <span className="palette-check">✓</span>
+              </span>
+              <span className="palette-name">{value.charAt(0).toUpperCase() + value.slice(1)}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
     </div>
   )
 }

@@ -64,11 +64,12 @@ export async function paletteBrowserTest() {
   for (const value of ['blue', 'forest', 'violet']) {
     for (const mode of ['light', 'dark']) {
       await openSettings()
-      const [appearance, palette] =
-        document.querySelectorAll<HTMLSelectElement>('.theme-control select')
+      const appearance = document.querySelector<HTMLSelectElement>('.theme-control select')
+      const palette = document.querySelector<HTMLInputElement>(
+        `input[name="palette"][value="${value}"]`,
+      )
       if (!appearance || !palette) throw new Error('Missing appearance controls')
-      palette.value = value
-      palette.dispatchEvent(new Event('change', { bubbles: true }))
+      palette.click()
       appearance.value = mode
       appearance.dispatchEvent(new Event('change', { bubbles: true }))
       await new Promise((resolve) => setTimeout(resolve, 50))

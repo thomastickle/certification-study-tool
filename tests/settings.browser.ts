@@ -14,7 +14,11 @@ export async function settingsBrowserTest() {
   assert(trigger.getAttribute('aria-current') === 'page', 'Settings destination is not announced')
   assert(!document.querySelector('dialog.settings-dialog'), 'Settings still uses a modal')
   assert(page.querySelector('h1')?.textContent === 'Settings', 'Settings page has no heading')
-  assert(page.querySelectorAll('select').length === 2, 'Appearance must contain Theme and Palette')
+  assert(page.querySelectorAll('select').length === 1, 'Appearance must contain the Theme selector')
+  assert(
+    page.querySelectorAll('input[name="palette"]').length === 3,
+    'Appearance must contain palette swatches',
+  )
   assert(
     !document.querySelector('header .appearance-controls'),
     'Appearance controls remain in header',
@@ -54,5 +58,45 @@ export async function settingsSessionPreferenceTest() {
     return 'Session-only appearance survives navigation when persistence is blocked'
   } finally {
     Storage.prototype.setItem = original
+  }
+}
+
+/** Select every visual palette preview using its public radio control. */
+export async function paletteSwatchesBrowserTest() {
+  document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  const radios = [...document.querySelectorAll<HTMLInputElement>('input[name="palette"]')]
+  if (radios.length !== 3) throw new Error('Palette must offer three native radio swatches')
+  const initial = radios.find((radio) => radio.checked)!
+  const previews = []
+  try {
+    for (const radio of radios) {
+      radio.click()
+      await new Promise((resolve) => setTimeout(resolve, 40))
+      if (!radio.checked || radios.filter((item) => item.checked).length !== 1) {
+        throw new Error('Palette must have exactly one selected swatch')
+      }
+      if (document.documentElement.dataset.palette !== radio.value)
+        throw new Error('Swatch did not apply palette')
+      const expected = radio.value === 'blue' ? null : radio.value
+      if (localStorage.getItem('study-palette') !== expected)
+        throw new Error('Swatch did not save palette')
+      const preview = radio.parentElement!.querySelector<HTMLElement>('.palette-preview')!
+      if (
+        !preview ||
+        !radio.labels?.[0]?.textContent?.includes(
+          radio.value[0]!.toUpperCase() + radio.value.slice(1),
+        )
+      ) {
+        throw new Error('Palette swatch needs a visual preview and a visible name')
+      }
+      previews.push(getComputedStyle(preview).backgroundImage)
+    }
+    if (new Set(previews).size !== 3) throw new Error('Palette previews must show their own colors')
+    if (document.documentElement.scrollWidth > innerWidth)
+      throw new Error('Swatches overflow the viewport')
+    return { swatches: 3, selection: 'exclusive, applied, persisted, labeled', width: innerWidth }
+  } finally {
+    initial.click()
   }
 }

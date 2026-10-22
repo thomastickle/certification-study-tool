@@ -1,5 +1,6 @@
 /* Violet changes the palette while sharing semantic status and chart colors. */
-:root[data-palette='violet'] {
+:root[data-palette='violet'],
+.palette-preview[data-palette='violet'] {
   --ink: light-dark(#382f4b, #ede5f8);
   --muted: light-dark(#756484, #baabcb);
   --border: light-dark(#e5ddef, #4c3d60);

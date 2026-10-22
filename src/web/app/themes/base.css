@@ -1,5 +1,9 @@
 :root {
   color-scheme: light dark;
+}
+
+:root,
+.palette-preview[data-palette='blue'] {
   --ink: light-dark(#24324b, #e4eaf4);
   --muted: light-dark(#62718a, #a5b3c9);
   --border: light-dark(#e1e7f0, #39475f);

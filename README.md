@@ -197,7 +197,7 @@ for this origin; selecting System clears the override. If storage is blocked,
 changes still work for the current page. Theme preferences do not sync between
 devices or browser profiles. The theme uses modern browser `light-dark()` support.
 
-The independent **Palette** selector offers **Blue** (default), **Forest**, and
+The independent **Palette** swatches offer **Blue** (default), **Forest**, and
 **Violet**, each available in light and dark appearance. Palette choices are also
 remembered locally. `src/web/app/themes/base.css` owns shared semantic color tokens
 and the Blue palette; `forest.css` and `violet.css` override the palette tokens.
