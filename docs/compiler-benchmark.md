@@ -1,40 +1,51 @@
 # Compiler experiment — 2026-10-22
 
-The unchanged project passes TypeScript 5.9.3 but fails both native compilers on four CSS
-side-effect imports. **This experiment does not establish a successful-build speedup.**
-Default `typecheck`, `build`, project configuration, source, and root dependency lock remain unchanged.
-The experiment starts from `31d0015ccdc8cb22962f7600c711a542e4552358`; it does not include PR38 UI cleanup.
+After adding Vite's missing client declarations, all three compilers successfully check the same
+project. Microsoft Go TypeScript reduces the median check + Vite pipeline by **66.1%**;
+Rust tsrs reduces it by **72.8%** in this local sample. Vite itself is unchanged.
+Default `typecheck` and `build` commands, root dependency lock, and compiler configuration remain
+unchanged. This opt-in experiment is on a separate branch based on PR38 commit `31d0015`; it includes
+that UI cleanup as its baseline and makes no changes to PR38's branch.
 
 ## Results
 
-Wall-clock seconds, one warmup and five measured samples per available case:
+Wall-clock seconds, one warmup and five measured samples per case, all successful:
 
-| Case                             | Median |     Min–max | Outcome                                   |
-| -------------------------------- | -----: | ----------: | ----------------------------------------- |
-| TS 5.9.3 no-emit check           |  5.140 | 4.993–5.609 | 5/5 pass                                  |
-| TS 5.9.3 check + Vite            |  6.677 | 6.422–6.732 | 5/5 pass; identical artifacts             |
-| Microsoft TS 7.0.2 no-emit check |  0.716 | 0.712–0.842 | 5/5 fail; failure latency only            |
-| Microsoft TS 7.0.2 check + Vite  |      — |           — | Blocked by preflight errors; Vite not run |
-| tsrs no-emit check               |  0.229 | 0.202–0.283 | 5/5 fail; failure latency only            |
-| tsrs check + Vite                |      — |           — | Blocked by preflight errors; Vite not run |
-| Vite 7.3.7 alone                 |  1.729 | 1.696–2.034 | 5/5 pass; identical artifacts             |
+| Case                                | Median |      Min–max |
+| ----------------------------------- | -----: | -----------: |
+| TS 5.9.3 no-emit check              |  6.583 |  5.437–7.929 |
+| TS 5.9.3 check + Vite               |  9.015 | 7.636–11.561 |
+| Microsoft Go TS 7.0.2 no-emit check |  0.942 |  0.741–1.275 |
+| Microsoft Go TS 7.0.2 check + Vite  |  3.057 |  2.669–4.047 |
+| Rust tsrs no-emit check             |  0.249 |  0.225–0.319 |
+| Rust tsrs check + Vite              |  2.456 |  2.098–2.640 |
+| Vite 7.3.7 alone                    |  2.086 |  1.850–2.114 |
 
-The native compilers both report TS2882 at `CertificationPicker.tsx:5`, `ReportsPage.tsx:11`,
-and `main.tsx:4–5`, for `certification-picker.css`, `reports.css`, `styles.css`, and `workspace.css`.
-Go exits 1; Rust exits 2. TS 5.9 exits 0 with no diagnostics. The native diagnostic text and locations
-match each other; status and diagnostics do not match TS 5.9.
+These measure this small repository on one laptop. tsrs is experimental and based on a TypeScript
+7.1 development revision, while the Go package is stable 7.0.2 and the existing checker is 5.9.3.
+This is a practical package comparison, not an isolated Rust-versus-Go language benchmark.
+The modest absolute gap between native total builds matters more than their typecheck-only ratios:
+the unchanged bundler now dominates the pipeline. Retain the production checker until a migration
+is deliberately chosen; this experiment alone does not establish full diagnostic equivalence.
 
-This is a compiler-default compatibility difference: Microsoft documents that
+## Compatibility and correctness
+
+The initial unchanged-source run passed TS 5.9 but failed both native compilers on four CSS
+side-effect imports (TS2882). Their initial 0.716 s / 0.229 s check latencies were failures, not
+successful-build speedups. [Initial samples](compiler-benchmark-initial-results.json) are retained.
+Microsoft documents that
 [`noUncheckedSideEffectImports` defaults to true starting in TS 6](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html#simple-default-changes).
-As a separate, untimed diagnostic experiment, enabling that option on TS 5.9 reproduces the same four
-missing-CSS declaration failures (older diagnostic code TS2307). No config or declarations were
-changed to bypass them. A future migration could supply appropriate Vite asset declarations and
-repeat this experiment; that is outside this unchanged-source comparison.
+Enabling that option on TS 5.9 reproduced the four missing-declaration errors (TS2307).
 
-Each checker also rejected a temporary private `string = 123` assignment with TS2322. Native
-compilers reported that additional diagnostic alongside their four existing CSS errors. Merely
-returning a nonzero status was insufficient for the probe. This is a basic correctness guard,
-not proof of compiler-wide semantic equivalence.
+The experiment branch adds only `/// <reference types="vite/client" />` in `src/web/vite-env.d.ts`,
+following [Vite's client type documentation](https://vite.dev/guide/features.html#client-types).
+This declares assets the bundler already supports; it does not disable side-effect import checking
+or change runtime behavior. The Go check was reproduced red before that addition; both native checks
+then passed. The complete timed comparison was rerun with the declaration present for **all** compilers.
+
+All three preflights now exit 0 without diagnostics. Each checker also rejects a temporary private
+`string = 123` assignment specifically with TS2322. This is a basic correctness guard, not proof of
+compiler-wide semantic equivalence. Every successful output manifest matches the same Vite reference.
 
 ## Official packages and exact versions
 
@@ -90,16 +101,14 @@ sanitize any results before committing them.
   flushing. These are **cold-process, warm-filesystem** measurements, not cold-cache benchmarks.
   Preflight and an artifact-reference Vite build precede the warmup.
 - One warmup round, then five rounds, executing cases sequentially. The starting case rotates each
-  round to interleave order. With two blocked build cases, five remaining cases cover every measured
-  starting position once. All orders and individual measurements are in the sanitized results JSON.
+  round to interleave order. All seven cases run in each round; five measured rounds do not cover every possible starting position. All orders and individual measurements are in the sanitized results JSON.
 - Timings use Node's monotonic `performance.now()` around synchronous child processes. End-to-end
   timing includes check and subsequent unchanged `vite build`, launching the bundler only if checking
   succeeds. It excludes npm command-wrapper overhead, artifact hashing, and log writing. Vite alone
   uses the same command/configuration. “Build/assembly” here means Vite frontend asset generation;
   TypeScript emits nothing and the server runs TypeScript directly.
-- SHA-256 manifests include every emitted file and relative path. All ten successful measured builds
-  (five TS 5.9 + Vite, five Vite-only), plus both build warmups, match the initial Vite reference.
-  No artifact-equivalence claim is possible for the blocked native pipelines.
+- SHA-256 manifests include every emitted file and relative path. All twenty successful measured builds
+  (five per checker + Vite, five Vite-only), plus build warmups, match the initial Vite reference.
 - Linux `7.0.0-38-generic` x64, Intel Core i5-8265U @ 1.60 GHz, 8 logical CPUs / available parallelism 8,
   31.07 GiB reported RAM; Node 24.17.0, npm 11.13.0, Vite 7.3.7. Host load, CPU frequency and thermal
   behavior were not controlled. This is a small local experiment, not a general throughput claim.
@@ -112,6 +121,6 @@ TypeScript.
 
 Verification: `npm run check` passed (Prettier, ESLint, 156 tests, TS 5.9 check and Vite build).
 `npm run benchmark:compilers:test` passed both harness tests, and explicit ESLint checking of the
-benchmark `.mjs` files passed. Application source, tests, root lockfile, and TS/Vite configuration
-were verified unchanged against the starting commit. Container builds were not run for this optional
+benchmark `.mjs` files passed. Runtime application source, tests, root lockfile, and TS/Vite configuration
+remain unchanged against the starting commit; the only application typing addition is `src/web/vite-env.d.ts`. Container builds were not run for this optional
 local tooling experiment.
