@@ -302,7 +302,29 @@
   background: var(--accent-soft);
 }
 
-/* Keep study actions quiet and the question itself easy to scan. */
+/* Keep the blue study canvas distinct from the white question panel. */
+.practice-session {
+  background: #e8eef8;
+}
+.practice-session button,
+.practice-session .practice-menu summary {
+  border-width: 2px;
+  border-color: #879bb9;
+}
+.practice-session button.primary,
+.practice-session .question-navigation button:last-child {
+  border-color: var(--accent);
+}
+.practice-session .choice {
+  border-width: 2px;
+  border-color: #a6b6ce;
+}
+.practice-session .choice:hover {
+  border-color: #7189ad;
+}
+.practice-session .choice:has(input:checked) {
+  border-color: var(--accent);
+}
 .practice-session .quiz-status {
   padding: 8px 0;
   margin-bottom: 12px;
@@ -386,15 +408,26 @@
 .practice-session .confidence-row {
   margin-top: 20px !important;
   padding-top: 16px !important;
-  gap: 14px;
+  gap: 14px 24px;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
 }
 .practice-session .confidence-row legend,
 .practice-session .confidence-row label {
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 16px;
+  color: #000;
+}
+.practice-session .confidence-row legend {
+  float: left;
+  margin: 0 18px 0 0;
+}
+.practice-session .confidence-row label {
+  white-space: nowrap;
 }
 .practice-session .confidence-row fieldset {
   gap: 10px 18px;
+  min-width: 0;
 }
 .practice-session .confidence-row input {
   margin-left: 0;
