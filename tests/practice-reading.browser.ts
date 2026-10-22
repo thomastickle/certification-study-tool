@@ -208,7 +208,14 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     }
     const confidence = document.querySelector('.confidence-row fieldset')!.getBoundingClientRect()
     const flag = document.querySelector('.flag-control')!.getBoundingClientRect()
-    assert(flag.top >= confidence.bottom, 'Review mark is not under Confidence')
+    const controlRow = document.querySelector('.confidence-row')!.getBoundingClientRect()
+    assert(Math.abs(flag.right - controlRow.right) < 1, 'Review mark is not right-aligned')
+    if (controlRow.width >= 800) {
+      assert(
+        flag.top < confidence.bottom && flag.bottom > confidence.top,
+        'Review mark should share the desktop confidence row',
+      )
+    }
     assert(
       document.querySelector('.flag-control')?.textContent?.includes('Mark for Review'),
       'Review mark label is outdated',
