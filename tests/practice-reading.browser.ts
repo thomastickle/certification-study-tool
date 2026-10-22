@@ -35,7 +35,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     const button = [...document.querySelectorAll('button')].find(
       (item) =>
         item.textContent?.trim() === label ||
-        item.querySelector('.review-question-title')?.textContent?.trim() === label,
+        item.getAttribute('aria-label')?.startsWith(`${label},`),
     )
     assert(button && !button.disabled, `Missing enabled button: ${label}`)
     button.click()
@@ -111,8 +111,20 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       'Question title still has a separate button border',
     )
     assert(
-      tiles[1]!.querySelector('.review-tile-details')?.textContent?.trim() === 'Not Recorded',
+      tiles[1]!.querySelector('.review-confidence')?.textContent?.trim() === 'Not Recorded',
       'Unset confidence label is wrong',
+    )
+    assert(
+      tiles[0]!.querySelector('.review-tile-heading')?.textContent?.trim().replace(/\s+/g, ' ') ===
+        '1. Confident',
+      'Tile should show only its number and confidence on the first row',
+    )
+    const legend = document.querySelector('[aria-label="Answer completion colors"]')
+    assert(
+      legend?.textContent?.includes('Unanswered') &&
+        legend.textContent.includes('Partially answered') &&
+        legend.textContent.includes('Fully answered'),
+      'Completion color legend is missing',
     )
     click(`Question ${total}`)
     await until(
@@ -156,6 +168,11 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
         'Review flag did not follow checkbox',
       )
       assert(first.classList.contains('review-answered'), 'Flag changed the fully answered color')
+      if (flagged) {
+        const heading = first.querySelector('.review-tile-heading')!.getBoundingClientRect()
+        const flag = first.querySelector('.review-flag')!.getBoundingClientRect()
+        assert(flag.top >= heading.bottom, 'Review flag should be on the second row')
+      }
       click('Question 1')
       await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
     }

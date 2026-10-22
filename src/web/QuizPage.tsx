@@ -913,10 +913,21 @@ export function QuizPage({
         <>
           <section className="quiz-panel">
             <h2>Answer review</h2>
-            <p>
-              Select a question to return to it. Red: unanswered. Yellow: partially answered. Green:
-              fully answered.
-            </p>
+            <p>Select a question to return to it.</p>
+            <ul className="review-legend" aria-label="Answer completion colors">
+              <li>
+                <span className="review-legend-swatch review-unanswered" aria-hidden="true" />
+                Unanswered
+              </li>
+              <li>
+                <span className="review-legend-swatch review-partial" aria-hidden="true" />
+                Partially answered
+              </li>
+              <li>
+                <span className="review-legend-swatch review-answered" aria-hidden="true" />
+                Fully answered
+              </li>
+            </ul>
             <ul className="review-list">
               {questions.map((question, index) => (
                 <li key={question.questionId} className={`review-${reviewAnswerState(question)}`}>
@@ -928,11 +939,13 @@ export function QuizPage({
                       setStage('question')
                     }}
                   >
-                    <span className="review-question-title">Question {index + 1}</span>
-                    <span className="review-tile-details">
+                    <span className="review-tile-heading">
+                      <span className="review-number">{index + 1}.</span>{' '}
                       <span className="review-confidence">
                         {question.confidence ?? 'Not Recorded'}
                       </span>
+                    </span>
+                    <span className="review-tile-mark">
                       {question.flagged && (
                         <span
                           className="review-flag"

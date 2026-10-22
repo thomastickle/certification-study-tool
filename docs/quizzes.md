@@ -58,12 +58,14 @@ Review answers and opens answer review. Answers, confidence, and flags save
 immediately, without a lock-in step.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
-scroll containers. The review grid uses compact, equal-size clickable tiles. Each tile has a plain
-Question title and a second line with Confident, Educated Guess, Unsure, or Not Recorded.
-A small accessible red flag appears to the right of confidence only for explicit
+scroll containers. The review grid uses compact, equal-size clickable tiles. Each tile starts with its
+number and confidence (for example, **1. Confident**). Confidence reads Confident,
+Educated Guess, Unsure, or Not Recorded. A reserved second row shows a small
+accessible red flag only for explicit
 Mark for Review selections. Only those selections count as flagged.
 Tile color depends only on answer completion: red for unanswered, yellow for
 partially answered multiple-select questions, and green for fully answered questions.
+A color legend above the grid explains these completion states.
 Confidence and flags do not change the completion color. Clearing a flag removes it
 regardless of confidence. The tile's accessible name includes selection count,
 confidence, and review status.
