@@ -918,9 +918,6 @@ export function QuizPage({
             <p>Select a question to return to it.</p>
             <ul className="review-legend" aria-label="Answer completion colors">
               <li>
-                <strong>Border:</strong>
-              </li>
-              <li>
                 <span className="review-legend-swatch review-unanswered" aria-hidden="true" />
                 Not Answered
               </li>
