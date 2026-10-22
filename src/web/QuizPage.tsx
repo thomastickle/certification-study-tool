@@ -1186,7 +1186,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
         <p role="status">{copyNotice}</p>
       </section>
       <section className="quiz-panel">
-        <h2>All answers and confidence</h2>
+        <h2>Details</h2>
         <p>
           Accuracy on answered questions:{' '}
           {answered ? `${Math.round((correct / answered) * 100)}%` : '—'} · {answered} answered ·{' '}

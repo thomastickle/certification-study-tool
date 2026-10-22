@@ -1561,10 +1561,11 @@ select {
 
 /* Keep filter labels in the outline while retaining native select interaction. */
 .result-filters {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 1rem 0.75rem;
+  gap: 1rem 1.5rem;
   margin: 1.5rem 0 1rem;
 }
 
@@ -1573,6 +1574,24 @@ select {
   display: block;
   min-width: 0;
   max-width: 100%;
+}
+
+.result-filters label:nth-of-type(3) {
+  max-width: min(100%, 18rem);
+}
+
+/* Only divide controls when all three fit together on the same row. */
+@container (min-width: 700px) {
+  .result-filters label + label::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -0.75rem;
+    height: 1.5rem;
+    border-left: 1px solid var(--border);
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
 }
 
 .result-filter-label {
