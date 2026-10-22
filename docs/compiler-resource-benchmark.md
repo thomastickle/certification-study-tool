@@ -95,8 +95,8 @@ private phase logs preserve the diagnostic evidence.
 Raw command output and red/green test evidence stay in ignored `private/ai-runs/`, with directories
 restricted to the owner. Sanitized results contain counters, versions, hashes, order and manifests,
 without raw compiler output or absolute checkout paths. Retain private evidence for 90 days.
-Independent review is arranged by the parent before integration; these local commits do not satisfy
-that separate gate.
+Independent review approved the resource accounting and verified all 42 warmup/measured samples
+against the private logs. The parent also passed the integrated full check and eight harness tests.
 
 ## Executed checks
 

@@ -85,9 +85,12 @@ Do not run concurrent benchmarks or modify project inputs during measurement. Th
 absolute local binaries, never `npx` or an automatic download. Missing binaries are preflight failures.
 It writes full output to a unique, ignored `private/ai-runs/compiler-benchmark-*/` directory with
 restricted permissions. Inspect `preflight.json`, per-command logs, and `summary.json` locally.
-Failed timing cases have null successful medians in the summary; their individual latency samples
-remain available. Expected experimental failures do not abort the experiment; baseline/probe failures
-and artifact mismatches do. Each child command has a 120-second timeout.
+Failed samples are excluded from successful medians; a median is null only when no sample succeeds.
+Their individual latency samples remain available. The current resource harness aborts on any compiler
+preflight/probe failure or artifact mismatch. Baseline warmup/measured failures and instrumentation
+failures save the summary before failing; experimental measured checker failures remain recorded
+without counting as successful timings. Each child command has a 120-second timeout. See the
+[resource report](compiler-resource-benchmark.md#validation-and-failure-behavior) for current behavior.
 
 The Vite build replaces the normal ignored `dist/` directory just as `npm run build` does. The temporary
 private bad-type fixture and its extending config are removed after preflight. No application data
@@ -118,9 +121,8 @@ sanitize any results before committing them.
 
 [Sanitized samples, versions, config/lock hashes, order and artifact manifest](compiler-benchmark-results.json)
 are committed separately from raw logs. Harness tests retain private red/green evidence for excluding
-failed timings and preventing the bundler from running after a rejected check. Independent review is
-pending the parent agent's review gate; this local experiment does not authorize replacing production
-TypeScript.
+failed timings and preventing the bundler from running after a rejected check. Independent review approved the timing comparison; this local experiment does not authorize
+replacing production TypeScript.
 
 Verification: `npm run check` passed (Prettier, ESLint, 156 tests, TS 5.9 check and Vite build).
 `npm run benchmark:compilers:test` passed both harness tests, and explicit ESLint checking of the
