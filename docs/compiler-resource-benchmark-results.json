@@ -1,0 +1,2289 @@
+{
+  "metadata": {
+    "loadAverageStart": [2.61, 1.98, 1.76],
+    "freeMemoryGiBStart": 10.88455581665039,
+    "resourceTool": "time (GNU Time) UNKNOWN",
+    "date": "2026-10-22T07:28:49.368Z",
+    "commit": "853d2118ed85e19f9aa245144db2d029049b7596",
+    "platform": "linux 7.0.0-38-generic x64",
+    "cpu": "Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz",
+    "logicalCpus": 8,
+    "availableParallelism": 8,
+    "memoryGiB": 31.070533752441406,
+    "node": "v24.17.0",
+    "npm": "11.13.0",
+    "vite": "7.3.7",
+    "configSha256": "2cf870bffcfe8e9f4f955de48c26715945850d6c8d2dfdf1ff9193106a8c533f",
+    "rootLockSha256": "fdcdf6c0fa5aba38f84a5f3144319f3483f2838db1b8af41e7d95ce7ac10a297",
+    "warmups": 1,
+    "measuredRounds": 5,
+    "cache": "Fresh processes; warmed filesystem cache; no cache flushing; no incremental/watch mode",
+    "loadAverageEnd": [2.83, 2.32, 1.92],
+    "freeMemoryGiBEnd": 10.95071029663086
+  },
+  "preflight": {
+    "ts59": {
+      "version": "Version 5.9.3",
+      "ok": true,
+      "statuses": [0],
+      "diagnostics": {},
+      "probeRejected": true,
+      "probeDiagnostics": {
+        "2322": 1
+      }
+    },
+    "ts7": {
+      "version": "Version 7.0.2",
+      "ok": true,
+      "statuses": [0],
+      "diagnostics": {},
+      "probeRejected": true,
+      "probeDiagnostics": {
+        "2322": 1
+      }
+    },
+    "tsrs": {
+      "version": "Version 7.1.0-dev.20260930.4 (tsrs 0.18.0-ts7.1.0-dev.20260929, microsoft/TypeScript@b85298b6a81f)",
+      "ok": true,
+      "statuses": [0],
+      "diagnostics": {},
+      "probeRejected": true,
+      "probeDiagnostics": {
+        "2322": 1
+      }
+    }
+  },
+  "order": [
+    ["ts59-check", "ts59-build", "ts7-check", "ts7-build", "tsrs-check", "tsrs-build", "vite"],
+    ["ts59-build", "ts7-check", "ts7-build", "tsrs-check", "tsrs-build", "vite", "ts59-check"],
+    ["ts7-check", "ts7-build", "tsrs-check", "tsrs-build", "vite", "ts59-check", "ts59-build"],
+    ["ts7-build", "tsrs-check", "tsrs-build", "vite", "ts59-check", "ts59-build", "ts7-check"],
+    ["tsrs-check", "tsrs-build", "vite", "ts59-check", "ts59-build", "ts7-check", "ts7-build"],
+    ["tsrs-build", "vite", "ts59-check", "ts59-build", "ts7-check", "ts7-build", "tsrs-check"]
+  ],
+  "artifacts": [
+    {
+      "path": "assets/index-BHfIDnfC.js",
+      "sha256": "89a006fccb39f3f680ed16c4ec655acedc2370ab0ce27beee3f233e94b158e44"
+    },
+    {
+      "path": "assets/index-DnO0qZd7.css",
+      "sha256": "aadf02499988e5f522a508a814b58c8cf8ae0346a27267e416a50996a736808e"
+    },
+    {
+      "path": "index.html",
+      "sha256": "ca60784b48ec6b6f597a141edade6a8c426da13391e936b986ed24f1c1258e1f"
+    }
+  ],
+  "samples": {
+    "ts59-check": [
+      {
+        "ok": true,
+        "ms": 5080.104677000003,
+        "resources": {
+          "userCpuSeconds": 9.32,
+          "systemCpuSeconds": 0.31,
+          "peakRssKiB": 482808,
+          "majorFaults": 0,
+          "minorFaults": 113676,
+          "voluntaryContextSwitches": 7043,
+          "involuntaryContextSwitches": 276,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 189.56302305343215,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5080.0152210000015,
+            "resources": {
+              "userCpuSeconds": 9.32,
+              "systemCpuSeconds": 0.31,
+              "peakRssKiB": 482808,
+              "majorFaults": 0,
+              "minorFaults": 113676,
+              "voluntaryContextSwitches": 7043,
+              "involuntaryContextSwitches": 276,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 189.56636114378284,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 4986.132549999995,
+        "resources": {
+          "userCpuSeconds": 9.3,
+          "systemCpuSeconds": 0.33,
+          "peakRssKiB": 485696,
+          "majorFaults": 0,
+          "minorFaults": 114484,
+          "voluntaryContextSwitches": 6978,
+          "involuntaryContextSwitches": 182,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 193.13565982115762,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 4986.047966999999,
+            "resources": {
+              "userCpuSeconds": 9.3,
+              "systemCpuSeconds": 0.33,
+              "peakRssKiB": 485696,
+              "majorFaults": 0,
+              "minorFaults": 114484,
+              "voluntaryContextSwitches": 6978,
+              "involuntaryContextSwitches": 182,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 193.13893616218402,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5082.150292999999,
+        "resources": {
+          "userCpuSeconds": 9.64,
+          "systemCpuSeconds": 0.32,
+          "peakRssKiB": 489316,
+          "majorFaults": 0,
+          "minorFaults": 115407,
+          "voluntaryContextSwitches": 7002,
+          "involuntaryContextSwitches": 335,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 195.9800365156183,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5082.059991000002,
+            "resources": {
+              "userCpuSeconds": 9.64,
+              "systemCpuSeconds": 0.32,
+              "peakRssKiB": 489316,
+              "majorFaults": 0,
+              "minorFaults": 115407,
+              "voluntaryContextSwitches": 7002,
+              "involuntaryContextSwitches": 335,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 195.98351884154286,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5294.761320999998,
+        "resources": {
+          "userCpuSeconds": 9.8,
+          "systemCpuSeconds": 0.39,
+          "peakRssKiB": 487988,
+          "majorFaults": 0,
+          "minorFaults": 115099,
+          "voluntaryContextSwitches": 6960,
+          "involuntaryContextSwitches": 320,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 192.45437862486048,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5294.664954000007,
+            "resources": {
+              "userCpuSeconds": 9.8,
+              "systemCpuSeconds": 0.39,
+              "peakRssKiB": 487988,
+              "majorFaults": 0,
+              "minorFaults": 115099,
+              "voluntaryContextSwitches": 6960,
+              "involuntaryContextSwitches": 320,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 192.45788144350234,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5088.824536,
+        "resources": {
+          "userCpuSeconds": 9.47,
+          "systemCpuSeconds": 0.33,
+          "peakRssKiB": 481236,
+          "majorFaults": 0,
+          "minorFaults": 113369,
+          "voluntaryContextSwitches": 7146,
+          "involuntaryContextSwitches": 279,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 192.5788545207565,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5088.744884,
+            "resources": {
+              "userCpuSeconds": 9.47,
+              "systemCpuSeconds": 0.33,
+              "peakRssKiB": 481236,
+              "majorFaults": 0,
+              "minorFaults": 113369,
+              "voluntaryContextSwitches": 7146,
+              "involuntaryContextSwitches": 279,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 192.58186887719802,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "ts59-build": [
+      {
+        "ok": true,
+        "ms": 6924.5599820000025,
+        "resources": {
+          "userCpuSeconds": 11.99,
+          "systemCpuSeconds": 0.58,
+          "peakRssKiB": 483956,
+          "majorFaults": 0,
+          "minorFaults": 185095,
+          "voluntaryContextSwitches": 9694,
+          "involuntaryContextSwitches": 939,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 181.5277798542434,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 116.68611465571094
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5239.838319999995,
+            "resources": {
+              "userCpuSeconds": 9.65,
+              "systemCpuSeconds": 0.35,
+              "peakRssKiB": 483956,
+              "majorFaults": 0,
+              "minorFaults": 114013,
+              "voluntaryContextSwitches": 7136,
+              "involuntaryContextSwitches": 846,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 190.84558318967387,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1683.9687880000056,
+            "resources": {
+              "userCpuSeconds": 2.34,
+              "systemCpuSeconds": 0.23,
+              "peakRssKiB": 346168,
+              "majorFaults": 0,
+              "minorFaults": 71082,
+              "voluntaryContextSwitches": 2558,
+              "involuntaryContextSwitches": 93,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 152.6156552493057,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 479.81886942194166
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6744.814430999999,
+        "resources": {
+          "userCpuSeconds": 12.01,
+          "systemCpuSeconds": 0.5700000000000001,
+          "peakRssKiB": 486932,
+          "majorFaults": 0,
+          "minorFaults": 185539,
+          "voluntaryContextSwitches": 9644,
+          "involuntaryContextSwitches": 375,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 186.51365621240473,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 119.79573467378619
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5068.746494999992,
+            "resources": {
+              "userCpuSeconds": 9.58,
+              "systemCpuSeconds": 0.34,
+              "peakRssKiB": 486932,
+              "majorFaults": 0,
+              "minorFaults": 114892,
+              "voluntaryContextSwitches": 7132,
+              "involuntaryContextSwitches": 247,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 195.7091365643453,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1675.846464000002,
+            "resources": {
+              "userCpuSeconds": 2.43,
+              "systemCpuSeconds": 0.23,
+              "peakRssKiB": 344912,
+              "majorFaults": 0,
+              "minorFaults": 70647,
+              "voluntaryContextSwitches": 2512,
+              "involuntaryContextSwitches": 128,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 158.72575782694116,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 482.14440723371604
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6714.495047999997,
+        "resources": {
+          "userCpuSeconds": 11.85,
+          "systemCpuSeconds": 0.49,
+          "peakRssKiB": 486712,
+          "majorFaults": 0,
+          "minorFaults": 185206,
+          "voluntaryContextSwitches": 9536,
+          "involuntaryContextSwitches": 421,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 183.78150422012203,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 120.33667375191135
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 4982.898651999989,
+            "resources": {
+              "userCpuSeconds": 9.33,
+              "systemCpuSeconds": 0.31,
+              "peakRssKiB": 486712,
+              "majorFaults": 0,
+              "minorFaults": 114764,
+              "voluntaryContextSwitches": 7012,
+              "involuntaryContextSwitches": 265,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 193.4616911409745,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1731.3404870000086,
+            "resources": {
+              "userCpuSeconds": 2.52,
+              "systemCpuSeconds": 0.18,
+              "peakRssKiB": 354880,
+              "majorFaults": 0,
+              "minorFaults": 70442,
+              "voluntaryContextSwitches": 2524,
+              "involuntaryContextSwitches": 156,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 155.94852776061643,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 466.690409002141
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 7517.829328000007,
+        "resources": {
+          "userCpuSeconds": 13.24,
+          "systemCpuSeconds": 0.65,
+          "peakRssKiB": 484188,
+          "majorFaults": 0,
+          "minorFaults": 184373,
+          "voluntaryContextSwitches": 9615,
+          "involuntaryContextSwitches": 689,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 184.76077859691452,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 107.4778323299546
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5781.853281999996,
+            "resources": {
+              "userCpuSeconds": 10.76,
+              "systemCpuSeconds": 0.4,
+              "peakRssKiB": 484188,
+              "majorFaults": 0,
+              "minorFaults": 114076,
+              "voluntaryContextSwitches": 7038,
+              "involuntaryContextSwitches": 530,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 193.0176961553693,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1735.6839679999975,
+            "resources": {
+              "userCpuSeconds": 2.48,
+              "systemCpuSeconds": 0.25,
+              "peakRssKiB": 356848,
+              "majorFaults": 0,
+              "minorFaults": 70297,
+              "voluntaryContextSwitches": 2577,
+              "involuntaryContextSwitches": 159,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 157.28669794338987,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 465.52253457237737
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6787.143297000002,
+        "resources": {
+          "userCpuSeconds": 11.97,
+          "systemCpuSeconds": 0.5800000000000001,
+          "peakRssKiB": 481828,
+          "majorFaults": 0,
+          "minorFaults": 184105,
+          "voluntaryContextSwitches": 9499,
+          "involuntaryContextSwitches": 405,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 184.9084283449157,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 119.04861362764295
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5078.510572999992,
+            "resources": {
+              "userCpuSeconds": 9.56,
+              "systemCpuSeconds": 0.32,
+              "peakRssKiB": 481828,
+              "majorFaults": 0,
+              "minorFaults": 113514,
+              "voluntaryContextSwitches": 6998,
+              "involuntaryContextSwitches": 253,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 194.5452285267895,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1708.4301500000001,
+            "resources": {
+              "userCpuSeconds": 2.41,
+              "systemCpuSeconds": 0.26,
+              "peakRssKiB": 358760,
+              "majorFaults": 0,
+              "minorFaults": 70591,
+              "voluntaryContextSwitches": 2501,
+              "involuntaryContextSwitches": 152,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 156.28382582688556,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 472.9488062476537
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "ts7-check": [
+      {
+        "ok": true,
+        "ms": 638.0374660000016,
+        "resources": {
+          "userCpuSeconds": 2.72,
+          "systemCpuSeconds": 0.24,
+          "peakRssKiB": 277344,
+          "majorFaults": 0,
+          "minorFaults": 80714,
+          "voluntaryContextSwitches": 1152,
+          "involuntaryContextSwitches": 557,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 463.9225998054467,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 637.9331630000015,
+            "resources": {
+              "userCpuSeconds": 2.72,
+              "systemCpuSeconds": 0.24,
+              "peakRssKiB": 277344,
+              "majorFaults": 0,
+              "minorFaults": 80714,
+              "voluntaryContextSwitches": 1152,
+              "involuntaryContextSwitches": 557,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 463.9984518252727,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 795.8904200000034,
+        "resources": {
+          "userCpuSeconds": 3.41,
+          "systemCpuSeconds": 0.24,
+          "peakRssKiB": 291040,
+          "majorFaults": 0,
+          "minorFaults": 83482,
+          "voluntaryContextSwitches": 1001,
+          "involuntaryContextSwitches": 1119,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 458.60584676970797,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 795.2913489999992,
+            "resources": {
+              "userCpuSeconds": 3.41,
+              "systemCpuSeconds": 0.24,
+              "peakRssKiB": 291040,
+              "majorFaults": 0,
+              "minorFaults": 83482,
+              "voluntaryContextSwitches": 1001,
+              "involuntaryContextSwitches": 1119,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 458.9513018832051,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 661.6392979999946,
+        "resources": {
+          "userCpuSeconds": 2.63,
+          "systemCpuSeconds": 0.23,
+          "peakRssKiB": 283996,
+          "majorFaults": 0,
+          "minorFaults": 81554,
+          "voluntaryContextSwitches": 960,
+          "involuntaryContextSwitches": 408,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 432.25969325661544,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 661.5018019999989,
+            "resources": {
+              "userCpuSeconds": 2.63,
+              "systemCpuSeconds": 0.23,
+              "peakRssKiB": 283996,
+              "majorFaults": 0,
+              "minorFaults": 81554,
+              "voluntaryContextSwitches": 960,
+              "involuntaryContextSwitches": 408,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 432.3495402964911,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 785.0437119999988,
+        "resources": {
+          "userCpuSeconds": 3.17,
+          "systemCpuSeconds": 0.29,
+          "peakRssKiB": 285336,
+          "majorFaults": 0,
+          "minorFaults": 82285,
+          "voluntaryContextSwitches": 1115,
+          "involuntaryContextSwitches": 1188,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 440.73978902209274,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 784.9388360000012,
+            "resources": {
+              "userCpuSeconds": 3.17,
+              "systemCpuSeconds": 0.29,
+              "peakRssKiB": 285336,
+              "majorFaults": 0,
+              "minorFaults": 82285,
+              "voluntaryContextSwitches": 1115,
+              "involuntaryContextSwitches": 1188,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 440.7986764461728,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 741.9744830000127,
+        "resources": {
+          "userCpuSeconds": 3.12,
+          "systemCpuSeconds": 0.24,
+          "peakRssKiB": 285280,
+          "majorFaults": 0,
+          "minorFaults": 82685,
+          "voluntaryContextSwitches": 884,
+          "involuntaryContextSwitches": 1126,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 452.84576181307074,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 741.8734350000013,
+            "resources": {
+              "userCpuSeconds": 3.12,
+              "systemCpuSeconds": 0.24,
+              "peakRssKiB": 285280,
+              "majorFaults": 0,
+              "minorFaults": 82685,
+              "voluntaryContextSwitches": 884,
+              "involuntaryContextSwitches": 1126,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 452.90744235908574,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "ts7-build": [
+      {
+        "ok": true,
+        "ms": 2489.3411300000007,
+        "resources": {
+          "userCpuSeconds": 5.83,
+          "systemCpuSeconds": 0.47,
+          "peakRssKiB": 357752,
+          "majorFaults": 0,
+          "minorFaults": 154804,
+          "voluntaryContextSwitches": 3467,
+          "involuntaryContextSwitches": 833,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 253.0790145262252,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 324.5838789479206
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 730.924890000002,
+            "resources": {
+              "userCpuSeconds": 3.27,
+              "systemCpuSeconds": 0.26,
+              "peakRssKiB": 290468,
+              "majorFaults": 0,
+              "minorFaults": 83273,
+              "voluntaryContextSwitches": 943,
+              "involuntaryContextSwitches": 710,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 482.94975972154816,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1758.1617770000012,
+            "resources": {
+              "userCpuSeconds": 2.56,
+              "systemCpuSeconds": 0.21,
+              "peakRssKiB": 357752,
+              "majorFaults": 0,
+              "minorFaults": 71531,
+              "voluntaryContextSwitches": 2524,
+              "involuntaryContextSwitches": 123,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 157.55091688584687,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 459.5709055731562
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 2472.6690920000037,
+        "resources": {
+          "userCpuSeconds": 5.54,
+          "systemCpuSeconds": 0.49,
+          "peakRssKiB": 345868,
+          "majorFaults": 0,
+          "minorFaults": 153580,
+          "voluntaryContextSwitches": 3314,
+          "involuntaryContextSwitches": 610,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 243.86603203434188,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 326.7723945004117
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 729.7538209999984,
+            "resources": {
+              "userCpuSeconds": 3.07,
+              "systemCpuSeconds": 0.27,
+              "peakRssKiB": 287648,
+              "majorFaults": 0,
+              "minorFaults": 82591,
+              "voluntaryContextSwitches": 786,
+              "involuntaryContextSwitches": 471,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 457.68859358942734,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1742.5067259999996,
+            "resources": {
+              "userCpuSeconds": 2.47,
+              "systemCpuSeconds": 0.22,
+              "peakRssKiB": 345868,
+              "majorFaults": 0,
+              "minorFaults": 70989,
+              "voluntaryContextSwitches": 2528,
+              "involuntaryContextSwitches": 139,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 154.3753008159121,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 463.6997883243753
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 2457.0024050000065,
+        "resources": {
+          "userCpuSeconds": 5.25,
+          "systemCpuSeconds": 0.51,
+          "peakRssKiB": 346684,
+          "majorFaults": 0,
+          "minorFaults": 152822,
+          "voluntaryContextSwitches": 3456,
+          "involuntaryContextSwitches": 1300,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 234.43200496175277,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 328.8560069602365
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 722.0409220000001,
+            "resources": {
+              "userCpuSeconds": 2.82,
+              "systemCpuSeconds": 0.27,
+              "peakRssKiB": 282720,
+              "majorFaults": 0,
+              "minorFaults": 81201,
+              "voluntaryContextSwitches": 972,
+              "involuntaryContextSwitches": 1185,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 427.9535834950916,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1734.7141709999996,
+            "resources": {
+              "userCpuSeconds": 2.43,
+              "systemCpuSeconds": 0.24,
+              "peakRssKiB": 346684,
+              "majorFaults": 0,
+              "minorFaults": 71621,
+              "voluntaryContextSwitches": 2484,
+              "involuntaryContextSwitches": 115,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 153.9158464625237,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 465.78278629857357
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 2470.1606949999987,
+        "resources": {
+          "userCpuSeconds": 5.5,
+          "systemCpuSeconds": 0.44999999999999996,
+          "peakRssKiB": 358904,
+          "majorFaults": 0,
+          "minorFaults": 149757,
+          "voluntaryContextSwitches": 3255,
+          "involuntaryContextSwitches": 663,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 240.87501724255242,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 327.1042250957687
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 718.6120079999964,
+            "resources": {
+              "userCpuSeconds": 3,
+              "systemCpuSeconds": 0.24,
+              "peakRssKiB": 273636,
+              "majorFaults": 0,
+              "minorFaults": 78852,
+              "voluntaryContextSwitches": 759,
+              "involuntaryContextSwitches": 573,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 450.8691705580316,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1751.2388490000012,
+            "resources": {
+              "userCpuSeconds": 2.5,
+              "systemCpuSeconds": 0.21,
+              "peakRssKiB": 358904,
+              "majorFaults": 0,
+              "minorFaults": 70905,
+              "voluntaryContextSwitches": 2496,
+              "involuntaryContextSwitches": 90,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 154.7475949124515,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 461.387663060003
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 2476.465802000006,
+        "resources": {
+          "userCpuSeconds": 5.23,
+          "systemCpuSeconds": 0.48,
+          "peakRssKiB": 352724,
+          "majorFaults": 0,
+          "minorFaults": 152258,
+          "voluntaryContextSwitches": 3516,
+          "involuntaryContextSwitches": 973,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 230.5705168788754,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 326.27141442755044
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 743.1112119999889,
+            "resources": {
+              "userCpuSeconds": 2.76,
+              "systemCpuSeconds": 0.29,
+              "peakRssKiB": 284516,
+              "majorFaults": 0,
+              "minorFaults": 81467,
+              "voluntaryContextSwitches": 927,
+              "involuntaryContextSwitches": 837,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 410.43654714767587,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1733.1170310000016,
+            "resources": {
+              "userCpuSeconds": 2.47,
+              "systemCpuSeconds": 0.19,
+              "peakRssKiB": 352724,
+              "majorFaults": 0,
+              "minorFaults": 70791,
+              "voluntaryContextSwitches": 2589,
+              "involuntaryContextSwitches": 136,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 153.48069128748855,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 466.2120246627472
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "tsrs-check": [
+      {
+        "ok": true,
+        "ms": 206.99558000000252,
+        "resources": {
+          "userCpuSeconds": 0.57,
+          "systemCpuSeconds": 0.08,
+          "peakRssKiB": 108652,
+          "majorFaults": 0,
+          "minorFaults": 17729,
+          "voluntaryContextSwitches": 393,
+          "involuntaryContextSwitches": 1466,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 314.01636691952166,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 206.89663599999767,
+            "resources": {
+              "userCpuSeconds": 0.57,
+              "systemCpuSeconds": 0.08,
+              "peakRssKiB": 108652,
+              "majorFaults": 0,
+              "minorFaults": 17729,
+              "voluntaryContextSwitches": 393,
+              "involuntaryContextSwitches": 1466,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 314.1665386961667,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 214.60904700000538,
+        "resources": {
+          "userCpuSeconds": 0.61,
+          "systemCpuSeconds": 0.08,
+          "peakRssKiB": 110360,
+          "majorFaults": 0,
+          "minorFaults": 17739,
+          "voluntaryContextSwitches": 294,
+          "involuntaryContextSwitches": 1272,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 321.5148707127816,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 214.5091590000011,
+            "resources": {
+              "userCpuSeconds": 0.61,
+              "systemCpuSeconds": 0.08,
+              "peakRssKiB": 110360,
+              "majorFaults": 0,
+              "minorFaults": 17739,
+              "voluntaryContextSwitches": 294,
+              "involuntaryContextSwitches": 1272,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 321.66458682540286,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 255.3826490000065,
+        "resources": {
+          "userCpuSeconds": 0.75,
+          "systemCpuSeconds": 0.07,
+          "peakRssKiB": 110940,
+          "majorFaults": 0,
+          "minorFaults": 17821,
+          "voluntaryContextSwitches": 389,
+          "involuntaryContextSwitches": 837,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 321.0868096211106,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 255.2830510000058,
+            "resources": {
+              "userCpuSeconds": 0.75,
+              "systemCpuSeconds": 0.07,
+              "peakRssKiB": 110940,
+              "majorFaults": 0,
+              "minorFaults": 17821,
+              "voluntaryContextSwitches": 389,
+              "involuntaryContextSwitches": 837,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 321.21208078165023,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 227.4849499999982,
+        "resources": {
+          "userCpuSeconds": 0.65,
+          "systemCpuSeconds": 0.08,
+          "peakRssKiB": 110516,
+          "majorFaults": 0,
+          "minorFaults": 17644,
+          "voluntaryContextSwitches": 362,
+          "involuntaryContextSwitches": 315,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 320.90034967148625,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 227.3693009999988,
+            "resources": {
+              "userCpuSeconds": 0.65,
+              "systemCpuSeconds": 0.08,
+              "peakRssKiB": 110516,
+              "majorFaults": 0,
+              "minorFaults": 17644,
+              "voluntaryContextSwitches": 362,
+              "involuntaryContextSwitches": 315,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 321.0635722541997,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 202.69613700000627,
+        "resources": {
+          "userCpuSeconds": 0.56,
+          "systemCpuSeconds": 0.07,
+          "peakRssKiB": 112296,
+          "majorFaults": 0,
+          "minorFaults": 17709,
+          "voluntaryContextSwitches": 334,
+          "involuntaryContextSwitches": 571,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 310.8100673867212,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 202.60019399999874,
+            "resources": {
+              "userCpuSeconds": 0.56,
+              "systemCpuSeconds": 0.07,
+              "peakRssKiB": 112296,
+              "majorFaults": 0,
+              "minorFaults": 17709,
+              "voluntaryContextSwitches": 334,
+              "involuntaryContextSwitches": 571,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 310.9572540685741,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "tsrs-build": [
+      {
+        "ok": true,
+        "ms": 2106.277836000001,
+        "resources": {
+          "userCpuSeconds": 3.27,
+          "systemCpuSeconds": 0.26,
+          "peakRssKiB": 352212,
+          "majorFaults": 0,
+          "minorFaults": 88363,
+          "voluntaryContextSwitches": 2906,
+          "involuntaryContextSwitches": 666,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 167.59422425978553,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 383.6151082206989
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 200.78991900000256,
+            "resources": {
+              "userCpuSeconds": 0.58,
+              "systemCpuSeconds": 0.06,
+              "peakRssKiB": 109776,
+              "majorFaults": 0,
+              "minorFaults": 17693,
+              "voluntaryContextSwitches": 346,
+              "involuntaryContextSwitches": 211,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 318.7411017382759,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1905.1718309999997,
+            "resources": {
+              "userCpuSeconds": 2.69,
+              "systemCpuSeconds": 0.2,
+              "peakRssKiB": 352212,
+              "majorFaults": 0,
+              "minorFaults": 70670,
+              "voluntaryContextSwitches": 2560,
+              "involuntaryContextSwitches": 455,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 151.6923540950675,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 424.10872702011943
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1963.527489,
+        "resources": {
+          "userCpuSeconds": 3.0700000000000003,
+          "systemCpuSeconds": 0.29,
+          "peakRssKiB": 359304,
+          "majorFaults": 0,
+          "minorFaults": 88638,
+          "voluntaryContextSwitches": 2871,
+          "involuntaryContextSwitches": 1592,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 171.12059896402096,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 411.50429750871695
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 233.3133200000011,
+            "resources": {
+              "userCpuSeconds": 0.62,
+              "systemCpuSeconds": 0.08,
+              "peakRssKiB": 109612,
+              "majorFaults": 0,
+              "minorFaults": 17629,
+              "voluntaryContextSwitches": 357,
+              "involuntaryContextSwitches": 1429,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 300.02573363578074,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1729.9395490000024,
+            "resources": {
+              "userCpuSeconds": 2.45,
+              "systemCpuSeconds": 0.21,
+              "peakRssKiB": 359304,
+              "majorFaults": 0,
+              "minorFaults": 71009,
+              "voluntaryContextSwitches": 2514,
+              "involuntaryContextSwitches": 163,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 153.76259832533583,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 467.06834378523064
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1927.3883849999984,
+        "resources": {
+          "userCpuSeconds": 3.08,
+          "systemCpuSeconds": 0.26,
+          "peakRssKiB": 351896,
+          "majorFaults": 0,
+          "minorFaults": 88622,
+          "voluntaryContextSwitches": 2808,
+          "involuntaryContextSwitches": 661,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 173.29148738229026,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 419.22012516434285
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 224.31306899999618,
+            "resources": {
+              "userCpuSeconds": 0.67,
+              "systemCpuSeconds": 0.07,
+              "peakRssKiB": 110860,
+              "majorFaults": 0,
+              "minorFaults": 17624,
+              "voluntaryContextSwitches": 330,
+              "involuntaryContextSwitches": 547,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 329.89607038902074,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1702.7620139999926,
+            "resources": {
+              "userCpuSeconds": 2.41,
+              "systemCpuSeconds": 0.19,
+              "peakRssKiB": 351896,
+              "majorFaults": 0,
+              "minorFaults": 70998,
+              "voluntaryContextSwitches": 2478,
+              "involuntaryContextSwitches": 114,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 152.69309384535114,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 474.5231531809374
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1981.9531449999922,
+        "resources": {
+          "userCpuSeconds": 3.24,
+          "systemCpuSeconds": 0.33,
+          "peakRssKiB": 348660,
+          "majorFaults": 0,
+          "minorFaults": 85148,
+          "voluntaryContextSwitches": 2879,
+          "involuntaryContextSwitches": 1710,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 180.12534801876023,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 407.67865882117167
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 280.73387500000536,
+            "resources": {
+              "userCpuSeconds": 0.79,
+              "systemCpuSeconds": 0.14,
+              "peakRssKiB": 111200,
+              "majorFaults": 0,
+              "minorFaults": 17792,
+              "voluntaryContextSwitches": 341,
+              "involuntaryContextSwitches": 1528,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 331.2745923519142,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1700.9353799999953,
+            "resources": {
+              "userCpuSeconds": 2.45,
+              "systemCpuSeconds": 0.19,
+              "peakRssKiB": 348660,
+              "majorFaults": 0,
+              "minorFaults": 67356,
+              "voluntaryContextSwitches": 2538,
+              "involuntaryContextSwitches": 182,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 155.2087181583587,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 475.0327434543705
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1913.8052840000018,
+        "resources": {
+          "userCpuSeconds": 2.9899999999999998,
+          "systemCpuSeconds": 0.29000000000000004,
+          "peakRssKiB": 360588,
+          "majorFaults": 0,
+          "minorFaults": 88975,
+          "voluntaryContextSwitches": 2880,
+          "involuntaryContextSwitches": 960,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 171.38629658000238,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 422.1955110873229
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 197.77404000000388,
+            "resources": {
+              "userCpuSeconds": 0.57,
+              "systemCpuSeconds": 0.07,
+              "peakRssKiB": 114620,
+              "majorFaults": 0,
+              "minorFaults": 17717,
+              "voluntaryContextSwitches": 351,
+              "involuntaryContextSwitches": 844,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 323.6016213250169,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1715.8042990000104,
+            "resources": {
+              "userCpuSeconds": 2.42,
+              "systemCpuSeconds": 0.22,
+              "peakRssKiB": 360588,
+              "majorFaults": 0,
+              "minorFaults": 71258,
+              "voluntaryContextSwitches": 2529,
+              "involuntaryContextSwitches": 116,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 153.86370121223155,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 470.9161764374359
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "vite": [
+      {
+        "ok": true,
+        "ms": 1723.6422689999963,
+        "resources": {
+          "userCpuSeconds": 2.5,
+          "systemCpuSeconds": 0.18,
+          "peakRssKiB": 354508,
+          "majorFaults": 0,
+          "minorFaults": 70648,
+          "voluntaryContextSwitches": 2588,
+          "involuntaryContextSwitches": 115,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 155.4846993602015,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 468.7747652352344
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 1723.558094,
+            "resources": {
+              "userCpuSeconds": 2.5,
+              "systemCpuSeconds": 0.18,
+              "peakRssKiB": 354508,
+              "majorFaults": 0,
+              "minorFaults": 70648,
+              "voluntaryContextSwitches": 2588,
+              "involuntaryContextSwitches": 115,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 155.49229291020347,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 468.79765922180746
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1690.8015830000004,
+        "resources": {
+          "userCpuSeconds": 2.41,
+          "systemCpuSeconds": 0.19,
+          "peakRssKiB": 349388,
+          "majorFaults": 0,
+          "minorFaults": 71148,
+          "voluntaryContextSwitches": 2505,
+          "involuntaryContextSwitches": 114,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 153.77321775313237,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 477.8798459405037
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 1690.7018499999976,
+            "resources": {
+              "userCpuSeconds": 2.41,
+              "systemCpuSeconds": 0.19,
+              "peakRssKiB": 349388,
+              "majorFaults": 0,
+              "minorFaults": 71148,
+              "voluntaryContextSwitches": 2505,
+              "involuntaryContextSwitches": 114,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 153.78228869862556,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 477.9080356480364
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1669.2185860000027,
+        "resources": {
+          "userCpuSeconds": 2.4,
+          "systemCpuSeconds": 0.18,
+          "peakRssKiB": 358560,
+          "majorFaults": 0,
+          "minorFaults": 70835,
+          "voluntaryContextSwitches": 2545,
+          "involuntaryContextSwitches": 48,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 154.5633400945127,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 484.0588325440553
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 1669.1296300000104,
+            "resources": {
+              "userCpuSeconds": 2.4,
+              "systemCpuSeconds": 0.18,
+              "peakRssKiB": 358560,
+              "majorFaults": 0,
+              "minorFaults": 70835,
+              "voluntaryContextSwitches": 2545,
+              "involuntaryContextSwitches": 48,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 154.5715775233098,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 484.0846303830787
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1636.7131920000102,
+        "resources": {
+          "userCpuSeconds": 2.37,
+          "systemCpuSeconds": 0.18,
+          "peakRssKiB": 345728,
+          "majorFaults": 0,
+          "minorFaults": 70783,
+          "voluntaryContextSwitches": 2526,
+          "involuntaryContextSwitches": 68,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 155.8000517417461,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 493.67232081306213
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 1636.5837799999863,
+            "resources": {
+              "userCpuSeconds": 2.37,
+              "systemCpuSeconds": 0.18,
+              "peakRssKiB": 345728,
+              "majorFaults": 0,
+              "minorFaults": 70783,
+              "voluntaryContextSwitches": 2526,
+              "involuntaryContextSwitches": 68,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 155.8123715487405,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 493.7113576916953
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1643.5595570000005,
+        "resources": {
+          "userCpuSeconds": 2.35,
+          "systemCpuSeconds": 0.19,
+          "peakRssKiB": 360996,
+          "majorFaults": 0,
+          "minorFaults": 71026,
+          "voluntaryContextSwitches": 2562,
+          "involuntaryContextSwitches": 136,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 154.54261996056155,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 491.61589341784935
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 1643.4385030000121,
+            "resources": {
+              "userCpuSeconds": 2.35,
+              "systemCpuSeconds": 0.19,
+              "peakRssKiB": 360996,
+              "majorFaults": 0,
+              "minorFaults": 71026,
+              "voluntaryContextSwitches": 2562,
+              "involuntaryContextSwitches": 136,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 154.55400341195374,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 491.6521053419631
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ]
+  },
+  "warmups": {
+    "ts59-check": [
+      {
+        "ok": true,
+        "ms": 4581.620186,
+        "resources": {
+          "userCpuSeconds": 8.47,
+          "systemCpuSeconds": 0.32,
+          "peakRssKiB": 480452,
+          "majorFaults": 0,
+          "minorFaults": 113102,
+          "voluntaryContextSwitches": 6988,
+          "involuntaryContextSwitches": 345,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 191.85352873333966,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 4581.484666999999,
+            "resources": {
+              "userCpuSeconds": 8.47,
+              "systemCpuSeconds": 0.32,
+              "peakRssKiB": 480452,
+              "majorFaults": 0,
+              "minorFaults": 113102,
+              "voluntaryContextSwitches": 6988,
+              "involuntaryContextSwitches": 345,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 191.85920370559222,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "ts59-build": [
+      {
+        "ok": true,
+        "ms": 6914.831058,
+        "resources": {
+          "userCpuSeconds": 12.05,
+          "systemCpuSeconds": 0.6499999999999999,
+          "peakRssKiB": 485980,
+          "majorFaults": 0,
+          "minorFaults": 190244,
+          "voluntaryContextSwitches": 9563,
+          "involuntaryContextSwitches": 492,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 183.6632000619443,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 116.85028791342599
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 5084.901293999999,
+            "resources": {
+              "userCpuSeconds": 9.47,
+              "systemCpuSeconds": 0.35,
+              "peakRssKiB": 485980,
+              "majorFaults": 0,
+              "minorFaults": 114564,
+              "voluntaryContextSwitches": 7019,
+              "involuntaryContextSwitches": 350,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 193.12075952363614,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1829.6524329999993,
+            "resources": {
+              "userCpuSeconds": 2.58,
+              "systemCpuSeconds": 0.3,
+              "peakRssKiB": 334064,
+              "majorFaults": 0,
+              "minorFaults": 75680,
+              "voluntaryContextSwitches": 2544,
+              "involuntaryContextSwitches": 142,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 157.40694505993102,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 441.6139291959176
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "ts7-check": [
+      {
+        "ok": true,
+        "ms": 679.6468359999999,
+        "resources": {
+          "userCpuSeconds": 2.84,
+          "systemCpuSeconds": 0.25,
+          "peakRssKiB": 272992,
+          "majorFaults": 0,
+          "minorFaults": 78338,
+          "voluntaryContextSwitches": 1067,
+          "involuntaryContextSwitches": 970,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 454.6478900992045,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 679.5298640000001,
+            "resources": {
+              "userCpuSeconds": 2.84,
+              "systemCpuSeconds": 0.25,
+              "peakRssKiB": 272992,
+              "majorFaults": 0,
+              "minorFaults": 78338,
+              "voluntaryContextSwitches": 1067,
+              "involuntaryContextSwitches": 970,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 454.7261516677065,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "ts7-build": [
+      {
+        "ok": true,
+        "ms": 2544.9665129999994,
+        "resources": {
+          "userCpuSeconds": 5.67,
+          "systemCpuSeconds": 0.5,
+          "peakRssKiB": 324848,
+          "majorFaults": 0,
+          "minorFaults": 155070,
+          "voluntaryContextSwitches": 3296,
+          "involuntaryContextSwitches": 1521,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 242.4393393187253,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 317.4894427382983
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 792.4060290000016,
+            "resources": {
+              "userCpuSeconds": 3.14,
+              "systemCpuSeconds": 0.27,
+              "peakRssKiB": 288352,
+              "majorFaults": 0,
+              "minorFaults": 82097,
+              "voluntaryContextSwitches": 737,
+              "involuntaryContextSwitches": 1435,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 430.3349388069829,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1752.261386000002,
+            "resources": {
+              "userCpuSeconds": 2.53,
+              "systemCpuSeconds": 0.23,
+              "peakRssKiB": 324848,
+              "majorFaults": 0,
+              "minorFaults": 72973,
+              "voluntaryContextSwitches": 2559,
+              "involuntaryContextSwitches": 86,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 157.51074708667903,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 461.1184190073792
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "tsrs-check": [
+      {
+        "ok": true,
+        "ms": 295.23561399999744,
+        "resources": {
+          "userCpuSeconds": 0.69,
+          "systemCpuSeconds": 0.13,
+          "peakRssKiB": 101768,
+          "majorFaults": 0,
+          "minorFaults": 21018,
+          "voluntaryContextSwitches": 356,
+          "involuntaryContextSwitches": 3611,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 0,
+          "averageCpuPercent": 277.7442697004729,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 0
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 295.11318799999935,
+            "resources": {
+              "userCpuSeconds": 0.69,
+              "systemCpuSeconds": 0.13,
+              "peakRssKiB": 101768,
+              "majorFaults": 0,
+              "minorFaults": 21018,
+              "voluntaryContextSwitches": 356,
+              "involuntaryContextSwitches": 3611,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 277.8594903051238,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "tsrs-build": [
+      {
+        "ok": true,
+        "ms": 1928.588061999999,
+        "resources": {
+          "userCpuSeconds": 3.09,
+          "systemCpuSeconds": 0.31,
+          "peakRssKiB": 358232,
+          "majorFaults": 0,
+          "minorFaults": 88684,
+          "voluntaryContextSwitches": 2831,
+          "involuntaryContextSwitches": 1047,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 176.2947757995612,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 418.95934954719246
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 266.2960559999992,
+            "resources": {
+              "userCpuSeconds": 0.74,
+              "systemCpuSeconds": 0.11,
+              "peakRssKiB": 112356,
+              "majorFaults": 0,
+              "minorFaults": 17749,
+              "voluntaryContextSwitches": 384,
+              "involuntaryContextSwitches": 970,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 0,
+              "averageCpuPercent": 319.19361209014767,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 0
+            }
+          },
+          {
+            "ms": 1661.6438799999996,
+            "resources": {
+              "userCpuSeconds": 2.35,
+              "systemCpuSeconds": 0.2,
+              "peakRssKiB": 358232,
+              "majorFaults": 0,
+              "minorFaults": 70935,
+              "voluntaryContextSwitches": 2447,
+              "involuntaryContextSwitches": 77,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 153.4624855958908,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 486.2654445548226
+            }
+          }
+        ],
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "vite": [
+      {
+        "ok": true,
+        "ms": 1670.3050260000018,
+        "resources": {
+          "userCpuSeconds": 2.42,
+          "systemCpuSeconds": 0.18,
+          "peakRssKiB": 355376,
+          "majorFaults": 0,
+          "minorFaults": 70734,
+          "voluntaryContextSwitches": 2492,
+          "involuntaryContextSwitches": 84,
+          "fsInputOperations": 0,
+          "fsOutputOperations": 808,
+          "averageCpuPercent": 155.66019137393155,
+          "fsInputOperationsPerSecond": 0,
+          "fsOutputOperationsPerSecond": 483.74397934667957
+        },
+        "measurementError": false,
+        "phases": [
+          {
+            "ms": 1670.2052619999995,
+            "resources": {
+              "userCpuSeconds": 2.42,
+              "systemCpuSeconds": 0.18,
+              "peakRssKiB": 355376,
+              "majorFaults": 0,
+              "minorFaults": 70734,
+              "voluntaryContextSwitches": 2492,
+              "involuntaryContextSwitches": 84,
+              "fsInputOperations": 0,
+              "fsOutputOperations": 808,
+              "averageCpuPercent": 155.66948920317802,
+              "fsInputOperationsPerSecond": 0,
+              "fsOutputOperationsPerSecond": 483.77287413910705
+            }
+          }
+        ],
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ]
+  },
+  "resources": {
+    "ts59-check": {
+      "userCpuSeconds": 9.47,
+      "systemCpuSeconds": 0.33,
+      "peakRssKiB": 485696,
+      "majorFaults": 0,
+      "minorFaults": 114484,
+      "voluntaryContextSwitches": 7002,
+      "involuntaryContextSwitches": 279,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 0,
+      "averageCpuPercent": 192.5788545207565,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 0
+    },
+    "ts59-build": {
+      "userCpuSeconds": 11.99,
+      "systemCpuSeconds": 0.58,
+      "peakRssKiB": 484188,
+      "majorFaults": 0,
+      "minorFaults": 185095,
+      "voluntaryContextSwitches": 9615,
+      "involuntaryContextSwitches": 421,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 808,
+      "averageCpuPercent": 184.76077859691452,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 119.04861362764295
+    },
+    "ts7-check": {
+      "userCpuSeconds": 3.12,
+      "systemCpuSeconds": 0.24,
+      "peakRssKiB": 285280,
+      "majorFaults": 0,
+      "minorFaults": 82285,
+      "voluntaryContextSwitches": 1001,
+      "involuntaryContextSwitches": 1119,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 0,
+      "averageCpuPercent": 452.84576181307074,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 0
+    },
+    "ts7-build": {
+      "userCpuSeconds": 5.5,
+      "systemCpuSeconds": 0.48,
+      "peakRssKiB": 352724,
+      "majorFaults": 0,
+      "minorFaults": 152822,
+      "voluntaryContextSwitches": 3456,
+      "involuntaryContextSwitches": 833,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 808,
+      "averageCpuPercent": 240.87501724255242,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 326.7723945004117
+    },
+    "tsrs-check": {
+      "userCpuSeconds": 0.61,
+      "systemCpuSeconds": 0.08,
+      "peakRssKiB": 110516,
+      "majorFaults": 0,
+      "minorFaults": 17729,
+      "voluntaryContextSwitches": 362,
+      "involuntaryContextSwitches": 837,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 0,
+      "averageCpuPercent": 320.90034967148625,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 0
+    },
+    "tsrs-build": {
+      "userCpuSeconds": 3.08,
+      "systemCpuSeconds": 0.29,
+      "peakRssKiB": 352212,
+      "majorFaults": 0,
+      "minorFaults": 88622,
+      "voluntaryContextSwitches": 2879,
+      "involuntaryContextSwitches": 960,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 808,
+      "averageCpuPercent": 171.38629658000238,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 411.50429750871695
+    },
+    "vite": {
+      "userCpuSeconds": 2.4,
+      "systemCpuSeconds": 0.18,
+      "peakRssKiB": 354508,
+      "majorFaults": 0,
+      "minorFaults": 70835,
+      "voluntaryContextSwitches": 2545,
+      "involuntaryContextSwitches": 114,
+      "fsInputOperations": 0,
+      "fsOutputOperations": 808,
+      "averageCpuPercent": 154.5633400945127,
+      "fsInputOperationsPerSecond": 0,
+      "fsOutputOperationsPerSecond": 484.0588325440553
+    }
+  },
+  "timings": {
+    "ts59-check": {
+      "successful": 5,
+      "failed": 0,
+      "median": 5082.150292999999,
+      "min": 4986.132549999995,
+      "max": 5294.761320999998
+    },
+    "ts59-build": {
+      "successful": 5,
+      "failed": 0,
+      "median": 6787.143297000002,
+      "min": 6714.495047999997,
+      "max": 7517.829328000007
+    },
+    "ts7-check": {
+      "successful": 5,
+      "failed": 0,
+      "median": 741.9744830000127,
+      "min": 638.0374660000016,
+      "max": 795.8904200000034
+    },
+    "ts7-build": {
+      "successful": 5,
+      "failed": 0,
+      "median": 2472.6690920000037,
+      "min": 2457.0024050000065,
+      "max": 2489.3411300000007
+    },
+    "tsrs-check": {
+      "successful": 5,
+      "failed": 0,
+      "median": 214.60904700000538,
+      "min": 202.69613700000627,
+      "max": 255.3826490000065
+    },
+    "tsrs-build": {
+      "successful": 5,
+      "failed": 0,
+      "median": 1963.527489,
+      "min": 1913.8052840000018,
+      "max": 2106.277836000001
+    },
+    "vite": {
+      "successful": 5,
+      "failed": 0,
+      "median": 1669.2185860000027,
+      "min": 1636.7131920000102,
+      "max": 1723.6422689999963
+    }
+  }
+}

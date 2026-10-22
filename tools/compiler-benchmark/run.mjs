@@ -13,7 +13,7 @@ import os from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { measure, summarize } from './measure.mjs'
+import { measure, summarize, summarizeResources, writeSummary } from './measure.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 process.umask(0o077)
@@ -64,6 +64,7 @@ function diagnostics(result) {
 function rejectedProbe(result) {
   return (
     !result.ok &&
+    result.steps.every((step) => !step.measurementError) &&
     result.steps.some((step) =>
       /bad-type-probe\.ts[^\n]*error TS2322:/.test(`${step.stdout}\n${step.stderr}`),
     )
@@ -71,6 +72,9 @@ function rejectedProbe(result) {
 }
 
 const metadata = {
+  loadAverageStart: os.loadavg(),
+  freeMemoryGiBStart: os.freemem() / 1024 ** 3,
+  resourceTool: execFileSync('/usr/bin/time', ['--version'], { encoding: 'utf8' }).split('\n')[0],
   date: new Date().toISOString(),
   commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   platform: `${os.platform()} ${os.release()} ${os.arch()}`,
@@ -111,7 +115,7 @@ try {
     ])
     preflight[checker.name] = {
       version: version.steps[0].stdout?.trim(),
-      ok: project.ok,
+      ok: version.ok && project.ok,
       statuses: project.steps.map((step) => step.status),
       diagnostics: diagnostics(project),
       probeRejected: rejectedProbe(probe),
@@ -123,7 +127,10 @@ try {
   rmSync(fixtureConfig, { force: true })
 }
 writeFileSync(join(output, 'preflight.json'), JSON.stringify(preflight, null, 2))
-if (!preflight.ts59.ok || checkers.some((checker) => !preflight[checker.name].probeRejected)) {
+if (
+  checkers.some((checker) => !preflight[checker.name].ok) ||
+  checkers.some((checker) => !preflight[checker.name].probeRejected)
+) {
   throw new Error(`Baseline/probe validation failed. Inspect ${output}`)
 }
 const baseline = run('vite-artifact-reference', [vite])
@@ -142,6 +149,7 @@ const cases = checkers.flatMap((checker) => {
 cases.push({ name: 'vite', commands: [vite], builds: true })
 const samples = Object.fromEntries(cases.map((entry) => [entry.name, []]))
 const order = []
+const warmups = {}
 for (let round = 0; round <= metadata.measuredRounds; round += 1) {
   const rotated = [...cases.slice(round % cases.length), ...cases.slice(0, round % cases.length)]
   order.push(rotated.map((entry) => entry.name))
@@ -154,12 +162,17 @@ for (let round = 0; round <= metadata.measuredRounds; round += 1) {
     const sample = {
       ok: result.ok && artifactMatch !== false,
       ms: result.ms,
+      resources: result.resources,
+      measurementError: result.steps.some((step) => step.measurementError),
+      phases: result.steps.map((step) => ({ ms: step.ms, resources: step.resources ?? null })),
       statuses: result.steps.map((step) => step.status),
       diagnostics: diagnostics(result),
       artifactMatch,
     }
     if (round > 0) {
       samples[entry.name].push(sample)
+    } else {
+      warmups[entry.name] = [sample]
     }
     if (artifactMatch === false) {
       throw new Error(`Artifact mismatch in ${entry.name}. Inspect ${output}`)
@@ -167,15 +180,21 @@ for (let round = 0; round <= metadata.measuredRounds; round += 1) {
     process.stdout.write(`Round ${round} ${entry.name}: ${result.ok ? 'pass' : 'failed'}\n`)
   }
 }
+metadata.loadAverageEnd = os.loadavg()
+metadata.freeMemoryGiBEnd = os.freemem() / 1024 ** 3
 const summary = {
   metadata,
   preflight,
   order,
   artifacts: reference,
   samples,
+  warmups,
+  resources: Object.fromEntries(
+    Object.entries(samples).map(([name, results]) => [name, summarizeResources(results)]),
+  ),
   timings: Object.fromEntries(
     Object.entries(samples).map(([name, results]) => [name, summarize(results)]),
   ),
 }
-writeFileSync(join(output, 'summary.json'), JSON.stringify(summary, null, 2))
+writeSummary(join(output, 'summary.json'), summary)
 process.stdout.write(`Private results: ${relative(root, output)}/summary.json\n`)
