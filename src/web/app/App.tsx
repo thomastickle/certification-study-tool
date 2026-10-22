@@ -13,6 +13,7 @@ import { ReportsPage } from '../features/reports/ReportsPage.tsx'
 import { HomePage } from '../features/home/HomePage.tsx'
 import { CertificationsPage } from '../features/certifications/CertificationsPage.tsx'
 import { StudyIcon } from '../shared/ui/StudyIcon.tsx'
+import { ThemeControl } from './ThemeControl.tsx'
 import { WorkspaceSidebar } from './WorkspaceSidebar.tsx'
 import { pauseCertificationAttempts } from './workspace-session.ts'
 import type { CertificationProgress } from '../../shared/home-contracts.ts'
@@ -181,6 +182,7 @@ export function App() {
           loading={catalogLoading}
           onSelect={selectCertification}
         />
+        <ThemeControl />
         <span className="local-badge">
           <span aria-hidden="true" />
           Local workspace

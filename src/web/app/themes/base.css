@@ -1,0 +1,69 @@
+:root {
+  color-scheme: light dark;
+  --ink: light-dark(#24324b, #e4eaf4);
+  --muted: light-dark(#62718a, #a5b3c9);
+  --border: light-dark(#e1e7f0, #39475f);
+  --surface: light-dark(#fff, #1c2739);
+  --canvas: light-dark(#f5f7fb, #111927);
+  --workspace: light-dark(#f0f4fd, #131e30);
+  --chart-surface: #263f60;
+  --chart-ink: #e5edfa;
+  --chart-muted: #c2d1e6;
+  --chart-grid: #56708f;
+  --chart-line: #a9ceff;
+  --chart-target: #ebc78c;
+  --subtle: light-dark(#f0f4f9, #263349);
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-ink: light-dark(#1d4ed8, #9bc2ff);
+  --accent-soft: light-dark(#edf3ff, #21395b);
+  --focus: #8baff3;
+  --sidebar-surface: light-dark(#fafbfd, #172234);
+  --raised-surface: light-dark(#fbfcff, #202d42);
+  --track-surface: light-dark(#e9edf3, #334158);
+  --success-surface: light-dark(#eaf2df, #233a2c);
+  --success-ink: light-dark(#486335, #b4d89c);
+  --success-border: light-dark(#cfdfbd, #4b6c45);
+  --error-surface: light-dark(#fff0e9, #442c2a);
+  --error-ink: light-dark(#8c4635, #ffb4a3);
+  --error-border: light-dark(#edcdc0, #87514b);
+  --warning-surface: light-dark(#fff6df, #3c3323);
+  --warning-ink: light-dark(#66501c, #e4c181);
+  --warning-border: light-dark(#c6b58a, #826d43);
+  --control-border: light-dark(#879bb9, #667c9e);
+  --danger: #9f3b36;
+  --danger-hover: #87302c;
+  --timer-warning-surface: #fff0b3;
+  --timer-urgent-surface: #ffe0da;
+  --signal-success: #237a45;
+  --signal-warning: #ffd700;
+  --signal-error: #c1362b;
+  --completion-partial-border: #b88a00;
+  --completion-empty-border: #bd4339;
+  --completion-answered-border: #39834f;
+  --confidence-guess: #e0aa00;
+  --result-strong: #16a34a;
+  --result-middle: #eab308;
+  --result-paused: #2563eb;
+  --result-unknown: #64748b;
+  --local-indicator: #6b8c7b;
+  --readiness-low: #e44848;
+  --readiness-middle: #f2cc0c;
+  --readiness-ready: #25a567;
+  --readiness-neutral: #9aa5b4;
+  --chart-success: #7e9c56;
+  --chart-warning: #b59356;
+  --chart-correct: #6c8965;
+  --chart-incorrect: #c79e67;
+  --result-low: light-dark(#dc2626, #f87171);
+  --on-accent: #fff;
+  --on-timer-warning: #000;
+}
+
+/* The browser resolves System live, including desktop changes while this page is open. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

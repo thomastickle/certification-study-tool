@@ -186,3 +186,19 @@ npm run check         # Formatting, lint, tests, typecheck, and production build
 
 `npm run build` includes typechecking. Private banks/databases, editor settings,
 and generated output are excluded from formatting; linting is scoped to code.
+
+## Appearance
+
+The header's **Theme** selector offers **System**, **Light**, and **Dark**.
+System is the default and follows the desktop/browser appearance, including changes
+while the app is open. Explicit choices are saved in this browser's local storage
+for this origin; selecting System clears the override. If storage is blocked,
+changes still work for the current page. Theme preferences do not sync between
+devices or browser profiles. The theme uses modern browser `light-dark()` support.
+
+The independent **Palette** selector offers **Blue** (default), **Forest**, and
+**Violet**, each available in light and dark appearance. Palette choices are also
+remembered locally. `src/web/app/themes/base.css` owns shared semantic color tokens
+and the Blue palette; `forest.css` and `violet.css` override the palette tokens.
+Component styles consume these variables. Native CSS handles theme switching;
+Vite builds the CSS without a Sass dependency.

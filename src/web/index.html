@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#17382e" />
+    <script>
+      // Apply a saved override before the first paint; CSS handles the system default.
+      try {
+        const palette = localStorage.getItem('study-palette')
+        if (palette === 'forest' || palette === 'violet')
+          document.documentElement.dataset.palette = palette
+        const theme = localStorage.getItem('study-theme')
+        if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
+      } catch {
+        // Browser storage can be unavailable.
+      }
+    </script>
     <title>Certification Study Tool</title>
   </head>
   <body>

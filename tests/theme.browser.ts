@@ -1,0 +1,72 @@
+/** Exercise the mounted control and real CSS; use a disposable study library. */
+export async function themeBrowserTest() {
+  const select = document.querySelector<HTMLSelectElement>('.theme-control select')!
+
+  /** Change the public control and let React commit its effect. */
+  async function choose(value: string) {
+    select.value = value
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+    await new Promise((resolve) => setTimeout(resolve, 40))
+  }
+
+  /** Report the failed visible behavior without tying checks to CSS declarations. */
+  function assert(condition: unknown, message: string): asserts condition {
+    if (!condition) throw new Error(message)
+  }
+
+  const canvas = document.querySelector('.workspace-content')!
+  await choose('light')
+  const light = getComputedStyle(canvas).backgroundColor
+  assert(localStorage.getItem('study-theme') === 'light', 'Light choice was not saved')
+  await choose('dark')
+  const dark = getComputedStyle(canvas).backgroundColor
+  assert(light !== dark, 'Theme control did not change the rendered canvas')
+  assert(localStorage.getItem('study-theme') === 'dark', 'Dark choice was not saved')
+  for (const label of ['Home', 'Practice', 'Due Review', 'Certifications', 'Importer', 'Reports']) {
+    document.querySelector<HTMLButtonElement>(`nav button[aria-label="${label}"]`)!.click()
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    assert(getComputedStyle(canvas).backgroundColor === dark, `${label} lost the dark canvas`)
+    assert(document.documentElement.scrollWidth <= innerWidth, `${label} overflows the viewport`)
+  }
+  await choose('system')
+  assert(localStorage.getItem('study-theme') === null, 'System did not clear the override')
+  const expected = matchMedia('(prefers-color-scheme: dark)').matches ? dark : light
+  assert(
+    getComputedStyle(canvas).backgroundColor === expected,
+    'System does not follow browser preference',
+  )
+  return { light, dark, system: expected, destinations: 6, width: innerWidth }
+}
+
+/** Check every palette/appearance pairing through the rendered controls. */
+export async function paletteBrowserTest() {
+  const controls = [...document.querySelectorAll<HTMLSelectElement>('.theme-control select')]
+  const [appearance, palette] = controls
+  if (!appearance || !palette) throw new Error('Missing appearance controls')
+  const results: { palette: string; appearance: string; canvas: string }[] = []
+  for (const value of ['blue', 'forest', 'violet']) {
+    palette.value = value
+    palette.dispatchEvent(new Event('change', { bubbles: true }))
+    for (const mode of ['light', 'dark']) {
+      appearance.value = mode
+      appearance.dispatchEvent(new Event('change', { bubbles: true }))
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      if (document.documentElement.dataset.palette !== value)
+        throw new Error('Palette did not apply')
+      if (localStorage.getItem('study-palette') !== (value === 'blue' ? null : value)) {
+        throw new Error('Palette did not persist')
+      }
+      if (document.documentElement.scrollWidth > innerWidth)
+        throw new Error('Appearance controls overflow')
+      results.push({
+        palette: value,
+        appearance: mode,
+        canvas: getComputedStyle(document.querySelector('.workspace-content')!).backgroundColor,
+      })
+    }
+  }
+  if (new Set(results.map((result) => result.canvas)).size !== 6) {
+    throw new Error('Palette/appearance combinations must have distinct canvases')
+  }
+  return results
+}
