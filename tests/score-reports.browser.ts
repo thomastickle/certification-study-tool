@@ -182,3 +182,47 @@ export async function scoreReportsTest(): Promise<string> {
   await click('Reports')
   return 'Score-first master, mode/date filters, chart, domains, detailed accuracy and individual quiz/exam reports passed.'
 }
+
+/** Completion summaries keep score, question counts and outcome together without extra target copy. */
+export async function compactCompletionSummaryTest(): Promise<string> {
+  /** Waits for the selected synthetic attempt to render. */
+  async function until(check: () => boolean, message: string) {
+    const deadline = Date.now() + 5000
+    while (!check()) {
+      if (Date.now() >= deadline) {
+        throw new Error(message)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+  }
+
+  for (const [id, expected] of [
+    ['00000000-0000-4000-8000-000000000001', 'Score: 40% · 8 of 20 · Fail'],
+    ['00000000-0000-4000-8000-000000000002', 'Score: 80% · 52 of 65 · Pass'],
+    ['00000000-0000-4000-8000-000000000003', 'Score: 0% · 0 of 20 · Fail'],
+  ]) {
+    const practice = [...document.querySelectorAll<HTMLButtonElement>('nav button')].find(
+      (button) => button.textContent?.trim() === 'Practice',
+    )!
+    practice.click()
+    await until(() => !!document.querySelector(`a[href="#result-${id}"]`), 'History missing')
+    document.querySelector<HTMLAnchorElement>(`a[href="#result-${id}"]`)!.click()
+    await until(() => !!document.querySelector('.result-score'), 'Completion card missing')
+    const summary = document
+      .querySelector('.result-score-value')
+      ?.textContent?.replace(/\s+/g, ' ')
+      .trim()
+    if (summary !== expected) {
+      throw new Error(`Expected compact summary "${expected}", got "${summary}"`)
+    }
+    if (document.querySelector('.result-score')!.textContent!.includes('practice target')) {
+      throw new Error('Completion card still has practice-target explanation')
+    }
+    const back = [...document.querySelectorAll<HTMLButtonElement>('.result-score button')].find(
+      (button) => button.textContent?.includes('Back to practice history'),
+    )!
+    back.click()
+    await until(() => !document.querySelector('.result-score'), 'History did not reopen')
+  }
+  return 'Compact quiz/exam summaries preserve correct score, counts, and pass/fail, including all-skipped.'
+}

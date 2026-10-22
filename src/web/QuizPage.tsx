@@ -1124,7 +1124,7 @@ function QuestionEditor({
 }
 
 function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
-  const mode = view.options.mode ?? 'quiz'
+  const mode = view.mode ?? view.options.mode ?? 'quiz'
   const correct = view.questions.filter((question) => question.correct).length
   const percent = view.questions.length ? (correct / view.questions.length) * 100 : null
   const answered = view.questions.filter((question) => question.selected.length > 0).length
@@ -1157,20 +1157,18 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
       <DeletedBankNotice names={view.deletedBankNames} />
       <section className="quiz-panel result-score">
         <ResultCompletionHeader key={view.id} quiz={view} />
-        <h2>
-          {correct} of {view.questions.length}
-        </h2>
         <p className="result-score-value">
-          Score: {percent === null ? '—' : `${Math.round(percent)}%`} · skips count as misses
+          Score: {percent === null ? '—' : `${Math.round(percent)}%`} · {correct} of{' '}
+          {view.questions.length}
+          {mode !== 'review' && (
+            <>
+              {' · '}
+              <strong className={passed ? 'correct-text' : 'incorrect-text'}>
+                {passed ? 'Pass' : 'Fail'}
+              </strong>
+            </>
+          )}
         </p>
-        {mode !== 'review' && (
-          <>
-            <p className={passed ? 'correct-text' : 'incorrect-text'}>
-              <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
-            </p>
-            <p>This is a practice target, not an official certification score.</p>
-          </>
-        )}
         {mode === 'review' && (
           <p>Due Review · no quiz/exam pass target. Only correct + Confident passes a due check.</p>
         )}
