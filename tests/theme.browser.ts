@@ -4,9 +4,11 @@ export async function themeBrowserTest() {
 
   /** Change the public control and let React commit its effect. */
   async function choose(value: string) {
+    document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
     select.value = value
     select.dispatchEvent(new Event('change', { bubbles: true }))
     await new Promise((resolve) => setTimeout(resolve, 40))
+    document.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click()
   }
 
   /** Report the failed visible behavior without tying checks to CSS declarations. */
@@ -61,9 +63,12 @@ export async function paletteBrowserTest() {
 
   const results: { palette: string; appearance: string; canvas: string }[] = []
   for (const value of ['blue', 'forest', 'violet']) {
+    document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
     palette.value = value
     palette.dispatchEvent(new Event('change', { bubbles: true }))
+    document.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click()
     for (const mode of ['light', 'dark']) {
+      document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
       appearance.value = mode
       appearance.dispatchEvent(new Event('change', { bubbles: true }))
       await new Promise((resolve) => setTimeout(resolve, 50))
@@ -74,6 +79,7 @@ export async function paletteBrowserTest() {
       }
       if (document.documentElement.scrollWidth > innerWidth)
         throw new Error('Appearance controls overflow')
+      document.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click()
       const selected = document.querySelector('.report-mode-switch button[aria-pressed="true"]')
       if (!selected) throw new Error('Missing selected Reports mode')
       const style = getComputedStyle(selected)

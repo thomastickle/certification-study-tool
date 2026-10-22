@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
+import { SettingsMenu } from './SettingsMenu.tsx'
 import { StudyIcon } from '../shared/ui/StudyIcon.tsx'
 
 export type Destination = 'home' | 'practice' | 'review' | 'certifications' | 'importer' | 'reports'
@@ -160,6 +161,9 @@ export function WorkspaceSidebar({ destination, onNavigate }: Props) {
             </button>
           ))}
         </nav>
+        <div className="sidebar-settings">
+          <SettingsMenu />
+        </div>
         <p className="sidebar-note">
           Your library and progress
           <br />
