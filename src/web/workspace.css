@@ -440,6 +440,9 @@
   min-block-size: 30px;
   white-space: nowrap;
 }
+.practice-session .confidence-row .flag-control {
+  margin-inline-start: auto;
+}
 .practice-session .confidence-row fieldset {
   gap: 10px 18px;
   min-width: 0;
