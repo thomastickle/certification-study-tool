@@ -16,8 +16,8 @@ export async function settingsBrowserTest() {
   assert(page.querySelector('h1')?.textContent === 'Settings', 'Settings page has no heading')
   assert(page.querySelectorAll('select').length === 1, 'Appearance must contain the Theme selector')
   assert(
-    page.querySelectorAll('input[name="palette"]').length === 3,
-    'Appearance must contain palette swatches',
+    page.querySelectorAll('input[name="palette"]').length === 6,
+    'Appearance must contain six palette pairs',
   )
   assert(
     !document.querySelector('header .appearance-controls'),
@@ -66,7 +66,7 @@ export async function paletteSwatchesBrowserTest() {
   document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
   await new Promise((resolve) => setTimeout(resolve, 100))
   const radios = [...document.querySelectorAll<HTMLInputElement>('input[name="palette"]')]
-  if (radios.length !== 3) throw new Error('Palette must offer three native radio swatches')
+  if (radios.length !== 6) throw new Error('Palette must offer six native radio choices')
   const initial = radios.find((radio) => radio.checked)!
   const previews = new Map<string, string>()
   try {
@@ -90,23 +90,46 @@ export async function paletteSwatchesBrowserTest() {
       ) {
         throw new Error('Palette swatch needs a visual preview and a visible name')
       }
-      const backgrounds = radios.map((option) => {
-        const swatch = option.parentElement!.querySelector<HTMLElement>('.palette-preview')!
-        const background = getComputedStyle(swatch).backgroundImage
-        const previous = previews.get(option.value)
-        if (previous !== undefined && previous !== background) {
-          throw new Error(`${option.value} preview inherited the active ${radio.value} palette`)
-        }
-        previews.set(option.value, background)
-        return background
+      const backgrounds = radios.flatMap((option) => {
+        const swatches = [
+          ...option.parentElement!.querySelectorAll<HTMLElement>('.palette-preview'),
+        ]
+        if (swatches.length !== 2) throw new Error('Every palette needs light and dark previews')
+        return swatches.map((swatch) => {
+          const background = getComputedStyle(swatch).backgroundImage
+          const mode = swatch.dataset.appearance!
+          if (getComputedStyle(swatch).colorScheme !== mode)
+            throw new Error('Preview did not fix its light/dark appearance')
+          const key = `${option.value}/${mode}`
+          const previous = previews.get(key)
+          if (previous !== undefined && previous !== background) {
+            throw new Error(`${option.value} preview inherited the active ${radio.value} palette`)
+          }
+          previews.set(key, background)
+          return background
+        })
       })
-      if (new Set(backgrounds).size !== 3) {
-        throw new Error('All three previews must show independent colors under each active palette')
+      if (new Set(backgrounds).size !== 12) {
+        throw new Error(
+          'All twelve previews must show independent colors under each active palette',
+        )
       }
     }
     if (document.documentElement.scrollWidth > innerWidth)
       throw new Error('Swatches overflow the viewport')
-    return { swatches: 3, selection: 'exclusive, applied, persisted, labeled', width: innerWidth }
+    const control = document.querySelector('.theme-control')!
+    const select = control.querySelector('select')!.getBoundingClientRect()
+    const label = control.querySelector('span')!.getBoundingClientRect()
+    const picker = document.querySelector('.palette-picker')!.getBoundingClientRect()
+    if (select.left - label.right > 16 || picker.top - select.bottom > 40) {
+      throw new Error('Appearance dropdown is too far from its label or palette choices')
+    }
+    return {
+      palettes: 6,
+      previews: 12,
+      selection: 'exclusive, applied, persisted, labeled',
+      width: innerWidth,
+    }
   } finally {
     initial.click()
   }

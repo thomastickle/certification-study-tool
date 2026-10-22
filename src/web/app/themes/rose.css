@@ -1,0 +1,19 @@
+/* Rose shares semantic status colors with the base theme. */
+:root[data-palette='rose'],
+.palette-preview[data-palette='rose'] {
+  --ink: light-dark(#4a2e3b, #f4e3ec);
+  --muted: light-dark(#846473, #c9aaba);
+  --border: light-dark(#eddce5, #603d4f);
+  --surface: light-dark(#ffffff, #382330);
+  --canvas: light-dark(#fcf5f8, #25151e);
+  --workspace: light-dark(#f9edf3, #2e1a26);
+  --sidebar-surface: light-dark(#fdf8fa, #321e2a);
+  --raised-surface: light-dark(#fff9fc, #442938);
+  --subtle: light-dark(#f5e7ee, #503244);
+  --track-surface: light-dark(#eedfe7, #614055);
+  --accent: #b13e65;
+  --accent-hover: #963051;
+  --accent-ink: light-dark(#963051, #f2a9c2);
+  --accent-soft: light-dark(#fbe3ed, #603047);
+  --focus: #d98eaa;
+}

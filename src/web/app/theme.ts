@@ -26,13 +26,15 @@ export function saveThemePreference(preference: ThemePreference, storage?: Theme
   }
 }
 
-export type Palette = 'blue' | 'forest' | 'violet'
+export const palettes = ['blue', 'forest', 'violet', 'ocean', 'amber', 'rose'] as const
+
+export type Palette = (typeof palettes)[number]
 
 /** Fall back to the original blue palette when storage is unavailable or invalid. */
 export function readPalette(storage?: Pick<ThemeStorage, 'getItem'>): Palette {
   try {
     const value = (storage ?? localStorage).getItem('study-palette')
-    return value === 'forest' || value === 'violet' ? value : 'blue'
+    return palettes.find((palette) => palette === value) ?? 'blue'
   } catch {
     return 'blue'
   }

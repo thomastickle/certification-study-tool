@@ -61,7 +61,7 @@ export async function paletteBrowserTest() {
   }
 
   const results: { palette: string; appearance: string; canvas: string }[] = []
-  for (const value of ['blue', 'forest', 'violet']) {
+  for (const value of ['blue', 'forest', 'violet', 'ocean', 'amber', 'rose']) {
     for (const mode of ['light', 'dark']) {
       await openSettings()
       const appearance = document.querySelector<HTMLSelectElement>('.theme-control select')
@@ -97,7 +97,7 @@ export async function paletteBrowserTest() {
       })
     }
   }
-  if (new Set(results.map((result) => result.canvas)).size !== 6)
+  if (new Set(results.map((result) => result.canvas)).size !== 12)
     throw new Error('Palette/appearance combinations must have distinct canvases')
   return results
 }

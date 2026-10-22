@@ -88,3 +88,19 @@ test('palette choices persist independently of appearance and reject unknown pal
   values.set('study-palette', 'unknown')
   assert.equal(readPalette(storage), 'blue')
 })
+
+test('all six palettes restore from storage and bootstrap before the first paint', async () => {
+  const { readPalette } = await import('./theme.ts')
+  const { readFileSync } = await import('node:fs')
+  const { runInNewContext } = await import('node:vm')
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)![1]!
+  for (const palette of ['blue', 'forest', 'violet', 'ocean', 'amber', 'rose']) {
+    const storage = { getItem: (key: string) => (key === 'study-palette' ? palette : 'dark') }
+    assert.equal(readPalette(storage), palette)
+    const document = { documentElement: { dataset: {} as Record<string, string> } }
+    runInNewContext(script, { document, localStorage: storage })
+    assert.equal(document.documentElement.dataset.palette ?? 'blue', palette)
+    assert.equal(document.documentElement.dataset.theme, 'dark')
+  }
+})

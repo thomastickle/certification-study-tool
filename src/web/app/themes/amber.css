@@ -1,0 +1,19 @@
+/* Amber shares semantic status colors with the base theme. */
+:root[data-palette='amber'],
+.palette-preview[data-palette='amber'] {
+  --ink: light-dark(#493522, #f3e9db);
+  --muted: light-dark(#806b51, #c6b49a);
+  --border: light-dark(#eadfce, #594a36);
+  --surface: light-dark(#ffffff, #33291d);
+  --canvas: light-dark(#fbf8f2, #211b13);
+  --workspace: light-dark(#f8f1e5, #2a2116);
+  --sidebar-surface: light-dark(#fdfaf5, #2e251a);
+  --raised-surface: light-dark(#fffcf7, #3d3020);
+  --subtle: light-dark(#f4ecdf, #4a3b28);
+  --track-surface: light-dark(#ede3d2, #5a4932);
+  --accent: #9a5b10;
+  --accent-hover: #7d480b;
+  --accent-ink: light-dark(#7d480b, #edc280);
+  --accent-soft: light-dark(#f9ecd6, #523d23);
+  --focus: #c69a5c;
+}

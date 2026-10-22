@@ -1,0 +1,19 @@
+/* Ocean shares semantic status colors with the base theme. */
+:root[data-palette='ocean'],
+.palette-preview[data-palette='ocean'] {
+  --ink: light-dark(#233944, #e0eff4);
+  --muted: light-dark(#5d7580, #a0bdc9);
+  --border: light-dark(#d7e6ec, #355462);
+  --surface: light-dark(#ffffff, #1b303a);
+  --canvas: light-dark(#f3f9fb, #101e25);
+  --workspace: light-dark(#eaf4f8, #132630);
+  --sidebar-surface: light-dark(#f7fbfd, #162b35);
+  --raised-surface: light-dark(#f7fcfe, #203c49);
+  --subtle: light-dark(#e7f1f5, #294957);
+  --track-surface: light-dark(#dceaf0, #355967);
+  --accent: #0e7490;
+  --accent-hover: #155e75;
+  --accent-ink: light-dark(#155e75, #83d4eb);
+  --accent-soft: light-dark(#dff2f8, #224b5b);
+  --focus: #68b9d0;
+}

@@ -1,3 +1,4 @@
+import { palettes } from './theme.ts'
 import type { Palette, ThemePreference } from './theme.ts'
 
 export type ThemeControlProps = {
@@ -33,7 +34,7 @@ export function ThemeControl({
       <fieldset className="palette-picker">
         <legend>Palette</legend>
         <div className="palette-options">
-          {(['blue', 'forest', 'violet'] as const).map((value) => (
+          {palettes.map((value) => (
             <label key={value} className="palette-option">
               <input
                 type="radio"
@@ -42,10 +43,22 @@ export function ThemeControl({
                 checked={palette === value}
                 onChange={() => onPaletteChange(value)}
               />
-              <span className="palette-preview" data-palette={value} aria-hidden="true">
-                <span className="palette-check">✓</span>
+              <span className="palette-pair" aria-hidden="true">
+                {(['light', 'dark'] as const).map((mode) => (
+                  <span key={mode} className="palette-sample">
+                    <span className="palette-preview" data-palette={value} data-appearance={mode} />
+                    <span className="palette-mode">{mode === 'light' ? 'Light' : 'Dark'}</span>
+                  </span>
+                ))}
               </span>
-              <span className="palette-name">{value.charAt(0).toUpperCase() + value.slice(1)}</span>
+              <span className="palette-title">
+                <span className="palette-name">
+                  {value.charAt(0).toUpperCase() + value.slice(1)}
+                </span>
+                <span className="palette-check" aria-hidden="true">
+                  ✓
+                </span>
+              </span>
             </label>
           ))}
         </div>
