@@ -30,9 +30,10 @@ test('Home, Reports and individual reviews visibly explain retained evidence fro
   })
   const repository = new LibraryRepository(':memory:')
   try {
-    const { HomeDashboard } = await import('../src/web/HomeDashboard.tsx')
-    const { ReportDashboard } = await import('../src/web/ReportDashboard.tsx')
-    const { ReportAttemptReview } = await import('../src/web/ReportAttemptReview.tsx')
+    const { HomeDashboard } = await import('../src/web/features/home/HomeDashboard.tsx')
+    const { ReportDashboard } = await import('../src/web/features/reports/ReportDashboard.tsx')
+    const { ReportAttemptReview } =
+      await import('../src/web/features/reports/ReportAttemptReview.tsx')
     populate(repository)
     const now = Date.parse('2026-10-21T12:00:00Z')
     const quizzes = new QuizService(repository, () => now)

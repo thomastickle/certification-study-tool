@@ -38,7 +38,7 @@ async function renderTiming(view: QuizView): Promise<string> {
     },
   })
   try {
-    const { AttemptTiming } = await import('../src/web/AttemptTiming.tsx')
+    const { AttemptTiming } = await import('../src/web/shared/ui/AttemptTiming.tsx')
     return renderToStaticMarkup(createElement(AttemptTiming, { quiz: view }))
   } finally {
     hooks.deregister()
