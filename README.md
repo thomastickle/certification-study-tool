@@ -190,16 +190,17 @@ and generated output are excluded from formatting; linting is scoped to code.
 ## Appearance
 
 Open the **Settings** page from the sidebar. Its **Appearance** section contains
-the **Theme** selector offers **System**, **Light**, and **Dark**.
+the **Theme** selector, which offers **System**, **Light**, and **Dark**.
 System is the default and follows the desktop/browser appearance, including changes
 while the app is open. Explicit choices are saved in this browser's local storage
 for this origin; selecting System clears the override. If storage is blocked,
 changes still work for the current page. Theme preferences do not sync between
 devices or browser profiles. The theme uses modern browser `light-dark()` support.
 
-The independent **Palette** swatches offer **Blue** (default), **Forest**, and
-**Violet**, **Ocean**, **Amber**, and **Rose**. Each shows light and dark previews side by side. Palette choices are also
-remembered locally. `src/web/app/themes/base.css` owns shared semantic color tokens
-and the Blue palette; `forest.css` and `violet.css` override the palette tokens.
-Component styles consume these variables. Native CSS handles theme switching;
-Vite builds the CSS without a Sass dependency.
+The independent **Palette** choices offer **Blue** (default), **Forest**, **Violet**,
+**Ocean**, **Amber**, and **Rose**. Each shows light and dark previews side by side.
+Selecting a palette preserves your System/Light/Dark setting. Palette choices are
+also remembered locally. `src/web/app/themes/base.css` owns shared semantic color
+tokens and the Blue palette; each other palette has its own CSS override file in
+the same folder. Component styles consume these variables. Native CSS handles
+theme switching; Vite builds the CSS without a Sass dependency.
