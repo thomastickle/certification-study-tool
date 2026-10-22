@@ -1158,15 +1158,18 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
       <section className="quiz-panel result-score">
         <ResultCompletionHeader key={view.id} quiz={view} />
         <p className="result-score-value">
-          Score: {percent === null ? '—' : `${Math.round(percent)}%`} · {correct} of{' '}
-          {view.questions.length}
+          <strong className="result-summary-score">
+            {percent === null ? '—' : `${Math.round(percent)}%`} score
+          </strong>{' '}
+          <span className="result-summary-count">
+            {correct} of {view.questions.length} correct
+          </span>{' '}
           {mode !== 'review' && (
-            <>
-              {' · '}
-              <strong className={passed ? 'correct-text' : 'incorrect-text'}>
-                {passed ? 'Pass' : 'Fail'}
-              </strong>
-            </>
+            <span
+              className={`result-summary-outcome ${passed ? 'correct-text' : 'incorrect-text'}`}
+            >
+              {passed ? 'Pass' : 'Fail'}
+            </span>
           )}
         </p>
         {mode === 'review' && (

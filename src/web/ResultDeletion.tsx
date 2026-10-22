@@ -66,25 +66,27 @@ export function ResultCompletionHeader({ quiz, label }: { quiz: QuizView; label?
     <>
       <div className="result-completion-heading">
         <p className="eyebrow">{label ?? `${mode.toUpperCase()} COMPLETE`}</p>
-        <button
-          className="result-icon-action result-icon-delete"
-          aria-label={action}
-          title={action}
-          aria-busy={busy}
-          disabled={busy || (pending !== null && Date.now() >= pending.purgeAt)}
-          onClick={() => void change()}
-        >
-          <StudyIcon name={pending ? 'undo' : 'trash'} />
-        </button>
+        <div className="result-completion-actions">
+          {pending && (
+            <p className="deletion-deadline" role="status">
+              Will be deleted on{' '}
+              <time dateTime={new Date(pending.purgeAt).toISOString()}>
+                {new Date(pending.purgeAt).toLocaleString()}
+              </time>
+            </p>
+          )}
+          <button
+            className="result-icon-action result-icon-delete"
+            aria-label={action}
+            title={action}
+            aria-busy={busy}
+            disabled={busy || (pending !== null && Date.now() >= pending.purgeAt)}
+            onClick={() => void change()}
+          >
+            <StudyIcon name={pending ? 'undo' : 'trash'} />
+          </button>
+        </div>
       </div>
-      {pending && (
-        <p className="deletion-deadline" role="status">
-          Will be deleted on{' '}
-          <time dateTime={new Date(pending.purgeAt).toISOString()}>
-            {new Date(pending.purgeAt).toLocaleString()}
-          </time>
-        </p>
-      )}
       {error && <p role="alert">{error}</p>}
     </>
   )
