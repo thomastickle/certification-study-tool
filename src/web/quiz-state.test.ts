@@ -94,7 +94,7 @@ test('practice clock uses hours, minutes and seconds for both session lengths', 
   assert.equal(formatTime(0), '00:00:00')
 })
 
-test('review colors distinguish missing answers, uncertain answers, and unflagged confident answers', () => {
+test('review colors depend only on answer completion, independently of confidence and flags', () => {
   const question = {
     questionId: 0,
     selected: [1],
@@ -103,17 +103,19 @@ test('review colors distinguish missing answers, uncertain answers, and unflagge
     confidence: 'Confident',
   } as QuizQuestion
   assert.deepEqual(reviewQuestionIds([question]), [])
-  assert.equal(reviewAnswerState(question), 'unanswered')
+  assert.equal(reviewAnswerState(question), 'partial')
   assert.equal(reviewAnswerState({ ...question, selected: [] }), 'unanswered')
-  assert.equal(reviewAnswerState({ ...question, selected: [1, 2] }), 'confident')
-  for (const confidence of [null, 'Unsure', 'Educated Guess'] as const) {
-    const answer = { ...question, selected: [1, 2], confidence }
-    assert.equal(reviewAnswerState(answer), 'uncertain')
-    assert.deepEqual(reviewQuestionIds([{ ...answer, flagged: true }]), [0])
-    assert.deepEqual(reviewQuestionIds([{ ...answer, flagged: false }]), [])
+  for (const confidence of [null, 'Unsure', 'Educated Guess', 'Confident'] as const) {
+    for (const flagged of [true, false]) {
+      const answer = { ...question, confidence, flagged }
+      assert.equal(reviewAnswerState({ ...answer, selected: [] }), 'unanswered')
+      assert.equal(reviewAnswerState(answer), 'partial')
+      assert.equal(reviewAnswerState({ ...answer, selected: [1, 2] }), 'answered')
+      assert.deepEqual(reviewQuestionIds([answer]), flagged ? [0] : [])
+    }
   }
   const flagged = { ...question, selected: [1, 2], flagged: true }
   assert.deepEqual(reviewQuestionIds([flagged]), [0])
-  assert.equal(reviewAnswerState(flagged), 'uncertain')
+  assert.equal(reviewAnswerState(flagged), 'answered')
   assert.deepEqual(reviewQuestionIds([{ ...question, selected: [1, 2] }]), [])
 })

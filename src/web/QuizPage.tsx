@@ -914,37 +914,35 @@ export function QuizPage({
           <section className="quiz-panel">
             <h2>Answer review</h2>
             <p>
-              Select a question number to return to it. Red: incomplete or unanswered. Yellow: lower
-              or unset confidence, or flagged. Green: confident and unflagged.
+              Select a question to return to it. Red: unanswered. Yellow: partially answered. Green:
+              fully answered.
             </p>
             <ul className="review-list">
               {questions.map((question, index) => (
                 <li key={question.questionId} className={`review-${reviewAnswerState(question)}`}>
                   <button
+                    className="review-tile"
+                    aria-label={`Question ${index + 1}, ${question.selected.length} of ${question.selectCount} answers selected, ${question.confidence ?? 'Not Recorded'}${question.flagged ? ', marked for review' : ''}`}
                     onClick={() => {
                       setQuestionIndex(index)
                       setStage('question')
                     }}
                   >
-                    Question {index + 1}
-                  </button>
-                  <span>
-                    {question.selected.length === 0 ? 'Unanswered · ' : 'Answered · '}
-                    {question.selected.length > 0 && question.selected.length < question.selectCount
-                      ? 'Incomplete · '
-                      : ''}
-                    {question.confidence ?? 'Confidence not recorded'}
-                  </span>
-                  {reviewIds.includes(question.questionId) && (
-                    <span
-                      className="review-flag"
-                      role="img"
-                      aria-label="Marked for review"
-                      title="Marked for review"
-                    >
-                      ⚑
+                    <span className="review-question-title">Question {index + 1}</span>
+                    <span className="review-tile-details">
+                      <span>{question.confidence ?? 'Not Recorded'}</span>
+                      {question.flagged && (
+                        <span
+                          className="review-flag"
+                          role="img"
+                          aria-label="Marked for review"
+                          title="Marked for review"
+                        >
+                          ⚑
+                        </span>
+                      )}
                     </span>
-                  )}
+                  </button>
                 </li>
               ))}
             </ul>

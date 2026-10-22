@@ -33,7 +33,9 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
 
   function click(label: string) {
     const button = [...document.querySelectorAll('button')].find(
-      (item) => item.textContent?.trim() === label,
+      (item) =>
+        item.textContent?.trim() === label ||
+        item.querySelector('.review-question-title')?.textContent?.trim() === label,
     )
     assert(button && !button.disabled, `Missing enabled button: ${label}`)
     button.click()
@@ -87,12 +89,30 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     click('Review answers')
     await until(() => !!document.querySelector('.review-list'), 'Review did not open')
     assert(
-      document.querySelector('.review-list li')?.classList.contains('review-confident'),
+      document.querySelector('.review-list li')?.classList.contains('review-answered'),
       'Complete confident answer was not green',
     )
     assert(
       document.querySelectorAll('.review-list li')[1]?.classList.contains('review-unanswered'),
       'Unanswered item was not highlighted',
+    )
+    const tiles = [...document.querySelectorAll<HTMLElement>('.review-list li')]
+    const firstTile = tiles[0]!.getBoundingClientRect()
+    assert(
+      tiles.every((tile) => {
+        const box = tile.getBoundingClientRect()
+        return Math.abs(box.width - firstTile.width) < 1 && box.height === firstTile.height
+      }),
+      'Review tiles differ in size',
+    )
+    assert(firstTile.height <= 76, 'Review tiles are not compact')
+    assert(
+      getComputedStyle(tiles[0]!.querySelector('button')!).borderTopWidth === '0px',
+      'Question title still has a separate button border',
+    )
+    assert(
+      tiles[1]!.querySelector('.review-tile-details')?.textContent?.trim() === 'Not Recorded',
+      'Unset confidence label is wrong',
     )
     click(`Question ${total}`)
     await until(
@@ -135,10 +155,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
         !!first.querySelector('[aria-label="Marked for review"]') === flagged,
         'Review flag did not follow checkbox',
       )
-      assert(
-        first.classList.contains(flagged ? 'review-uncertain' : 'review-confident'),
-        'Flagged confident answer color is wrong',
-      )
+      assert(first.classList.contains('review-answered'), 'Flag changed the fully answered color')
       click('Question 1')
       await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
     }

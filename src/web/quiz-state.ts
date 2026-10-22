@@ -10,17 +10,15 @@ export function reviewQuestionIds(questions: QuizQuestion[]): number[] {
   return questions.filter((question) => question.flagged).map((question) => question.questionId)
 }
 
-/** Separate answer completeness/confidence colors from the explicit review indicator. */
-export function reviewAnswerState(
-  question: QuizQuestion,
-): 'unanswered' | 'uncertain' | 'confident' {
-  if (question.selected.length < question.selectCount) {
+/** Color review tiles by completion only; confidence and flags remain separate indicators. */
+export function reviewAnswerState(question: QuizQuestion): 'unanswered' | 'partial' | 'answered' {
+  if (question.selected.length === 0) {
     return 'unanswered'
   }
-  if (question.confidence === 'Confident' && !question.flagged) {
-    return 'confident'
+  if (question.selected.length < question.selectCount) {
+    return 'partial'
   }
-  return 'uncertain'
+  return 'answered'
 }
 
 export function meetsPracticeTarget(percent: number): boolean {
