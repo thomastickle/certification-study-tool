@@ -7,15 +7,20 @@ export function warningThreshold(remainingMs: number): '10-minute' | '2-minute' 
 }
 
 export function reviewQuestionIds(questions: QuizQuestion[]): number[] {
-  return questions
-    .filter(
-      (question) =>
-        question.selected.length < question.selectCount ||
-        question.flagged ||
-        question.confidence === null ||
-        question.confidence !== 'Confident',
-    )
-    .map((question) => question.questionId)
+  return questions.filter((question) => question.flagged).map((question) => question.questionId)
+}
+
+/** Separate answer completeness/confidence colors from the explicit review indicator. */
+export function reviewAnswerState(
+  question: QuizQuestion,
+): 'unanswered' | 'uncertain' | 'confident' {
+  if (question.selected.length < question.selectCount) {
+    return 'unanswered'
+  }
+  if (question.confidence === 'Confident' && !question.flagged) {
+    return 'confident'
+  }
+  return 'uncertain'
 }
 
 export function meetsPracticeTarget(percent: number): boolean {

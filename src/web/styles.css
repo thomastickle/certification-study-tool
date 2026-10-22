@@ -1195,12 +1195,21 @@ select {
 .timer.urgent .timer-indicator {
   background: #c1362b;
 }
-.practice-session .review-list li.needs-review {
+.practice-session .review-list li.review-uncertain {
   background: #fff5ce;
   border-color: #d3ae43;
 }
-.practice-session .review-list .review-attention {
-  color: #715000;
+.practice-session .review-list li.review-unanswered {
+  background: #fde4e2;
+  border-color: #bd4339;
+}
+.practice-session .review-list li.review-confident {
+  background: #e0f2e5;
+  border-color: #39834f;
+}
+.practice-session .review-list .review-flag {
+  color: #b42318;
+  font-size: 24px;
   font-weight: 700;
 }
 

@@ -25,6 +25,7 @@ import {
   meetsPracticeTarget,
   mergeQuizPoll,
   reviewQuestionIds,
+  reviewAnswerState,
   warningThreshold,
 } from './quiz-state.ts'
 
@@ -912,13 +913,13 @@ export function QuizPage({
         <>
           <section className="quiz-panel">
             <h2>Answer review</h2>
-            <p>Select a question number to return to it. Marked items need attention:</p>
+            <p>
+              Select a question number to return to it. Red: incomplete or unanswered. Yellow: lower
+              or unset confidence, or flagged. Green: confident and unflagged.
+            </p>
             <ul className="review-list">
               {questions.map((question, index) => (
-                <li
-                  key={question.questionId}
-                  className={reviewIds.includes(question.questionId) ? 'needs-review' : undefined}
-                >
+                <li key={question.questionId} className={`review-${reviewAnswerState(question)}`}>
                   <button
                     onClick={() => {
                       setQuestionIndex(index)
@@ -932,12 +933,17 @@ export function QuizPage({
                     {question.selected.length > 0 && question.selected.length < question.selectCount
                       ? 'Incomplete · '
                       : ''}
-                    {question.flagged ? 'Flagged · ' : ''}
                     {question.confidence ?? 'Confidence not recorded'}
-                    {question.confidence && question.confidence !== 'Confident' ? ' · Review' : ''}
                   </span>
                   {reviewIds.includes(question.questionId) && (
-                    <span className="review-attention">Needs review</span>
+                    <span
+                      className="review-flag"
+                      role="img"
+                      aria-label="Marked for review"
+                      title="Marked for review"
+                    >
+                      ⚑
+                    </span>
                   )}
                 </li>
               ))}

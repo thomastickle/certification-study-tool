@@ -87,11 +87,11 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     click('Review answers')
     await until(() => !!document.querySelector('.review-list'), 'Review did not open')
     assert(
-      !document.querySelector('.review-list li')?.classList.contains('needs-review'),
-      'Complete confident answer was highlighted',
+      document.querySelector('.review-list li')?.classList.contains('review-confident'),
+      'Complete confident answer was not green',
     )
     assert(
-      document.querySelectorAll('.review-list li')[1]?.classList.contains('needs-review'),
+      document.querySelectorAll('.review-list li')[1]?.classList.contains('review-unanswered'),
       'Unanswered item was not highlighted',
     )
     click(`Question ${total}`)
@@ -111,13 +111,37 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     )
     finalButton.click()
     await until(() => !!document.querySelector('.review-list'), 'Final button did not open review')
-    const attention = document.querySelector('.review-list li.needs-review')
+    assert(!document.querySelector('.review-flag'), 'Unflagged answers displayed a review flag')
     assert(
-      attention?.textContent?.includes('Needs review'),
-      'Review questions are not marked for attention',
+      document
+        .querySelector('.review-list')
+        ?.parentElement?.textContent?.includes('0 questions flagged for review.'),
+      'Unanswered questions were counted as flagged',
     )
     click('Question 1')
     await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
+    for (const flagged of [true, false]) {
+      document.querySelector<HTMLInputElement>('.flag-control input')!.click()
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+      await until(
+        () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
+        'Review flag did not save',
+      )
+      document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+      click('Review answers')
+      await until(() => !!document.querySelector('.review-list'), 'Review did not reopen')
+      const first = document.querySelector('.review-list li')!
+      assert(
+        !!first.querySelector('[aria-label="Marked for review"]') === flagged,
+        'Review flag did not follow checkbox',
+      )
+      assert(
+        first.classList.contains(flagged ? 'review-uncertain' : 'review-confident'),
+        'Flagged confident answer color is wrong',
+      )
+      click('Question 1')
+      await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
+    }
     const confidence = document.querySelector('.confidence-row fieldset')!.getBoundingClientRect()
     const flag = document.querySelector('.flag-control')!.getBoundingClientRect()
     assert(flag.top >= confidence.bottom, 'Review mark is not under Confidence')
@@ -215,7 +239,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       'Final warning did not disappear',
     )
     assertTimerIndicator('rgb(193, 54, 43)', '2 minutes or less remaining')
-    return `${mode}: reading layout, final-question review, yellow attention, and stable warnings passed`
+    return `${mode}: reading layout, final-question review, answer colors and explicit flags, and stable warnings passed`
   } finally {
     Date.now = originalNow
     window.setTimeout = originalSetTimeout
