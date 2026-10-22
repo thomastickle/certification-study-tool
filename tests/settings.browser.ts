@@ -68,7 +68,7 @@ export async function paletteSwatchesBrowserTest() {
   const radios = [...document.querySelectorAll<HTMLInputElement>('input[name="palette"]')]
   if (radios.length !== 3) throw new Error('Palette must offer three native radio swatches')
   const initial = radios.find((radio) => radio.checked)!
-  const previews = []
+  const previews = new Map<string, string>()
   try {
     for (const radio of radios) {
       radio.click()
@@ -90,9 +90,20 @@ export async function paletteSwatchesBrowserTest() {
       ) {
         throw new Error('Palette swatch needs a visual preview and a visible name')
       }
-      previews.push(getComputedStyle(preview).backgroundImage)
+      const backgrounds = radios.map((option) => {
+        const swatch = option.parentElement!.querySelector<HTMLElement>('.palette-preview')!
+        const background = getComputedStyle(swatch).backgroundImage
+        const previous = previews.get(option.value)
+        if (previous !== undefined && previous !== background) {
+          throw new Error(`${option.value} preview inherited the active ${radio.value} palette`)
+        }
+        previews.set(option.value, background)
+        return background
+      })
+      if (new Set(backgrounds).size !== 3) {
+        throw new Error('All three previews must show independent colors under each active palette')
+      }
     }
-    if (new Set(previews).size !== 3) throw new Error('Palette previews must show their own colors')
     if (document.documentElement.scrollWidth > innerWidth)
       throw new Error('Swatches overflow the viewport')
     return { swatches: 3, selection: 'exclusive, applied, persisted, labeled', width: innerWidth }
