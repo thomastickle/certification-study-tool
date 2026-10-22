@@ -1,0 +1,19 @@
+/* Forest changes the palette while sharing semantic status and chart colors. */
+:root[data-palette='forest'],
+.palette-preview[data-palette='forest'] {
+  --ink: light-dark(#223c33, #e0eee7);
+  --muted: light-dark(#567466, #a1bbae);
+  --border: light-dark(#d7e5dc, #355247);
+  --surface: light-dark(#ffffff, #1b3028);
+  --canvas: light-dark(#f4f8f5, #101e18);
+  --workspace: light-dark(#edf5ef, #13251d);
+  --sidebar-surface: light-dark(#f8fbf9, #162a21);
+  --raised-surface: light-dark(#f8fcf9, #203b2e);
+  --subtle: light-dark(#eaf2ec, #294638);
+  --track-surface: light-dark(#e1ebe4, #355244);
+  --accent: #237747;
+  --accent-hover: #195e36;
+  --accent-ink: light-dark(#195e36, #8cdbab);
+  --accent-soft: light-dark(#e3f3e9, #244a35);
+  --focus: #73b990;
+}

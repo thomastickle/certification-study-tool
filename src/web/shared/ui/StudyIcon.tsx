@@ -1,4 +1,6 @@
 const paths = {
+  settings:
+    'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
   trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7',
   undo: 'M9 4 3 10l6 6M3 10h11a7 7 0 0 1 7 7v3',
   home: 'M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9',

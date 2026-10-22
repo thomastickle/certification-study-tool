@@ -1,0 +1,19 @@
+/* Violet changes the palette while sharing semantic status and chart colors. */
+:root[data-palette='violet'],
+.palette-preview[data-palette='violet'] {
+  --ink: light-dark(#382f4b, #ede5f8);
+  --muted: light-dark(#756484, #baabcb);
+  --border: light-dark(#e5ddef, #4c3d60);
+  --surface: light-dark(#ffffff, #2b223a);
+  --canvas: light-dark(#f8f5fb, #1a1424);
+  --workspace: light-dark(#f2edfa, #21192e);
+  --sidebar-surface: light-dark(#fbf9fd, #251c33);
+  --raised-surface: light-dark(#fcfaff, #332743);
+  --subtle: light-dark(#f0eaf6, #3c2f4f);
+  --track-surface: light-dark(#e9e2ef, #4b3b60);
+  --accent: #7950bf;
+  --accent-hover: #643ba7;
+  --accent-ink: light-dark(#643ba7, #d1b2ff);
+  --accent-soft: light-dark(#f0e7fc, #48325f);
+  --focus: #b396dc;
+}

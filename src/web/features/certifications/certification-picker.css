@@ -22,7 +22,7 @@
 }
 
 .certification-picker-trigger:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--accent-ink);
 }
 
 .certification-picker-trigger:focus-visible,

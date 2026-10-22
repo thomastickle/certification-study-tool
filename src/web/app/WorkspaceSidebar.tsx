@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { StudyIcon } from '../shared/ui/StudyIcon.tsx'
 
-export type Destination = 'home' | 'practice' | 'review' | 'certifications' | 'importer' | 'reports'
+export type Destination =
+  'home' | 'practice' | 'review' | 'certifications' | 'importer' | 'reports' | 'settings'
 
 type Props = { destination: Destination; onNavigate: (destination: Destination) => void }
 
@@ -160,6 +161,18 @@ export function WorkspaceSidebar({ destination, onNavigate }: Props) {
             </button>
           ))}
         </nav>
+        <div className="sidebar-settings">
+          <button
+            className={`settings-trigger${destination === 'settings' ? ' active' : ''}`}
+            aria-label="Settings"
+            aria-current={destination === 'settings' ? 'page' : undefined}
+            title={layout.collapsed ? 'Settings' : undefined}
+            onClick={() => onNavigate('settings')}
+          >
+            <StudyIcon name="settings" />
+            <span>Settings</span>
+          </button>
+        </div>
         <p className="sidebar-note">
           Your library and progress
           <br />
