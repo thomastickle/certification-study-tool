@@ -20,7 +20,7 @@ test('importer renders page content without duplicating the application header',
     },
   })
   try {
-    const { LibraryPage } = await import('../src/web/LibraryPage.tsx')
+    const { LibraryPage } = await import('../src/web/features/library/LibraryPage.tsx')
     const html = renderToStaticMarkup(createElement(LibraryPage))
     assert.equal((html.match(/<header\b/g) ?? []).length, 0, 'the app shell owns the shared header')
     assert.equal((html.match(/<main\b/g) ?? []).length, 1)
@@ -47,7 +47,7 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
     },
   })
   try {
-    const { QuizSourcePicker } = await import('../src/web/QuizSourcePicker.tsx')
+    const { QuizSourcePicker } = await import('../src/web/features/practice/QuizSourcePicker.tsx')
     const base = { provider: 'AWS', certification: 'CLF-C02', certificationName: 'Synthetic exam' }
     const sources: Source[] = [
       {
@@ -106,7 +106,7 @@ test('quiz bank picker renders individual checked banks, source groups, counts a
     assert.match(html, /aria-expanded="false"/)
     assert.match(html, /<dialog\b/)
     assert.doesNotMatch(html, /<dialog[^>]*\sopen(?:=|\s|>)/)
-    const { QuizPage } = await import('../src/web/QuizPage.tsx')
+    const { QuizPage } = await import('../src/web/features/practice/QuizPage.tsx')
     const setup = renderToStaticMarkup(
       createElement(QuizPage, {
         certification: {

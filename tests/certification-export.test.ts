@@ -50,7 +50,8 @@ test('attempt detail does not label another certification with CLF-C02 exam doma
     },
   })
   try {
-    const { ReportAttemptReview } = await import('../src/web/ReportAttemptReview.tsx')
+    const { ReportAttemptReview } =
+      await import('../src/web/features/reports/ReportAttemptReview.tsx')
     const quiz: QuizView = {
       id: 'synthetic-view',
       status: 'completed',
