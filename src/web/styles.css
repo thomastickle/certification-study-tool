@@ -841,8 +841,8 @@ select {
   color: var(--muted);
 }
 .result-score {
-  text-align: center;
-  padding: 34px;
+  text-align: left;
+  padding: 20px 24px;
 }
 .result-score h2 {
   font-size: 43px;
@@ -851,36 +851,69 @@ select {
 .result-score > .result-score-value {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 1rem 0 1.5rem;
-  font-size: 1rem;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
   color: var(--ink);
-  text-align: left;
 }
 
-.result-summary-score {
+.result-summary-score,
+.result-summary-count,
+.result-summary-skipped {
+  white-space: nowrap;
+}
+
+.result-summary-score strong {
   font-weight: 650;
 }
 
-.result-summary-count {
+.result-summary-count,
+.result-summary-skipped {
   border-left: 1px solid var(--border);
   padding-left: 0.75rem;
-  color: var(--muted);
-  font-size: 0.875rem;
 }
 
 .result-summary-outcome {
-  margin-left: auto;
-  padding: 0.25rem 0.6rem;
+  padding: 0 0.5rem;
   border: 1px solid #efb8b4;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 650;
+  border-radius: 5px;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: 600;
 }
 
 .result-summary-outcome.correct-text {
   border-color: #b8d5c2;
+}
+
+.result-score .attempt-timing dl {
+  padding-block: 0.75rem;
+}
+
+.result-score .quiz-actions {
+  margin-top: 0.75rem;
+}
+
+.result-copy-notice:empty {
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .result-score {
+    padding: 16px;
+  }
+
+  .result-score > .result-score-value {
+    gap: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .result-summary-count,
+  .result-summary-skipped {
+    padding-left: 0.5rem;
+  }
 }
 
 .result-question {
@@ -1369,11 +1402,19 @@ select {
 }
 
 .result-completion-heading .eyebrow {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
   margin: 0;
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .result-completion-heading .result-icon-action {
   flex-shrink: 0;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px;
 }
 
 .result-completion-actions {
@@ -1738,5 +1779,32 @@ select {
   .attempt-timing dl > div:nth-child(odd) {
     padding-left: 0;
     border-left: 0;
+  }
+}
+
+@media (pointer: coarse) {
+  .result-completion-heading .eyebrow {
+    min-height: 44px;
+  }
+
+  .result-completion-heading .result-icon-action {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .result-score > .result-score-value {
+    gap: 0.375rem;
+  }
+
+  .result-summary-count,
+  .result-summary-skipped {
+    padding-left: 0.375rem;
+  }
+
+  .result-summary-outcome {
+    padding-inline: 0.375rem;
   }
 }

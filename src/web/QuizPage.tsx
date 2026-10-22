@@ -1167,18 +1167,26 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
       <section className="quiz-panel result-score">
         <ResultCompletionHeader key={view.id} quiz={view} />
         <p className="result-score-value">
-          <strong className="result-summary-score">
-            {percent === null ? '—' : `${Math.round(percent)}%`} score
-          </strong>{' '}
-          <span className="result-summary-count">
-            {correct} of {view.questions.length} correct
-          </span>{' '}
           {mode !== 'review' && (
             <span
               className={`result-summary-outcome ${passed ? 'correct-text' : 'incorrect-text'}`}
             >
               {passed ? 'Pass' : 'Fail'}
             </span>
+          )}{' '}
+          <span className="result-summary-score">
+            Score: <strong>{percent === null ? '—' : `${Math.round(percent)}%`}</strong>
+          </span>{' '}
+          <span className="result-summary-count">
+            {correct} of {view.questions.length}
+          </span>
+          {view.questions.length > answered && (
+            <>
+              {' '}
+              <span className="result-summary-skipped">
+                {view.questions.length - answered} skipped
+              </span>
+            </>
           )}
         </p>
         {mode === 'review' && (
@@ -1192,7 +1200,9 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
           <button onClick={() => void copyReport()}>Copy discussion report</button>
           <button onClick={downloadReport}>Download report</button>
         </div>
-        <p role="status">{copyNotice}</p>
+        <p className="result-copy-notice" role="status">
+          {copyNotice}
+        </p>
       </section>
       <section className="quiz-panel">
         <h2>Details</h2>

@@ -165,7 +165,7 @@ export async function scoreReportsTest(): Promise<string> {
     )
     const result = document.querySelector('.result-score')!.textContent!
     if (
-      !result.includes(`${expectedScore} score`) ||
+      !result.includes(`Score: ${expectedScore}`) ||
       !result.includes(mode === 'Exam' ? 'Pass' : 'Fail')
     ) {
       throw new Error(`${mode} result score and target must agree with reports.`)
@@ -184,7 +184,7 @@ export async function scoreReportsTest(): Promise<string> {
 }
 
 /** Completion summaries keep score, question counts and outcome together without extra target copy. */
-export async function compactCompletionSummaryTest(): Promise<string> {
+export async function compactCompletionSummaryTest(zeroSkipAttemptId?: string): Promise<string> {
   /** Waits for the selected synthetic attempt to render. */
   async function until(check: () => boolean, message: string) {
     const deadline = Date.now() + 5000
@@ -196,11 +196,20 @@ export async function compactCompletionSummaryTest(): Promise<string> {
     }
   }
 
-  for (const [id, score, count, outcome] of [
-    ['00000000-0000-4000-8000-000000000001', '40% score', '8 of 20 correct', 'Fail'],
-    ['00000000-0000-4000-8000-000000000002', '80% score', '52 of 65 correct', 'Pass'],
-    ['00000000-0000-4000-8000-000000000003', '0% score', '0 of 20 correct', 'Fail'],
-  ]) {
+  const cases = [
+    ['00000000-0000-4000-8000-000000000001', 'Score: 40%', '8 of 20', 'Fail', '12 skipped'],
+    ['00000000-0000-4000-8000-000000000002', 'Score: 80%', '52 of 65', 'Pass', '13 skipped'],
+    ['00000000-0000-4000-8000-000000000003', 'Score: 0%', '0 of 20', 'Fail', '20 skipped'],
+  ]
+  if (zeroSkipAttemptId) {
+    cases.push([zeroSkipAttemptId, 'Score: 100%', '20 of 20', 'Pass', ''])
+  }
+  for (const [id, score, count, outcome, skipped] of cases) {
+    const home = [...document.querySelectorAll<HTMLButtonElement>('nav button')].find(
+      (button) => button.textContent?.trim() === 'Home',
+    )!
+    home.click()
+    await until(() => !!document.querySelector('.home-page'), 'Home did not open')
     const practice = [...document.querySelectorAll<HTMLButtonElement>('nav button')].find(
       (button) => button.textContent?.trim() === 'Practice',
     )!
@@ -208,12 +217,23 @@ export async function compactCompletionSummaryTest(): Promise<string> {
     await until(() => !!document.querySelector(`a[href="#result-${id}"]`), 'History missing')
     document.querySelector<HTMLAnchorElement>(`a[href="#result-${id}"]`)!.click()
     await until(() => !!document.querySelector('.result-score'), 'Completion card missing')
-    const expected = [score, count, outcome]
+    const expected = [outcome, score, count, skipped]
     const actual = [
+      '.result-summary-outcome',
       '.result-summary-score',
       '.result-summary-count',
-      '.result-summary-outcome',
-    ].map((selector) => document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim())
+      '.result-summary-skipped',
+    ].map(
+      (selector) =>
+        document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+    )
+    if (
+      !document
+        .querySelector('.result-score-value')
+        ?.firstElementChild?.classList.contains('result-summary-outcome')
+    ) {
+      throw new Error('Outcome must lead the summary row')
+    }
     if (expected.some((value, index) => actual[index] !== value)) {
       throw new Error(
         `Expected score, count and outcome ${expected.join(' / ')}, got ${actual.join(' / ')}`,
