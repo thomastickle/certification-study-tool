@@ -1,3 +1,4 @@
+import { StudyIcon } from './StudyIcon.tsx'
 import { useResultFilters } from './ResultFilters.tsx'
 import { ResultCompletionHeader, CompletedResults } from './ResultDeletion.tsx'
 import { DeletedBankNotice } from './DeletedBankNotice.tsx'
@@ -685,13 +686,30 @@ export function QuizPage({
     heading = 'Practice'
   }
 
+  /** Return completed reviews to history and make the setup heading visible again. */
+  function returnToSetup() {
+    setView(undefined)
+    viewRef.current = undefined
+    setStage('setup')
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
   return (
     <main
       className={`quiz-page ${stage === 'question' || stage === 'review' || stage === 'paused' ? 'practice-session' : ''}`}
     >
       {stage !== 'question' && stage !== 'review' && stage !== 'paused' && (
-        <div className="page-heading practice-heading">
-          <p className="eyebrow">TIMED STUDY SESSION</p>
+        <div
+          className={`page-heading practice-heading ${stage === 'completed' ? 'result-page-heading' : ''}`}
+        >
+          {stage === 'completed' ? (
+            <button className="result-back-link" onClick={returnToSetup}>
+              <StudyIcon name="chevron" />
+              Back to {mode === 'review' ? 'due review' : 'practice'}
+            </button>
+          ) : (
+            <p className="eyebrow">TIMED STUDY SESSION</p>
+          )}
           <div className="practice-title-row">
             <h1>{heading}</h1>
             <p className="practice-certification">
@@ -999,16 +1017,7 @@ export function QuizPage({
           </div>
         </section>
       )}
-      {stage === 'completed' && view && (
-        <Result
-          view={view}
-          onBack={() => {
-            setView(undefined)
-            viewRef.current = undefined
-            setStage('setup')
-          }}
-        />
-      )}
+      {stage === 'completed' && view && <Result view={view} onBack={returnToSetup} />}
       {stage === 'abandoned' && (
         <section className="quiz-panel">
           <h2>{title} abandoned</h2>

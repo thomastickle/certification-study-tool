@@ -128,6 +128,40 @@ main {
   overflow-wrap: anywhere;
   color: var(--muted);
 }
+.result-page-heading .practice-title-row {
+  display: block;
+}
+
+.result-page-heading .practice-certification {
+  margin-top: 0.25rem;
+  color: var(--ink);
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+.result-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+}
+
+.result-back-link:hover {
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.result-score .result-summary-count,
+.result-score .attempt-timing dt,
+.result-score .result-completion-heading .eyebrow {
+  color: var(--ink);
+}
+
 .completed-result-mode {
   display: inline-block;
   width: 3.25rem;

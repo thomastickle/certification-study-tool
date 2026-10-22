@@ -19,6 +19,7 @@ type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'cert
 /** Keep every workspace destination behind the existing practice suspension guard. */
 export function App() {
   const [page, setPage] = useState<Page>('home')
+  const [practiceVisit, setPracticeVisit] = useState(0)
   const [practiceMode, setPracticeMode] = useState<'quiz' | 'exam'>('quiz')
   const [practiceSources, setPracticeSources] = useState<Record<string, number[]>>({})
   const [certifications, setCertifications] = useState<Certification[]>([])
@@ -137,20 +138,20 @@ export function App() {
 
   /** Serialize page changes while practice work is being suspended. */
   async function navigate(next: Page, presetChange = false) {
-    if (navigating.current || next === page) {
+    const inPractice = page === 'quiz' || page === 'exam' || page === 'review'
+    if (navigating.current || (next === page && !inPractice)) {
       return
     }
     navigating.current = true
     try {
-      if (
-        (page === 'quiz' || page === 'exam' || page === 'review') &&
-        next !== page &&
-        !(await leaveQuiz.current())
-      ) {
+      if (inPractice && !(await leaveQuiz.current())) {
         return
       }
       if (next === 'quiz' || next === 'exam') setPracticeMode(next)
       setFocusPreset(presetChange)
+      if (next === page) {
+        setPracticeVisit((visit) => visit + 1)
+      }
       setPage(next)
     } finally {
       navigating.current = false
@@ -211,7 +212,7 @@ export function App() {
         )}
         {(page === 'quiz' || page === 'exam' || page === 'review') && selected && (
           <QuizPage
-            key={`${scopeKey}-${page}`}
+            key={`${scopeKey}-${page}-${practiceVisit}`}
             certification={selected}
             mode={page}
             initialSourceIds={practiceSources[scopeKey]}
