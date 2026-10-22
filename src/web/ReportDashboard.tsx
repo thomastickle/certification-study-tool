@@ -72,8 +72,8 @@ function ProgressChart({ report }: { report: StudyReport }) {
       >
         <defs>
           <linearGradient id="progress-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#cce8a6" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#cce8a6" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--chart-line)" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="var(--chart-line)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[0, 0.5, 1].map((fraction) => (
@@ -83,7 +83,7 @@ function ProgressChart({ report }: { report: StudyReport }) {
               x2="686"
               y1={180 - fraction * 145}
               y2={180 - fraction * 145}
-              stroke="#476355"
+              stroke="var(--chart-grid)"
               strokeDasharray="3 6"
             />
             <text x="32" y={184 - fraction * 145} textAnchor="end">
@@ -94,7 +94,14 @@ function ProgressChart({ report }: { report: StudyReport }) {
         ))}
         {metric === 'score' && report.targetAttempts > 0 && (
           <g>
-            <line x1="48" x2="686" y1="64" y2="64" stroke="#ebc78c" strokeDasharray="5 5" />
+            <line
+              x1="48"
+              x2="686"
+              y1="64"
+              y2="64"
+              stroke="var(--chart-target)"
+              strokeDasharray="5 5"
+            />
             <text x="680" y="55" textAnchor="end" className="chart-target">
               80% practice target
             </text>
@@ -106,12 +113,12 @@ function ProgressChart({ report }: { report: StudyReport }) {
         <polyline
           points={line}
           fill="none"
-          stroke="#d4edb3"
+          stroke="var(--chart-line)"
           strokeWidth="3"
           strokeLinejoin="round"
         />
         {points.map((point) => (
-          <circle key={point.date} cx={point.x} cy={point.y} r="4" fill="#e2f3c7">
+          <circle key={point.date} cx={point.x} cy={point.y} r="4" fill="var(--chart-ink)">
             <title>
               {point.date}: {point.counts.correct} correct / {point.counts.total} questions;{' '}
               {point.counts.skipped} skipped

@@ -4,6 +4,13 @@
   --border: #e1e7f0;
   --surface: #fff;
   --canvas: #f5f7fb;
+  --workspace: #e8eef8;
+  --chart-surface: #263f60;
+  --chart-ink: #e5edfa;
+  --chart-muted: #c2d1e6;
+  --chart-grid: #56708f;
+  --chart-line: #a9ceff;
+  --chart-target: #ebc78c;
   --subtle: #f0f4f9;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;

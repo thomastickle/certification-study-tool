@@ -183,6 +183,7 @@
 }
 .workspace-content {
   min-width: 0;
+  background: var(--workspace);
 }
 .home-page {
   max-width: 1040px;
@@ -304,7 +305,7 @@
 
 /* Keep the blue study canvas distinct from the white question panel. */
 .practice-session {
-  background: #e8eef8;
+  background: var(--workspace);
 }
 .practice-session button,
 .practice-session .practice-menu summary {
