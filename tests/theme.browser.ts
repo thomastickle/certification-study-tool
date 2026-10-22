@@ -43,6 +43,22 @@ export async function paletteBrowserTest() {
   const controls = [...document.querySelectorAll<HTMLSelectElement>('.theme-control select')]
   const [appearance, palette] = controls
   if (!appearance || !palette) throw new Error('Missing appearance controls')
+  document.querySelector<HTMLButtonElement>('nav button[aria-label="Reports"]')!.click()
+  await new Promise((resolve) => setTimeout(resolve, 150))
+
+  /** Calculate WCAG contrast from the actual rendered foreground and fill. */
+  function luminance(color: string) {
+    const channels = color
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map(Number)
+    return channels.reduce((sum, channel, index) => {
+      const value = channel / 255
+      const linear = value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+      return sum + linear * [0.2126, 0.7152, 0.0722][index]!
+    }, 0)
+  }
+
   const results: { palette: string; appearance: string; canvas: string }[] = []
   for (const value of ['blue', 'forest', 'violet']) {
     palette.value = value
@@ -58,6 +74,15 @@ export async function paletteBrowserTest() {
       }
       if (document.documentElement.scrollWidth > innerWidth)
         throw new Error('Appearance controls overflow')
+      const selected = document.querySelector('.report-mode-switch button[aria-pressed="true"]')
+      if (!selected) throw new Error('Missing selected Reports mode')
+      const style = getComputedStyle(selected)
+      const foreground = luminance(style.color)
+      const background = luminance(style.backgroundColor)
+      const ratio =
+        (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+      if (ratio < 4.5)
+        throw new Error(`${value}/${mode}: selected Reports mode contrast is ${ratio.toFixed(2)}:1`)
       results.push({
         palette: value,
         appearance: mode,

@@ -82,7 +82,7 @@
 }
 .report-mode-switch button[aria-pressed='true'] {
   background: var(--accent);
-  color: var(--surface);
+  color: var(--on-accent);
 }
 .report-filter-group {
   gap: 18px;
