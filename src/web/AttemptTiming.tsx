@@ -1,33 +1,50 @@
 import type { QuizView } from '../shared/quiz-contracts.ts'
-import { formatDuration, quizTiming, timingSummary } from '../shared/quiz-timing.ts'
+import { quizTiming } from '../shared/quiz-timing.ts'
 
-/** Timing details never score an unfinished attempt or infer missing legacy history. */
+/** Uses explicit units so compact durations need no format legend. */
+function duration(ms: number | null): string {
+  if (ms === null) {
+    return '—'
+  }
+  const seconds = Math.floor(Math.max(0, ms) / 1000)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const parts = []
+  if (hours > 0) {
+    parts.push(`${hours}h`)
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}m`)
+  }
+  if (seconds % 60 > 0 || parts.length === 0) {
+    parts.push(`${seconds % 60}s`)
+  }
+  return parts.join(' ')
+}
+
+/** Shows saved timing totals without inferring missing legacy pause history. */
 export function AttemptTiming({ quiz }: { quiz: QuizView }) {
   const timing = quizTiming(quiz)
   return (
     <section className="attempt-timing" aria-label="Study time">
-      <h2>Study time</h2>
-      <p>{timingSummary(timing)}</p>
-      <small>HH:MM:SS, rounded down to whole seconds.</small>
-      {!timing.historyComplete && (
-        <p>Earlier pause history was not recorded. Totals are unknown.</p>
-      )}
-      {timing.pauses.length > 0 && (
-        <ol>
-          {timing.pauses.map((pause, index) => (
-            <li key={index}>
-              {pause.cause ?? 'Cause not recorded'} · {new Date(pause.startedAt).toISOString()}
-              {' → '}
-              {pause.endedAt === null ? 'Ongoing' : new Date(pause.endedAt).toISOString()}
-              {' · '}
-              {formatDuration(pause.durationMs)}
-            </li>
-          ))}
-        </ol>
-      )}
-      {quiz.status === 'paused' && (
-        <p>Ongoing pause duration as of server time {new Date(quiz.serverNow).toISOString()}.</p>
-      )}
+      <dl>
+        <div title="From start to finish, including pauses">
+          <dt>Total time</dt>
+          <dd>{duration(timing.elapsedMs)}</dd>
+        </div>
+        <div title="Total time minus pauses">
+          <dt>Time in test</dt>
+          <dd>{duration(timing.activeMs)}</dd>
+        </div>
+        <div>
+          <dt>Pauses</dt>
+          <dd>{timing.pauseCount ?? '—'}</dd>
+        </div>
+        <div>
+          <dt>Pause time</dt>
+          <dd>{duration(timing.pausedMs)}</dd>
+        </div>
+      </dl>
     </section>
   )
 }

@@ -1640,3 +1640,50 @@ select {
   background: var(--subtle);
   color: var(--ink);
 }
+
+.attempt-timing {
+  text-align: left;
+}
+
+.attempt-timing dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 1rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.attempt-timing dl > div + div {
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+}
+
+.attempt-timing dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.attempt-timing dd {
+  margin: 0.3rem 0 0;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .attempt-timing dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .attempt-timing dl > div:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
