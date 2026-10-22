@@ -104,7 +104,7 @@ test('aggregate dashboard omits generic domain coverage and ranking while preser
     },
   })
   try {
-    const { ReportDashboard } = await import('../src/web/ReportDashboard.tsx')
+    const { ReportDashboard } = await import('../src/web/features/reports/ReportDashboard.tsx')
     for (const report of [
       genericReport(),
       genericReport('Other', 'CLF-C02'),

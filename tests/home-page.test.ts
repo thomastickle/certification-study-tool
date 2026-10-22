@@ -25,7 +25,7 @@ const hooks = registerHooks({
 
 test('home dashboard groups real tracks and explains readiness without exposing answer data', async () => {
   try {
-    const { HomeDashboard } = await import('../src/web/HomeDashboard.tsx')
+    const { HomeDashboard } = await import('../src/web/features/home/HomeDashboard.tsx')
     const summary: HomeSummary = {
       generatedAt: 1,
       providers: [
@@ -108,7 +108,7 @@ test('home dashboard groups real tracks and explains readiness without exposing 
 
 test('home dashboard renders unsupported readiness neutrally without a score', async () => {
   try {
-    const { HomeDashboard } = await import('../src/web/HomeDashboard.tsx')
+    const { HomeDashboard } = await import('../src/web/features/home/HomeDashboard.tsx')
     const html = renderToStaticMarkup(
       createElement(HomeDashboard, {
         summary: {

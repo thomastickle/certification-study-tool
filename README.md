@@ -129,6 +129,24 @@ For the five-file curated bundle, use the repeatable local command documented in
 selected database; `--apply` explicitly imports. Both source and database paths
 are required, so it never implicitly selects your default library.
 
+## Frontend structure
+
+`src/web/main.tsx` boots React; `index.html` remains the Vite entry point.
+
+- `app/` contains application wiring, workspace navigation/session coordination,
+  and global styles (`styles.css` and `workspace.css`).
+- `features/` groups the `home`, `certifications`, `practice`, `reports`, and
+  `library` screens with their supporting components and state helpers.
+  Certification picker and report styles live alongside their owning features.
+- `shared/ui/` contains presentation reused across screens; `shared/lib/`
+  contains frontend API and filtering utilities. Backend/frontend contracts
+  remain in `src/shared/`.
+
+Imports refer directly to modules. Practice owns saved-result actions reused by
+reports; certification metadata is shared by workspace and feature consumers.
+Frontend unit tests stay beside their modules, while cross-layer and rendered
+screen tests remain in `tests/`. `npm test` discovers both trees recursively.
+
 ## Code hygiene
 
 Use the project-local tools so editors and command-line checks follow the same
