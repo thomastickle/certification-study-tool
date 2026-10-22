@@ -31,7 +31,7 @@ function ResultFilterControls({
   return (
     <div className="result-filters">
       <label>
-        Answer
+        <span className="result-filter-label">Answer</span>
         <select
           value={filters.answer}
           onChange={(event) =>
@@ -46,7 +46,7 @@ function ResultFilterControls({
         </select>
       </label>
       <label>
-        Confidence
+        <span className="result-filter-label">Confidence</span>
         <select
           value={filters.confidence}
           onChange={(event) => onChange({ ...filters, confidence: event.target.value })}
@@ -58,7 +58,7 @@ function ResultFilterControls({
         </select>
       </label>
       <label>
-        Source
+        <span className="result-filter-label">Source</span>
         <select
           value={filters.source}
           onChange={(event) => onChange({ ...filters, source: event.target.value })}
