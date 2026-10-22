@@ -1,5 +1,8 @@
 # Compiler experiment — 2026-10-22
 
+Follow-up: [resource measurements and current harness behavior](compiler-resource-benchmark.md).
+The timing evidence below is retained from the earlier run.
+
 After adding Vite's missing client declarations, all three compilers successfully check the same
 project. Microsoft Go TypeScript reduces the median check + Vite pipeline by **66.1%**;
 Rust tsrs reduces it by **72.8%** in this local sample. Vite itself is unchanged.
