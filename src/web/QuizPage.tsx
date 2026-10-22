@@ -1,3 +1,4 @@
+import { useResultFilters } from './ResultFilters.tsx'
 import { DeleteResultButton, CompletedResults } from './ResultDeletion.tsx'
 import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 import { ResultIndicator } from './ResultIndicator.tsx'
@@ -1128,7 +1129,7 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
   const percent = view.questions.length ? (correct / view.questions.length) * 100 : null
   const answered = view.questions.filter((question) => question.selected.length > 0).length
   const passed = percent !== null && meetsPracticeTarget(percent)
-  const review = view.questions
+  const { questions: review, controls: filterControls } = useResultFilters(view.questions)
   const [copyNotice, setCopyNotice] = useState('')
 
   function downloadReport() {
@@ -1189,7 +1190,11 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
           {answered ? `${Math.round((correct / answered) * 100)}%` : '—'} · {answered} answered ·{' '}
           {view.questions.length - answered} skipped
         </p>
-        {review.length === 0 && <p>All answers are correct and marked confident.</p>}
+        {filterControls}
+        <p role="status">
+          Showing {review.length} of {view.questions.length} questions
+        </p>
+        {review.length === 0 && <p>No questions match these filters.</p>}
         {review.map((question) => (
           <article className="result-question" key={question.questionId}>
             <h3>{question.question}</h3>

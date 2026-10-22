@@ -1498,3 +1498,22 @@ select {
   font-size: 0.85rem;
   line-height: 1.5;
 }
+
+.result-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.result-filters label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.result-filters select {
+  max-width: 100%;
+}
