@@ -1,36 +1,19 @@
-import { useEffect, useState } from 'react'
-import { readPalette, readThemePreference, savePalette, saveThemePreference } from './theme.ts'
 import type { Palette, ThemePreference } from './theme.ts'
 
-/** Keep appearance local to this browser, with a way back to the desktop setting. */
-export function ThemeControl() {
-  const [preference, setPreference] = useState(readThemePreference)
+export type ThemeControlProps = {
+  preference: ThemePreference
+  palette: Palette
+  onPreferenceChange: (preference: ThemePreference) => void
+  onPaletteChange: (palette: Palette) => void
+}
 
-  const [palette, setPalette] = useState(readPalette)
-
-  useEffect(() => {
-    document.documentElement.dataset.palette = palette
-  }, [palette])
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = preference
-  }, [preference])
-
-  useEffect(() => {
-    /** Reflect preference changes made in another tab on the same origin. */
-    function syncPreference(event: StorageEvent) {
-      if (event.key === 'study-palette' || event.key === null) {
-        setPalette(readPalette())
-      }
-      if (event.key === 'study-theme' || event.key === null) {
-        setPreference(readThemePreference())
-      }
-    }
-
-    window.addEventListener('storage', syncPreference)
-    return () => window.removeEventListener('storage', syncPreference)
-  }, [])
-
+/** Present browser-local appearance options using workspace-owned preference state. */
+export function ThemeControl({
+  preference,
+  palette,
+  onPreferenceChange,
+  onPaletteChange,
+}: ThemeControlProps) {
   return (
     <div className="appearance-controls">
       <label className="theme-control">
@@ -39,8 +22,7 @@ export function ThemeControl() {
           value={preference}
           onChange={(event) => {
             const next = event.target.value as ThemePreference
-            setPreference(next)
-            saveThemePreference(next)
+            onPreferenceChange(next)
           }}
         >
           <option value="system">System</option>
@@ -54,8 +36,7 @@ export function ThemeControl() {
           value={palette}
           onChange={(event) => {
             const next = event.target.value as Palette
-            setPalette(next)
-            savePalette(next)
+            onPaletteChange(next)
           }}
         >
           <option value="blue">Blue</option>

@@ -1,14 +1,19 @@
+/** Navigate to the public Settings destination before interacting with its controls. */
+async function openSettings() {
+  document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  if (!document.querySelector('main.settings-page')) throw new Error('Settings page did not open')
+}
+
 /** Exercise the mounted control and real CSS; use a disposable study library. */
 export async function themeBrowserTest() {
-  const select = document.querySelector<HTMLSelectElement>('.theme-control select')!
-
   /** Change the public control and let React commit its effect. */
   async function choose(value: string) {
-    document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
+    await openSettings()
+    const select = document.querySelector<HTMLSelectElement>('.theme-control select')!
     select.value = value
     select.dispatchEvent(new Event('change', { bubbles: true }))
     await new Promise((resolve) => setTimeout(resolve, 40))
-    document.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click()
   }
 
   /** Report the failed visible behavior without tying checks to CSS declarations. */
@@ -37,17 +42,11 @@ export async function themeBrowserTest() {
     getComputedStyle(canvas).backgroundColor === expected,
     'System does not follow browser preference',
   )
-  return { light, dark, system: expected, destinations: 6, width: innerWidth }
+  return { light, dark, system: expected, destinations: 7, width: innerWidth }
 }
 
-/** Check every palette/appearance pairing through the rendered controls. */
+/** Check every palette/appearance pairing, including Reports after leaving Settings. */
 export async function paletteBrowserTest() {
-  const controls = [...document.querySelectorAll<HTMLSelectElement>('.theme-control select')]
-  const [appearance, palette] = controls
-  if (!appearance || !palette) throw new Error('Missing appearance controls')
-  document.querySelector<HTMLButtonElement>('nav button[aria-label="Reports"]')!.click()
-  await new Promise((resolve) => setTimeout(resolve, 150))
-
   /** Calculate WCAG contrast from the actual rendered foreground and fill. */
   function luminance(color: string) {
     const channels = color
@@ -63,23 +62,24 @@ export async function paletteBrowserTest() {
 
   const results: { palette: string; appearance: string; canvas: string }[] = []
   for (const value of ['blue', 'forest', 'violet']) {
-    document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
-    palette.value = value
-    palette.dispatchEvent(new Event('change', { bubbles: true }))
-    document.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click()
     for (const mode of ['light', 'dark']) {
-      document.querySelector<HTMLButtonElement>('.settings-trigger')!.click()
+      await openSettings()
+      const [appearance, palette] =
+        document.querySelectorAll<HTMLSelectElement>('.theme-control select')
+      if (!appearance || !palette) throw new Error('Missing appearance controls')
+      palette.value = value
+      palette.dispatchEvent(new Event('change', { bubbles: true }))
       appearance.value = mode
       appearance.dispatchEvent(new Event('change', { bubbles: true }))
       await new Promise((resolve) => setTimeout(resolve, 50))
       if (document.documentElement.dataset.palette !== value)
         throw new Error('Palette did not apply')
-      if (localStorage.getItem('study-palette') !== (value === 'blue' ? null : value)) {
+      if (localStorage.getItem('study-palette') !== (value === 'blue' ? null : value))
         throw new Error('Palette did not persist')
-      }
       if (document.documentElement.scrollWidth > innerWidth)
         throw new Error('Appearance controls overflow')
-      document.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click()
+      document.querySelector<HTMLButtonElement>('nav button[aria-label="Reports"]')!.click()
+      await new Promise((resolve) => setTimeout(resolve, 150))
       const selected = document.querySelector('.report-mode-switch button[aria-pressed="true"]')
       if (!selected) throw new Error('Missing selected Reports mode')
       const style = getComputedStyle(selected)
@@ -96,8 +96,7 @@ export async function paletteBrowserTest() {
       })
     }
   }
-  if (new Set(results.map((result) => result.canvas)).size !== 6) {
+  if (new Set(results.map((result) => result.canvas)).size !== 6)
     throw new Error('Palette/appearance combinations must have distinct canvases')
-  }
   return results
 }

@@ -189,7 +189,8 @@ and generated output are excluded from formatting; linting is scoped to code.
 
 ## Appearance
 
-Open **Settings** in the sidebar. The **Theme** selector offers **System**, **Light**, and **Dark**.
+Open the **Settings** page from the sidebar. Its **Appearance** section contains
+the **Theme** selector offers **System**, **Light**, and **Dark**.
 System is the default and follows the desktop/browser appearance, including changes
 while the app is open. Explicit choices are saved in this browser's local storage
 for this origin; selecting System clears the override. If storage is blocked,

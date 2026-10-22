@@ -990,28 +990,6 @@
   }
 }
 
-.appearance-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.theme-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.theme-control select {
-  min-height: 36px;
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--ink);
-  background: var(--surface);
-  font: inherit;
-}
-
 .sidebar-settings {
   margin-top: auto;
   padding-top: 20px;
@@ -1027,34 +1005,10 @@
   color: var(--muted);
   text-align: left;
 }
-.settings-dialog {
-  background: var(--surface);
-}
-.settings-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.settings-heading h2 {
-  margin: 0;
-}
-.settings-dialog h3 {
-  margin: 0;
-  font-size: 15px;
-}
-.settings-dialog .appearance-controls {
-  display: grid;
-  gap: 16px;
-  margin-block: 24px;
-}
-.settings-dialog .theme-control {
-  justify-content: space-between;
-  font-size: 14px;
-}
-.settings-dialog select {
-  min-width: 140px;
+.settings-trigger.active {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  font-weight: 600;
 }
 @media (min-width: 761px) {
   .sidebar-collapsed .settings-trigger {

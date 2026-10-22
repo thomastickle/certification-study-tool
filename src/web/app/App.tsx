@@ -13,14 +13,18 @@ import { ReportsPage } from '../features/reports/ReportsPage.tsx'
 import { HomePage } from '../features/home/HomePage.tsx'
 import { CertificationsPage } from '../features/certifications/CertificationsPage.tsx'
 import { StudyIcon } from '../shared/ui/StudyIcon.tsx'
+import { SettingsPage } from '../features/settings/SettingsPage.tsx'
+import { useAppearance } from './use-appearance.ts'
 import { WorkspaceSidebar } from './WorkspaceSidebar.tsx'
 import { pauseCertificationAttempts } from './workspace-session.ts'
 import type { CertificationProgress } from '../../shared/home-contracts.ts'
 
-type Page = 'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'certifications'
+type Page =
+  'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'certifications' | 'settings'
 
 /** Keep every workspace destination behind the existing practice suspension guard. */
 export function App() {
+  const appearance = useAppearance()
   const [page, setPage] = useState<Page>('home')
   const [practiceVisit, setPracticeVisit] = useState(0)
   const [practiceMode, setPracticeMode] = useState<'quiz' | 'exam'>('quiz')
@@ -235,18 +239,25 @@ export function App() {
             }}
           />
         )}
+        {page === 'settings' && <SettingsPage appearance={appearance} />}
         {page === 'certifications' && <CertificationsPage />}
         {page === 'reports' && selected && <ReportsPage key={scopeKey} certification={selected} />}
-        {!selected && page !== 'home' && page !== 'importer' && page !== 'certifications' && (
-          <main>
-            <h1>
-              {catalogLoading ? 'Loading certifications…' : 'Import a question bank to get started'}
-            </h1>
-            {!catalogLoading && (
-              <button onClick={() => void navigate('importer')}>Open library</button>
-            )}
-          </main>
-        )}
+        {!selected &&
+          page !== 'home' &&
+          page !== 'importer' &&
+          page !== 'certifications' &&
+          page !== 'settings' && (
+            <main>
+              <h1>
+                {catalogLoading
+                  ? 'Loading certifications…'
+                  : 'Import a question bank to get started'}
+              </h1>
+              {!catalogLoading && (
+                <button onClick={() => void navigate('importer')}>Open library</button>
+              )}
+            </main>
+          )}
         {page === 'importer' && <LibraryPage onLibraryChange={refreshCertifications} />}
       </div>
     </div>
