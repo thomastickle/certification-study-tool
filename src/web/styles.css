@@ -814,7 +814,7 @@ select {
   font-size: 43px;
   font-weight: 600;
 }
-.result-score > p:nth-of-type(2) {
+.result-score > .result-score-value {
   font-size: 22px;
   color: var(--ink);
 }
@@ -1295,14 +1295,26 @@ select {
   overflow-wrap: anywhere;
 }
 
-.result-deletion {
-  margin-block: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 0.75rem;
+.result-completion-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.result-deletion p,
+.result-completion-heading .eyebrow {
+  margin: 0;
+}
+
+.result-completion-heading .result-icon-action {
+  flex-shrink: 0;
+}
+
+.result-score > .deletion-deadline {
+  font-size: 0.875rem;
+  color: #dc2626;
+}
+
 .completed-results li p {
   margin-bottom: 0;
 }

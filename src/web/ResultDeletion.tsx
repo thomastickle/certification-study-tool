@@ -1,45 +1,92 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DeletedQuizSummary, PracticeMode, QuizSummary } from '../shared/quiz-contracts.ts'
+import type {
+  DeletedQuizSummary,
+  PracticeMode,
+  QuizSummary,
+  QuizView,
+} from '../shared/quiz-contracts.ts'
 import type { Certification } from './certifications.ts'
 import { ResultIndicator, ResultLegend } from './ResultIndicator.tsx'
 import { StudyIcon } from './StudyIcon.tsx'
 import { api } from './api.ts'
 import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 
-/** Deletes immediately without confirmation; the recovery list owns undo. */
-export function DeleteResultButton({ id, onDeleted }: { id: string; onDeleted: () => void }) {
+/** Keeps completion evidence visible while its saved result is pending deletion. */
+export function ResultCompletionHeader({ quiz, label }: { quiz: QuizView; label?: string }) {
+  const [pending, setPending] = useState<DeletedQuizSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const mode = quiz.mode ?? quiz.options.mode ?? 'quiz'
+  const action = pending ? 'Undo deletion' : 'Mark for deletion'
 
-  /** Retains the result on failure and allows retry after a lost response. */
-  async function remove(): Promise<void> {
+  /** Marks or restores the saved attempt without navigating away from its answer review. */
+  async function change(): Promise<void> {
     setBusy(true)
     setError('')
     try {
-      await api(`/quizzes/${id}`, { method: 'DELETE' })
-      onDeleted()
+      if (pending) {
+        await api(`/quizzes/${quiz.id}/restore`, { method: 'POST' })
+        setPending(null)
+      } else {
+        const deleted = await api<DeletedQuizSummary | null>(`/quizzes/${quiz.id}`, {
+          method: 'DELETE',
+        })
+        if (!deleted) {
+          throw new Error('This result is no longer available.')
+        }
+        setPending(deleted)
+      }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not delete this result.')
+      const message = reason instanceof Error ? reason.message : 'Could not change this result.'
+      // A lost mutation response can still have saved successfully; reconcile before retrying.
+      try {
+        const query = new URLSearchParams({
+          provider: quiz.options.provider ?? 'AWS',
+          certification: quiz.options.certification ?? 'CLF-C02',
+        })
+        const deleted = await api<DeletedQuizSummary[]>(`/quizzes/deleted?${query}`)
+        const saved = deleted.find((item) => item.id === quiz.id)
+        if (saved) {
+          setPending(saved)
+        } else {
+          await api<QuizView>(`/quizzes/${quiz.id}`)
+          setPending(null)
+        }
+      } catch {
+        setError(`${message} Check practice history if the saved status is uncertain.`)
+        return
+      }
+      setError(message)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="result-deletion">
-      <button
-        className="result-icon-action result-icon-delete"
-        aria-label="Delete result"
-        title="Delete result"
-        aria-busy={busy}
-        disabled={busy}
-        onClick={() => void remove()}
-      >
-        <StudyIcon name="trash" />
-      </button>
-      <p>Removes this attempt from stats and scheduling immediately. Undo within 48 hours.</p>
+    <>
+      <div className="result-completion-heading">
+        <p className="eyebrow">{label ?? `${mode.toUpperCase()} COMPLETE`}</p>
+        <button
+          className="result-icon-action result-icon-delete"
+          aria-label={action}
+          title={action}
+          aria-busy={busy}
+          disabled={busy || (pending !== null && Date.now() >= pending.purgeAt)}
+          onClick={() => void change()}
+        >
+          <StudyIcon name={pending ? 'undo' : 'trash'} />
+        </button>
+      </div>
+      {pending && (
+        <p className="deletion-deadline" role="status">
+          Will be deleted on{' '}
+          <time dateTime={new Date(pending.purgeAt).toISOString()}>
+            {new Date(pending.purgeAt).toLocaleString()}
+          </time>
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
-    </div>
+    </>
   )
 }
 

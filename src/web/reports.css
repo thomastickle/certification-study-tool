@@ -14,7 +14,7 @@
 .report-confidence-row > div,
 .attempt-row,
 .history-pagination,
-.attempt-summary,
+.attempt-summary-content,
 .answer-detail summary,
 .review-choices li {
   display: flex;
@@ -612,6 +612,9 @@
   padding: 30px;
   background: #eaf0df;
 }
+.attempt-summary-content {
+  margin-top: 12px;
+}
 .attempt-summary h2 {
   font-size: 30px;
 }
@@ -878,7 +881,7 @@
   .attempt-title small {
     font-size: 8px;
   }
-  .attempt-summary {
+  .attempt-summary-content {
     align-items: flex-start;
     gap: 12px;
   }
