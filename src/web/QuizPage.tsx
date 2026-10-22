@@ -1,4 +1,6 @@
-import { DeleteResultButton, CompletedResults } from './ResultDeletion.tsx'
+import { StudyIcon } from './StudyIcon.tsx'
+import { useResultFilters } from './ResultFilters.tsx'
+import { ResultCompletionHeader, CompletedResults } from './ResultDeletion.tsx'
 import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 import { ResultIndicator } from './ResultIndicator.tsx'
 import { ConceptLabels } from './ConceptLabels.tsx'
@@ -687,13 +689,30 @@ export function QuizPage({
     heading = 'Practice'
   }
 
+  /** Return completed reviews to history and make the setup heading visible again. */
+  function returnToSetup() {
+    setView(undefined)
+    viewRef.current = undefined
+    setStage('setup')
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+
   return (
     <main
       className={`quiz-page ${stage === 'question' || stage === 'review' || stage === 'paused' ? 'practice-session' : ''}`}
     >
       {stage !== 'question' && stage !== 'review' && stage !== 'paused' && (
-        <div className="page-heading practice-heading">
-          <p className="eyebrow">TIMED STUDY SESSION</p>
+        <div
+          className={`page-heading practice-heading ${stage === 'completed' ? 'result-page-heading' : ''}`}
+        >
+          {stage === 'completed' ? (
+            <button className="result-back-link" onClick={returnToSetup}>
+              <StudyIcon name="chevron" />
+              Back to {mode === 'review' ? 'due review' : 'practice'}
+            </button>
+          ) : (
+            <p className="eyebrow">TIMED STUDY SESSION</p>
+          )}
           <div className="practice-title-row">
             <h1>{heading}</h1>
             <p className="practice-certification">
@@ -1045,16 +1064,7 @@ export function QuizPage({
           </div>
         </section>
       )}
-      {stage === 'completed' && view && (
-        <Result
-          view={view}
-          onBack={() => {
-            setView(undefined)
-            viewRef.current = undefined
-            setStage('setup')
-          }}
-        />
-      )}
+      {stage === 'completed' && view && <Result view={view} onBack={returnToSetup} />}
       {stage === 'abandoned' && (
         <section className="quiz-panel">
           <h2>{title} abandoned</h2>
@@ -1170,12 +1180,12 @@ function QuestionEditor({
 }
 
 function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
-  const mode = view.options.mode ?? 'quiz'
+  const mode = view.mode ?? view.options.mode ?? 'quiz'
   const correct = view.questions.filter((question) => question.correct).length
   const percent = view.questions.length ? (correct / view.questions.length) * 100 : null
   const answered = view.questions.filter((question) => question.selected.length > 0).length
   const passed = percent !== null && meetsPracticeTarget(percent)
-  const review = view.questions
+  const { questions: review, controls: filterControls } = useResultFilters(view.questions)
   const [copyNotice, setCopyNotice] = useState('')
 
   function downloadReport() {
@@ -1200,22 +1210,32 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
 
   return (
     <>
-      <DeleteResultButton id={view.id} onDeleted={onBack} />
       <DeletedBankNotice names={view.deletedBankNames} />
       <section className="quiz-panel result-score">
-        <p className="eyebrow">{mode.toUpperCase()} COMPLETE</p>
-        <h2>
-          {correct} of {view.questions.length}
-        </h2>
-        <p>Score: {percent === null ? '—' : `${Math.round(percent)}%`} · skips count as misses</p>
-        {mode !== 'review' && (
-          <>
-            <p className={passed ? 'correct-text' : 'incorrect-text'}>
-              <strong>Practice target (80%): {passed ? 'Pass' : 'Fail'}</strong>
-            </p>
-            <p>This is a practice target, not an official certification score.</p>
-          </>
-        )}
+        <ResultCompletionHeader key={view.id} quiz={view} />
+        <p className="result-score-value">
+          {mode !== 'review' && (
+            <span
+              className={`result-summary-outcome ${passed ? 'correct-text' : 'incorrect-text'}`}
+            >
+              {passed ? 'Pass' : 'Fail'}
+            </span>
+          )}{' '}
+          <span className="result-summary-score">
+            Score: <strong>{percent === null ? '—' : `${Math.round(percent)}%`}</strong>
+          </span>{' '}
+          <span className="result-summary-count">
+            {correct} of {view.questions.length}
+          </span>
+          {view.questions.length > answered && (
+            <>
+              {' '}
+              <span className="result-summary-skipped">
+                {view.questions.length - answered} skipped
+              </span>
+            </>
+          )}
+        </p>
         {mode === 'review' && (
           <p>Due Review · no quiz/exam pass target. Only correct + Confident passes a due check.</p>
         )}
@@ -1227,16 +1247,22 @@ function Result({ view, onBack }: { view: QuizView; onBack: () => void }) {
           <button onClick={() => void copyReport()}>Copy discussion report</button>
           <button onClick={downloadReport}>Download report</button>
         </div>
-        <p role="status">{copyNotice}</p>
+        <p className="result-copy-notice" role="status">
+          {copyNotice}
+        </p>
       </section>
       <section className="quiz-panel">
-        <h2>All answers and confidence</h2>
+        <h2>Details</h2>
         <p>
           Accuracy on answered questions:{' '}
           {answered ? `${Math.round((correct / answered) * 100)}%` : '—'} · {answered} answered ·{' '}
           {view.questions.length - answered} skipped
         </p>
-        {review.length === 0 && <p>All answers are correct and marked confident.</p>}
+        {filterControls}
+        <p role="status">
+          Showing {review.length} of {view.questions.length} questions
+        </p>
+        {review.length === 0 && <p>No questions match these filters.</p>}
         {review.map((question) => (
           <article className="result-question" key={question.questionId}>
             <h3>{question.question}</h3>

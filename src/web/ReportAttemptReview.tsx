@@ -1,11 +1,11 @@
+import { ResultCompletionHeader } from './ResultDeletion.tsx'
+import { useResultFilters } from './ResultFilters.tsx'
 import { ConceptLabels } from './ConceptLabels.tsx'
 import { DeletedBankNotice } from './DeletedBankNotice.tsx'
 import { AttemptTiming } from './AttemptTiming.tsx'
 import { useState } from 'react'
 import type { QuizView } from '../shared/quiz-contracts.ts'
 import { percent, reportDate } from './ReportDashboard.tsx'
-
-type AnswerFilter = 'all' | 'incorrect' | 'skipped' | 'flagged'
 
 /** Describes skipped answers independently from the scoring outcome. */
 function outcome(correct: boolean | undefined, answered: boolean): string {
@@ -17,24 +17,14 @@ function outcome(correct: boolean | undefined, answered: boolean): string {
 
 /** Lets learners inspect the saved answer evidence behind an individual result. */
 export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
-  const [filter, setFilter] = useState<AnswerFilter>('all')
+  const { questions: filteredQuestions, controls: filterControls } = useResultFilters(
+    quiz.questions,
+  )
   const [domain, setDomain] = useState('all')
   const mode = quiz.mode ?? quiz.options.mode ?? 'quiz'
-  const questions = quiz.questions.filter((question) => {
-    if (domain !== 'all' && question.domain !== Number(domain)) {
-      return false
-    }
-    if (filter === 'incorrect') {
-      return question.selected.length > 0 && !question.correct
-    }
-    if (filter === 'skipped') {
-      return question.selected.length === 0
-    }
-    if (filter === 'flagged') {
-      return question.flagged
-    }
-    return true
-  })
+  const questions = filteredQuestions.filter(
+    (question) => domain === 'all' || question.domain === Number(domain),
+  )
   const clf =
     (quiz.options.provider ?? 'AWS') === 'AWS' &&
     (quiz.options.certification ?? 'CLF-C02') === 'CLF-C02'
@@ -52,36 +42,38 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
     <>
       <DeletedBankNotice names={quiz.deletedBankNames} />
       <section className="attempt-summary report-panel">
-        <div>
-          <p className="eyebrow">
-            {mode.toUpperCase()} · {reportDate(quiz.finishedAt!)} ·{' '}
-            {quiz.options.certification ?? 'CLF-C02'}
-          </p>
-          <h2>
-            {score !== null && score >= 80
-              ? 'A milestone worth keeping.'
-              : 'Every attempt is a step forward.'}
-          </h2>
-          <p>
-            {quiz.correctCount} correct · {answered - quiz.correctCount!} incorrect ·{' '}
-            {quiz.total - answered} skipped
-          </p>
-          <p className="report-muted">
-            Score includes skipped questions.{' '}
-            {mode === 'review' ? 'Due Review · no pass target.' : 'Practice target: 80%.'}
-          </p>
-          <p className="report-muted">
-            Accuracy on answered questions:{' '}
-            {percent(answered ? (quiz.correctCount! / answered) * 100 : null)} · {answered} answered
-            · {quiz.total - answered} skipped
-          </p>
-        </div>
-        <div className="attempt-score-large">
-          <strong>{percent(score)}</strong>
-          <span>Score</span>
-          <span>
-            {quiz.correctCount}/{quiz.total} correct
-          </span>
+        <ResultCompletionHeader
+          quiz={quiz}
+          label={`${mode.toUpperCase()} · ${reportDate(quiz.finishedAt!)} · ${quiz.options.certification ?? 'CLF-C02'}`}
+        />
+        <div className="attempt-summary-content">
+          <div>
+            <h2>
+              {score !== null && score >= 80
+                ? 'A milestone worth keeping.'
+                : 'Every attempt is a step forward.'}
+            </h2>
+            <p>
+              {quiz.correctCount} correct · {answered - quiz.correctCount!} incorrect ·{' '}
+              {quiz.total - answered} skipped
+            </p>
+            <p className="report-muted">
+              Score includes skipped questions.{' '}
+              {mode === 'review' ? 'Due Review · no pass target.' : 'Practice target: 80%.'}
+            </p>
+            <p className="report-muted">
+              Accuracy on answered questions:{' '}
+              {percent(answered ? (quiz.correctCount! / answered) * 100 : null)} · {answered}{' '}
+              answered · {quiz.total - answered} skipped
+            </p>
+          </div>
+          <div className="attempt-score-large">
+            <strong>{percent(score)}</strong>
+            <span>Score</span>
+            <span>
+              {quiz.correctCount}/{quiz.total} correct
+            </span>
+          </div>
         </div>
       </section>
       <section className="report-panel">
@@ -130,13 +122,7 @@ export function ReportAttemptReview({ quiz }: { quiz: QuizView }) {
             </select>
           </label>
         </div>
-        <div className="report-segments answer-filters" aria-label="Answer review filter">
-          {(['all', 'incorrect', 'skipped', 'flagged'] as const).map((value) => (
-            <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
-              {value === 'all' ? 'All questions' : value[0]!.toUpperCase() + value.slice(1)}
-            </button>
-          ))}
-        </div>
+        {filterControls}
         <p className="report-muted">
           Showing {questions.length} of {quiz.total} questions
         </p>

@@ -125,13 +125,20 @@ export async function verifyPauseRecovery(saved: {
   }
   ;(row as HTMLButtonElement).click()
   await until(() => !!document.querySelector('.attempt-timing'))
-  const detail = document.querySelector('.attempt-timing')!.textContent!
+  // The compact UI shows totals; the export below retains individual pause evidence.
+  const metrics = new Map(
+    [...document.querySelectorAll('.attempt-timing dl > div')].map((item) => [
+      item.querySelector('dt')?.textContent,
+      item.querySelector('dd')?.textContent,
+    ]),
+  )
   if (
-    !detail.includes('Total paused:') ||
-    !detail.includes('navigation') ||
-    detail.includes('Ongoing')
+    metrics.get('Pauses') !== '1' ||
+    ['Total time', 'Time in test', 'Pause time'].some(
+      (label) => !metrics.get(label) || metrics.get(label) === '—',
+    )
   ) {
-    throw new Error('Completed detail timing missing')
+    throw new Error('Completed timing totals missing')
   }
   const originalCreate = URL.createObjectURL
   let exported: Blob | undefined

@@ -182,3 +182,71 @@ export async function scoreReportsTest(): Promise<string> {
   await click('Reports')
   return 'Score-first master, mode/date filters, chart, domains, detailed accuracy and individual quiz/exam reports passed.'
 }
+
+/** Completion summaries keep score, question counts and outcome together without extra target copy. */
+export async function compactCompletionSummaryTest(zeroSkipAttemptId?: string): Promise<string> {
+  /** Waits for the selected synthetic attempt to render. */
+  async function until(check: () => boolean, message: string) {
+    const deadline = Date.now() + 5000
+    while (!check()) {
+      if (Date.now() >= deadline) {
+        throw new Error(message)
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+  }
+
+  const cases = [
+    ['00000000-0000-4000-8000-000000000001', 'Score: 40%', '8 of 20', 'Fail', '12 skipped'],
+    ['00000000-0000-4000-8000-000000000002', 'Score: 80%', '52 of 65', 'Pass', '13 skipped'],
+    ['00000000-0000-4000-8000-000000000003', 'Score: 0%', '0 of 20', 'Fail', '20 skipped'],
+  ]
+  if (zeroSkipAttemptId) {
+    cases.push([zeroSkipAttemptId, 'Score: 100%', '20 of 20', 'Pass', ''])
+  }
+  for (const [id, score, count, outcome, skipped] of cases) {
+    const home = [...document.querySelectorAll<HTMLButtonElement>('nav button')].find(
+      (button) => button.textContent?.trim() === 'Home',
+    )!
+    home.click()
+    await until(() => !!document.querySelector('.home-page'), 'Home did not open')
+    const practice = [...document.querySelectorAll<HTMLButtonElement>('nav button')].find(
+      (button) => button.textContent?.trim() === 'Practice',
+    )!
+    practice.click()
+    await until(() => !!document.querySelector(`a[href="#result-${id}"]`), 'History missing')
+    document.querySelector<HTMLAnchorElement>(`a[href="#result-${id}"]`)!.click()
+    await until(() => !!document.querySelector('.result-score'), 'Completion card missing')
+    const expected = [outcome, score, count, skipped]
+    const actual = [
+      '.result-summary-outcome',
+      '.result-summary-score',
+      '.result-summary-count',
+      '.result-summary-skipped',
+    ].map(
+      (selector) =>
+        document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+    )
+    if (
+      !document
+        .querySelector('.result-score-value')
+        ?.firstElementChild?.classList.contains('result-summary-outcome')
+    ) {
+      throw new Error('Outcome must lead the summary row')
+    }
+    if (expected.some((value, index) => actual[index] !== value)) {
+      throw new Error(
+        `Expected score, count and outcome ${expected.join(' / ')}, got ${actual.join(' / ')}`,
+      )
+    }
+    if (document.querySelector('.result-score')!.textContent!.includes('practice target')) {
+      throw new Error('Completion card still has practice-target explanation')
+    }
+    const back = [...document.querySelectorAll<HTMLButtonElement>('.result-score button')].find(
+      (button) => button.textContent?.includes('Back to practice history'),
+    )!
+    back.click()
+    await until(() => !document.querySelector('.result-score'), 'History did not reopen')
+  }
+  return 'Compact quiz/exam summaries preserve correct score, counts, and pass/fail, including all-skipped.'
+}
