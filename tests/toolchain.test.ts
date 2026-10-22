@@ -7,8 +7,11 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { ESLint } from 'eslint'
 
+const npmCli = process.env.npm_execpath
+assert.ok(npmCli, 'Run toolchain tests through npm test or npm exec')
+
 test('default typecheck runs TypeScript 7 native', () => {
-  const result = spawnSync('npm', ['run', 'typecheck', '--', '--version'], {
+  const result = spawnSync(process.execPath, [npmCli, 'run', 'typecheck', '--', '--version'], {
     encoding: 'utf8',
   })
   assert.equal(result.status, 0, result.stderr)
@@ -20,13 +23,13 @@ test('default typecheck accepts valid TypeScript and rejects a type error', () =
   try {
     writeFileSync(join(directory, 'tsconfig.json'), '{"compilerOptions":{"strict":true}}')
     const source = join(directory, 'probe.ts')
-    const args = ['run', 'typecheck', '--', '--project', directory]
+    const args = [npmCli, 'run', 'typecheck', '--', '--project', directory]
     writeFileSync(source, 'const count: number = 1\n')
-    const valid = spawnSync('npm', args, { encoding: 'utf8' })
+    const valid = spawnSync(process.execPath, args, { encoding: 'utf8' })
     assert.equal(valid.status, 0, valid.stdout + valid.stderr)
 
     writeFileSync(source, 'const count: number = "invalid"\n')
-    const invalid = spawnSync('npm', args, { encoding: 'utf8' })
+    const invalid = spawnSync(process.execPath, args, { encoding: 'utf8' })
     assert.ok(invalid.status !== null && invalid.status !== 0, invalid.stdout + invalid.stderr)
     assert.match(invalid.stdout, /TS2322/)
   } finally {
