@@ -1,0 +1,9 @@
+{
+  "name": "certification-compiler-benchmark",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "tsrs": "0.18.0-ts7.1.0-dev.20260929",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,323 @@
+{
+  "metadata": {
+    "date": "2026-10-22T06:59:40.584Z",
+    "commit": "31d0015ccdc8cb22962f7600c711a542e4552358",
+    "platform": "linux 7.0.0-38-generic x64",
+    "cpu": "Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz",
+    "logicalCpus": 8,
+    "availableParallelism": 8,
+    "memoryGiB": 31.070533752441406,
+    "node": "v24.17.0",
+    "npm": "11.13.0",
+    "vite": "7.3.7",
+    "configSha256": "2cf870bffcfe8e9f4f955de48c26715945850d6c8d2dfdf1ff9193106a8c533f",
+    "rootLockSha256": "fdcdf6c0fa5aba38f84a5f3144319f3483f2838db1b8af41e7d95ce7ac10a297",
+    "warmups": 1,
+    "measuredRounds": 5,
+    "cache": "Fresh processes; warmed filesystem cache; no cache flushing; no incremental/watch mode"
+  },
+  "preflight": {
+    "ts59": {
+      "version": "Version 5.9.3",
+      "ok": true,
+      "statuses": [0],
+      "diagnostics": {},
+      "probeRejected": true,
+      "probeDiagnostics": {
+        "2322": 1
+      }
+    },
+    "ts7": {
+      "version": "Version 7.0.2",
+      "ok": false,
+      "statuses": [1],
+      "diagnostics": {
+        "2882": 4
+      },
+      "probeRejected": true,
+      "probeDiagnostics": {
+        "2322": 1,
+        "2882": 4
+      }
+    },
+    "tsrs": {
+      "version": "Version 7.1.0-dev.20260930.4 (tsrs 0.18.0-ts7.1.0-dev.20260929, microsoft/TypeScript@b85298b6a81f)",
+      "ok": false,
+      "statuses": [2],
+      "diagnostics": {
+        "2882": 4
+      },
+      "probeRejected": true,
+      "probeDiagnostics": {
+        "2322": 1,
+        "2882": 4
+      }
+    }
+  },
+  "order": [
+    ["ts59-check", "ts59-build", "ts7-check", "tsrs-check", "vite"],
+    ["ts59-build", "ts7-check", "tsrs-check", "vite", "ts59-check"],
+    ["ts7-check", "tsrs-check", "vite", "ts59-check", "ts59-build"],
+    ["tsrs-check", "vite", "ts59-check", "ts59-build", "ts7-check"],
+    ["vite", "ts59-check", "ts59-build", "ts7-check", "tsrs-check"],
+    ["ts59-check", "ts59-build", "ts7-check", "tsrs-check", "vite"]
+  ],
+  "artifacts": [
+    {
+      "path": "assets/index-BHfIDnfC.js",
+      "sha256": "89a006fccb39f3f680ed16c4ec655acedc2370ab0ce27beee3f233e94b158e44"
+    },
+    {
+      "path": "assets/index-DnO0qZd7.css",
+      "sha256": "aadf02499988e5f522a508a814b58c8cf8ae0346a27267e416a50996a736808e"
+    },
+    {
+      "path": "index.html",
+      "sha256": "ca60784b48ec6b6f597a141edade6a8c426da13391e936b986ed24f1c1258e1f"
+    }
+  ],
+  "samples": {
+    "ts59-check": [
+      {
+        "ok": true,
+        "ms": 4992.978139999999,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5024.024813000004,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5139.918476999999,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5609.300778999997,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      },
+      {
+        "ok": true,
+        "ms": 5166.482022000011,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": null
+      }
+    ],
+    "ts59-build": [
+      {
+        "ok": true,
+        "ms": 6422.491028,
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6676.825112999999,
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6655.739712999995,
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6732.294219999996,
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 6702.525502999997,
+        "statuses": [0, 0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ],
+    "ts7-check": [
+      {
+        "ok": false,
+        "ms": 716.1790639999999,
+        "statuses": [1],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 721.4381429999994,
+        "statuses": [1],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 714.8665800000017,
+        "statuses": [1],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 711.6993149999907,
+        "statuses": [1],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 842.0328790000058,
+        "statuses": [1],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      }
+    ],
+    "tsrs-check": [
+      {
+        "ok": false,
+        "ms": 202.09072299999752,
+        "statuses": [2],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 217.68832400000247,
+        "statuses": [2],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 237.3430210000006,
+        "statuses": [2],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 282.9667449999979,
+        "statuses": [2],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      },
+      {
+        "ok": false,
+        "ms": 228.89810299999954,
+        "statuses": [2],
+        "diagnostics": {
+          "2882": 4
+        },
+        "artifactMatch": null
+      }
+    ],
+    "vite": [
+      {
+        "ok": true,
+        "ms": 1729.2914979999987,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1720.9355880000003,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1764.2955690000017,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 2034.1852689999942,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      },
+      {
+        "ok": true,
+        "ms": 1695.973714000007,
+        "statuses": [0],
+        "diagnostics": {},
+        "artifactMatch": true
+      }
+    ]
+  },
+  "timings": {
+    "ts59-check": {
+      "successful": 5,
+      "failed": 0,
+      "median": 5139.918476999999,
+      "min": 4992.978139999999,
+      "max": 5609.300778999997
+    },
+    "ts59-build": {
+      "successful": 5,
+      "failed": 0,
+      "median": 6676.825112999999,
+      "min": 6422.491028,
+      "max": 6732.294219999996
+    },
+    "ts7-check": {
+      "successful": 0,
+      "failed": 5,
+      "median": null,
+      "min": null,
+      "max": null
+    },
+    "tsrs-check": {
+      "successful": 0,
+      "failed": 5,
+      "median": null,
+      "min": null,
+      "max": null
+    },
+    "vite": {
+      "successful": 5,
+      "failed": 0,
+      "median": 1729.2914979999987,
+      "min": 1695.973714000007,
+      "max": 2034.1852689999942
+    }
+  }
+}

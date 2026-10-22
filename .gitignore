@@ -45,3 +45,6 @@ nbproject/private/
 .#*
 \#*#
 .netrwhist
+
+# Opt-in compiler experiment dependencies.
+/tools/compiler-benchmark/node_modules/
