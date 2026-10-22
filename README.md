@@ -122,6 +122,19 @@ banks, databases, logs, and generated build assets are excluded from Git.
 See [architecture](docs/architecture.md) and the
 [bank format](docs/question-bank.schema.json).
 
+Typechecking uses Microsoft's official Go-based TypeScript 7.0.2 compiler locally,
+in GitHub Actions, and in Docker through the same `npm run typecheck` / `build`
+scripts. npm installs the platform binary; no Go SDK is needed. Following
+[Microsoft's side-by-side setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0),
+`@typescript/native` aliases `typescript@7.0.2` and supplies `tsc`, while
+`typescript` aliases `@typescript/typescript6@6.0.2` for ESLint's JavaScript API
+(its separate compiler is `tsc6`). The typecheck script explicitly selects the
+native launcher to avoid competing transitive `tsc` binaries. Keep both aliases:
+TypeScript 7 has no JavaScript API. `npm run typecheck -- --version` verifies the
+default compiler, and `npm test`
+checks compiler error detection and ESLint's TypeScript rules. Vite's client types
+declare frontend asset imports in `src/web/vite-env.d.ts`.
+
 ## Curated CLF-C02 batch import
 
 For the five-file curated bundle, use the repeatable local command documented in
