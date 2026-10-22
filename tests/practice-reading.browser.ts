@@ -33,7 +33,9 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
 
   function click(label: string) {
     const button = [...document.querySelectorAll('button')].find(
-      (item) => item.textContent?.trim() === label,
+      (item) =>
+        item.textContent?.trim() === label ||
+        item.getAttribute('aria-label')?.startsWith(`${label},`),
     )
     assert(button && !button.disabled, `Missing enabled button: ${label}`)
     button.click()
@@ -87,12 +89,58 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     click('Review answers')
     await until(() => !!document.querySelector('.review-list'), 'Review did not open')
     assert(
-      !document.querySelector('.review-list li')?.classList.contains('needs-review'),
-      'Complete confident answer was highlighted',
+      document.querySelector('.review-list li')?.classList.contains('review-answered'),
+      'Complete confident answer was not green',
     )
     assert(
-      document.querySelectorAll('.review-list li')[1]?.classList.contains('needs-review'),
+      document.querySelectorAll('.review-list li')[1]?.classList.contains('review-unanswered'),
       'Unanswered item was not highlighted',
+    )
+    const tiles = [...document.querySelectorAll<HTMLElement>('.review-list li')]
+    const firstTile = tiles[0]!.getBoundingClientRect()
+    assert(
+      tiles.every((tile) => {
+        const box = tile.getBoundingClientRect()
+        return Math.abs(box.width - firstTile.width) < 1 && box.height === firstTile.height
+      }),
+      'Review tiles differ in size',
+    )
+    assert(firstTile.height <= 76, 'Review tiles are not compact')
+    assert(
+      getComputedStyle(tiles[0]!.querySelector('button')!).borderTopWidth === '0px',
+      'Question title still has a separate button border',
+    )
+    assert(
+      tiles[1]!.querySelector('.review-confidence-dot')?.getAttribute('aria-label') ===
+        'Not Recorded',
+      'Unset confidence label is wrong',
+    )
+    assert(
+      tiles[0]!.querySelector('.review-tile-heading')?.textContent?.trim().replace(/\s+/g, ' ') ===
+        '1. Answered',
+      'Tile should show its number and completion on the first row',
+    )
+    const legend = document.querySelector('[aria-label="Answer completion colors"]')
+    assert(
+      legend?.textContent?.includes('Not Answered') &&
+        legend.textContent.includes('Partial') &&
+        legend.textContent.includes('Answered'),
+      'Completion color legend is missing',
+    )
+    assert(getComputedStyle(tiles[0]!).borderTopWidth === '3px', 'Completion border should be bold')
+    assert(
+      getComputedStyle(tiles[0]!).backgroundColor === 'rgb(255, 255, 255)',
+      'Tile background should be neutral',
+    )
+    assert(
+      tiles[0]!.querySelector('.review-confidence-dot')?.getAttribute('aria-label') === 'Confident',
+      'Confidence icon should have a label',
+    )
+    assert(
+      document
+        .querySelector('[aria-label="Confidence icons"]')
+        ?.textContent?.includes('Not Recorded'),
+      'Confidence legend is missing',
     )
     click(`Question ${total}`)
     await until(
@@ -111,16 +159,63 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     )
     finalButton.click()
     await until(() => !!document.querySelector('.review-list'), 'Final button did not open review')
-    const attention = document.querySelector('.review-list li.needs-review')
     assert(
-      attention?.textContent?.includes('Needs review'),
-      'Review questions are not marked for attention',
+      !document.querySelector('.review-list .review-flag'),
+      'Unflagged answers displayed a review flag',
+    )
+    assert(
+      document
+        .querySelector('.review-list')
+        ?.parentElement?.textContent?.includes('0 questions flagged for review.'),
+      'Unanswered questions were counted as flagged',
     )
     click('Question 1')
     await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
+    for (const flagged of [true, false]) {
+      document.querySelector<HTMLInputElement>('.flag-control input')!.click()
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+      await until(
+        () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
+        'Review flag did not save',
+      )
+      document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+      click('Review answers')
+      await until(() => !!document.querySelector('.review-list'), 'Review did not reopen')
+      const first = document.querySelector('.review-list li')!
+      assert(
+        !!first.querySelector('[aria-label="Marked for review"]') === flagged,
+        'Review flag did not follow checkbox',
+      )
+      assert(first.classList.contains('review-answered'), 'Flag changed the fully answered color')
+      if (flagged) {
+        const heading = first.querySelector('.review-tile-heading')!.getBoundingClientRect()
+        const flag = first.querySelector('.review-flag')!.getBoundingClientRect()
+        assert(flag.top >= heading.bottom, 'Review flag should be on the second row')
+        const ball = first.querySelector('.review-confidence-dot')!.getBoundingClientRect()
+        const combinedCenter = (ball.left + flag.right) / 2
+        const tile = first.getBoundingClientRect()
+        assert(
+          Math.abs(combinedCenter - (tile.left + tile.right) / 2) < 1,
+          'Confidence and flag should be centered together',
+        )
+        assert(
+          Math.abs((ball.top + ball.bottom) / 2 - (flag.top + flag.bottom) / 2) < 1,
+          'Confidence and flag should share one line',
+        )
+      }
+      click('Question 1')
+      await until(() => !!document.querySelector('.quiz-question'), 'Question did not reopen')
+    }
     const confidence = document.querySelector('.confidence-row fieldset')!.getBoundingClientRect()
     const flag = document.querySelector('.flag-control')!.getBoundingClientRect()
-    assert(flag.top >= confidence.bottom, 'Review mark is not under Confidence')
+    const controlRow = document.querySelector('.confidence-row')!.getBoundingClientRect()
+    assert(Math.abs(flag.right - controlRow.right) < 1, 'Review mark is not right-aligned')
+    if (controlRow.width >= 800) {
+      assert(
+        flag.top < confidence.bottom && flag.bottom > confidence.top,
+        'Review mark should share the desktop confidence row',
+      )
+    }
     assert(
       document.querySelector('.flag-control')?.textContent?.includes('Mark for Review'),
       'Review mark label is outdated',
@@ -215,7 +310,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       'Final warning did not disappear',
     )
     assertTimerIndicator('rgb(193, 54, 43)', '2 minutes or less remaining')
-    return `${mode}: reading layout, final-question review, yellow attention, and stable warnings passed`
+    return `${mode}: reading layout, final-question review, answer colors and explicit flags, and stable warnings passed`
   } finally {
     Date.now = originalNow
     window.setTimeout = originalSetTimeout

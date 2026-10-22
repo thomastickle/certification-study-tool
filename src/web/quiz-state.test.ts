@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { meetsPracticeTarget, reviewQuestionIds, warningThreshold } from './quiz-state.ts'
+import {
+  meetsPracticeTarget,
+  reviewQuestionIds,
+  reviewAnswerState,
+  warningThreshold,
+} from './quiz-state.ts'
 import type { QuizQuestion, QuizView } from '../shared/quiz-contracts.ts'
 
 test('warning threshold follows server deadline, including crossed thresholds', () => {
@@ -12,7 +17,7 @@ test('warning threshold follows server deadline, including crossed thresholds', 
   assert.equal(warningThreshold(10 * 60_000 + 1), null)
 })
 
-test('review list includes unanswered, flagged, low confidence, and unrecorded confidence', () => {
+test('review list includes only explicit flags regardless of answer or confidence', () => {
   const questions = [
     { questionId: 1, selectCount: 1, selected: [], confidence: null, flagged: false },
     { questionId: 2, selectCount: 1, selected: [1], confidence: 'Confident', flagged: true },
@@ -20,7 +25,7 @@ test('review list includes unanswered, flagged, low confidence, and unrecorded c
     { questionId: 4, selectCount: 1, selected: [1], confidence: 'Educated Guess', flagged: false },
     { questionId: 5, selectCount: 1, selected: [1], confidence: 'Confident', flagged: false },
   ] as QuizQuestion[]
-  assert.deepEqual(reviewQuestionIds(questions), [1, 2, 3, 4])
+  assert.deepEqual(reviewQuestionIds(questions), [2])
 })
 
 test('80 percent practice target passes at the boundary only', () => {
@@ -89,7 +94,7 @@ test('practice clock uses hours, minutes and seconds for both session lengths', 
   assert.equal(formatTime(0), '00:00:00')
 })
 
-test('incomplete multi-select answers need review even when marked confident', () => {
+test('review colors depend only on answer completion, independently of confidence and flags', () => {
   const question = {
     questionId: 0,
     selected: [1],
@@ -97,6 +102,20 @@ test('incomplete multi-select answers need review even when marked confident', (
     flagged: false,
     confidence: 'Confident',
   } as QuizQuestion
-  assert.deepEqual(reviewQuestionIds([question]), [0])
+  assert.deepEqual(reviewQuestionIds([question]), [])
+  assert.equal(reviewAnswerState(question), 'partial')
+  assert.equal(reviewAnswerState({ ...question, selected: [] }), 'unanswered')
+  for (const confidence of [null, 'Unsure', 'Educated Guess', 'Confident'] as const) {
+    for (const flagged of [true, false]) {
+      const answer = { ...question, confidence, flagged }
+      assert.equal(reviewAnswerState({ ...answer, selected: [] }), 'unanswered')
+      assert.equal(reviewAnswerState(answer), 'partial')
+      assert.equal(reviewAnswerState({ ...answer, selected: [1, 2] }), 'answered')
+      assert.deepEqual(reviewQuestionIds([answer]), flagged ? [0] : [])
+    }
+  }
+  const flagged = { ...question, selected: [1, 2], flagged: true }
+  assert.deepEqual(reviewQuestionIds([flagged]), [0])
+  assert.equal(reviewAnswerState(flagged), 'answered')
   assert.deepEqual(reviewQuestionIds([{ ...question, selected: [1, 2] }]), [])
 })

@@ -7,15 +7,18 @@ export function warningThreshold(remainingMs: number): '10-minute' | '2-minute' 
 }
 
 export function reviewQuestionIds(questions: QuizQuestion[]): number[] {
-  return questions
-    .filter(
-      (question) =>
-        question.selected.length < question.selectCount ||
-        question.flagged ||
-        question.confidence === null ||
-        question.confidence !== 'Confident',
-    )
-    .map((question) => question.questionId)
+  return questions.filter((question) => question.flagged).map((question) => question.questionId)
+}
+
+/** Color review tiles by completion only; confidence and flags remain separate indicators. */
+export function reviewAnswerState(question: QuizQuestion): 'unanswered' | 'partial' | 'answered' {
+  if (question.selected.length === 0) {
+    return 'unanswered'
+  }
+  if (question.selected.length < question.selectCount) {
+    return 'partial'
+  }
+  return 'answered'
 }
 
 export function meetsPracticeTarget(percent: number): boolean {

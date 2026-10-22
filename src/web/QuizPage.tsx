@@ -25,10 +25,13 @@ import {
   meetsPracticeTarget,
   mergeQuizPoll,
   reviewQuestionIds,
+  reviewAnswerState,
   warningThreshold,
 } from './quiz-state.ts'
 
 type Stage = 'setup' | 'loading' | 'question' | 'review' | 'completed' | 'abandoned' | 'paused'
+
+const reviewAnswerLabels = { unanswered: 'Not Answered', partial: 'Partial', answered: 'Answered' }
 
 type Props = {
   certification: Certification
@@ -912,33 +915,77 @@ export function QuizPage({
         <>
           <section className="quiz-panel">
             <h2>Answer review</h2>
-            <p>Select a question number to return to it. Marked items need attention:</p>
+            <p>Select a question to return to it.</p>
+            <ul className="review-legend" aria-label="Answer completion colors">
+              <li>
+                <span className="review-legend-swatch review-unanswered" aria-hidden="true" />
+                Not Answered
+              </li>
+              <li>
+                <span className="review-legend-swatch review-partial" aria-hidden="true" />
+                Partial
+              </li>
+              <li>
+                <span className="review-legend-swatch review-answered" aria-hidden="true" />
+                Answered
+              </li>
+            </ul>
+            <ul className="review-legend" aria-label="Confidence icons">
+              <li>
+                <strong>Confidence:</strong>
+              </li>
+              {['Confident', 'Educated Guess', 'Unsure', 'Not Recorded'].map((confidence) => (
+                <li key={confidence}>
+                  <span
+                    className="review-confidence-dot"
+                    data-confidence={confidence}
+                    aria-hidden="true"
+                  />
+                  {confidence}
+                </li>
+              ))}
+              <li>
+                <span className="review-flag" aria-hidden="true">
+                  ⚑
+                </span>
+                Marked for review
+              </li>
+            </ul>
             <ul className="review-list">
               {questions.map((question, index) => (
-                <li
-                  key={question.questionId}
-                  className={reviewIds.includes(question.questionId) ? 'needs-review' : undefined}
-                >
+                <li key={question.questionId} className={`review-${reviewAnswerState(question)}`}>
                   <button
+                    className="review-tile"
+                    aria-label={`Question ${index + 1}, ${question.selected.length} of ${question.selectCount} answers selected, ${question.confidence ?? 'Not Recorded'}${question.flagged ? ', marked for review' : ''}`}
                     onClick={() => {
                       setQuestionIndex(index)
                       setStage('question')
                     }}
                   >
-                    Question {index + 1}
+                    <span className="review-tile-heading">
+                      <span className="review-number">{index + 1}.</span>{' '}
+                      <span>{reviewAnswerLabels[reviewAnswerState(question)]}</span>
+                    </span>
+                    <span className="review-tile-mark">
+                      <span
+                        className="review-confidence-dot"
+                        data-confidence={question.confidence ?? 'Not Recorded'}
+                        role="img"
+                        aria-label={question.confidence ?? 'Not Recorded'}
+                        title={question.confidence ?? 'Not Recorded'}
+                      />
+                      {question.flagged && (
+                        <span
+                          className="review-flag"
+                          role="img"
+                          aria-label="Marked for review"
+                          title="Marked for review"
+                        >
+                          ⚑
+                        </span>
+                      )}
+                    </span>
                   </button>
-                  <span>
-                    {question.selected.length === 0 ? 'Unanswered · ' : 'Answered · '}
-                    {question.selected.length > 0 && question.selected.length < question.selectCount
-                      ? 'Incomplete · '
-                      : ''}
-                    {question.flagged ? 'Flagged · ' : ''}
-                    {question.confidence ?? 'Confidence not recorded'}
-                    {question.confidence && question.confidence !== 'Confident' ? ' · Review' : ''}
-                  </span>
-                  {reviewIds.includes(question.questionId) && (
-                    <span className="review-attention">Needs review</span>
-                  )}
                 </li>
               ))}
             </ul>

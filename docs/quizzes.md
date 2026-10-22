@@ -58,15 +58,23 @@ Review answers and opens answer review. Answers, confidence, and flags save
 immediately, without a lock-in step.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
-scroll containers. The review grid labels answered/unanswered questions and flags. Questions needing
-review have a yellow background and a Needs review label: unanswered/incomplete
-answers, return flags, and missing or low confidence. Confident complete answers
-without flags are unhighlighted.
+scroll containers. The review grid uses compact, equal-size clickable tiles with neutral
+backgrounds and bold completion borders. The first row shows the number and status,
+for example **1. Answered**. Red borders mean **Not Answered**, yellow borders mean
+**Partial** (an incomplete multiple-select answer), and green borders mean **Answered**.
+The second row centers a confidence ball beside a red flag when manually marked:
+green for Confident, yellow for Educated Guess, red for Unsure, and hollow gray for
+Not Recorded. Icons include accessible names and hover labels. Separate completion
+and confidence legends explain the borders, balls, and review flag.
+Only explicit Mark for Review selections count as flagged. Confidence and flags do
+not change the completion border. Clearing a flag removes it regardless of confidence.
+The tile's accessible name includes question number, selection count, confidence,
+and review status.
 
 Each question supports its original single/multiple selection count, optional
 confidence (Confident, Educated Guess, Unsure), and a Mark for Review checkbox. The review
-screen lists all questions and highlights unanswered, marked, low-confidence,
-and unrecorded-confidence items. Submit and score ends the attempt. The result
+screen lists all questions and counts only manual flags.
+Submit and score ends the attempt. The result
 shows correct count, score (correct / all questions, including skips), and an **80% practice target**: green Pass
 at or above 80%, red Fail below it, with text labels as well as color. This raw
 percentage is not AWS's scaled certification score.

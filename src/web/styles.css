@@ -1105,17 +1105,73 @@ select {
 }
 .practice-session .review-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
   gap: 8px;
 }
+.review-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.review-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.review-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border: 3px solid;
+  border-radius: 3px;
+}
 .practice-session .review-list li {
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid var(--border);
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 3px solid var(--border);
   border-radius: 7px;
+  background: #fff;
+}
+.practice-session .review-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 62px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.practice-session .review-tile:hover {
+  background: var(--subtle);
+}
+.practice-session .review-tile .review-number {
+  color: var(--ink);
+  font-weight: 600;
+}
+.practice-session .review-tile-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  white-space: nowrap;
+}
+.practice-session .review-list .review-tile-heading span {
+  font-size: 13px;
+}
+.practice-session .review-tile-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 18px;
 }
 .paused-panel {
   text-align: center;
@@ -1195,12 +1251,46 @@ select {
 .timer.urgent .timer-indicator {
   background: #c1362b;
 }
-.practice-session .review-list li.needs-review {
-  background: #fff5ce;
-  border-color: #d3ae43;
+.practice-session .review-list li.review-partial,
+.review-legend .review-partial {
+  border-color: #b88a00;
 }
-.practice-session .review-list .review-attention {
-  color: #715000;
+.practice-session .review-list li.review-unanswered,
+.review-legend .review-unanswered {
+  border-color: #bd4339;
+}
+.practice-session .review-list li.review-answered,
+.review-legend .review-answered {
+  border-color: #39834f;
+}
+.review-confidence-dot {
+  display: inline-block;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #62718a;
+  border-radius: 50%;
+  background: transparent;
+}
+.review-confidence-dot[data-confidence='Confident'] {
+  border-color: #237a45;
+  background: #237a45;
+}
+.review-confidence-dot[data-confidence='Educated Guess'] {
+  border-color: #b88a00;
+  background: #e0aa00;
+}
+.review-confidence-dot[data-confidence='Unsure'] {
+  border-color: #c1362b;
+  background: #c1362b;
+}
+.practice-session .review-list .review-flag,
+.review-legend .review-flag {
+  color: #b42318;
+  flex: 0 0 16px;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
   font-weight: 700;
 }
 
