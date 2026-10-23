@@ -1,7 +1,11 @@
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only fixture checks for answer spacing and scored-report contrast. */
-export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string> {
+export async function practiceSpacingTest(
+  mode: 'quiz' | 'exam',
+  typical = false,
+  wrapped = false,
+): Promise<string> {
   const originalFetch = window.fetch
   const originalConfirm = window.confirm
   const total = mode === 'exam' ? 65 : 20
@@ -48,14 +52,21 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     if (!view?.questions || view.id !== attemptId) return response
     for (let index = 0; index < 3; index++) {
       const question = view.questions[index]
-      question.question = 'Synthetic answer-spacing question?'
+      question.question = typical
+        ? 'A company is moving its ordering application to the cloud. Traffic increases during seasonal promotions, and background workers must scale independently. The operations team prefers managed services and needs to preserve accepted orders during an outage. The solution must keep the website responsive during sudden bursts of traffic. Which design best separates incoming requests from background processing?'
+        : 'Synthetic answer-spacing question?'
       question.sourceName = 'Synthetic layout fixture'
       question.domain = 1
       question.type = 'single_select'
       question.selectCount = 1
       question.answers = Array.from({ length: index + 4 }, (_, id) => ({
         id,
-        text: `Choice ${id + 1}`,
+        text:
+          wrapped && index === 2 && id === 5
+            ? 'This longer answer describes a managed service with independent workers and durable messages. '.repeat(
+                4,
+              )
+            : `Choice ${id + 1}`,
       }))
     }
     return new Response(JSON.stringify(view), {
@@ -79,18 +90,58 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     click(`Start ${total}-question ${mode}`)
     await until(() => !!document.querySelector('.answer-choices'), 'Question did not load')
     const tops: number[] = []
+    const confidenceTops: number[] = []
+    const lastAnswerBottoms: number[] = []
     for (let index = 0; index < 3; index++) {
       await until(
         () => document.querySelectorAll('.choice').length === index + 4,
         'Choice fixture did not load',
       )
       tops.push(document.querySelector('.answer-choices')!.getBoundingClientRect().top)
+      const confidence = document.querySelector('.confidence-row')!.getBoundingClientRect()
+      const lastChoice = [...document.querySelectorAll('.choice')].at(-1)!.getBoundingClientRect()
+      assert(confidence.top - lastChoice.bottom >= 12, 'Answers crowd the confidence controls')
+      confidenceTops.push(confidence.top)
+      lastAnswerBottoms.push(lastChoice.bottom)
+      if (wrapped && index === 2) {
+        const range = document.createRange()
+        range.selectNodeContents(document.querySelectorAll('.choice')[5]!.lastElementChild!)
+        assert(range.getClientRects().length > 1, 'Wrapped-answer fixture did not wrap')
+      }
+      const toolbar = document.querySelector('.quiz-status')!
+      assert(toolbar.scrollWidth <= toolbar.clientWidth + 1, 'Toolbar overflows its width')
+      if (index < 2 && window.innerWidth >= 1100 && window.innerHeight >= 740) {
+        assert(
+          document.querySelector('.question-navigation')!.getBoundingClientRect().bottom <=
+            window.innerHeight,
+          'Four or five answers should fit without scrolling',
+        )
+        assert(
+          document.documentElement.scrollHeight <= window.innerHeight,
+          `Four or five answers cause unnecessary page scrolling: ${document.documentElement.scrollHeight}px in ${window.innerHeight}px`,
+        )
+      }
       if (index < 2) click('Next question')
     }
     assert(
       Math.max(...tops) - Math.min(...tops) < 1,
       'Answer start moved between four, five and six choices',
     )
+    if (window.innerWidth > 760) {
+      assert(
+        Math.abs(confidenceTops[0]! - confidenceTops[1]!) < 1,
+        'Confidence moved between four and five choices',
+      )
+      assert(
+        confidenceTops[2]! > confidenceTops[1]!,
+        'Sixth choice should grow the page before Confidence',
+      )
+      assert(
+        confidenceTops[0]! - lastAnswerBottoms[0]! >=
+          lastAnswerBottoms[1]! - lastAnswerBottoms[0]! + 12,
+        'Four-choice question did not reserve a fifth row',
+      )
+    }
     const clear = document.querySelector('.confidence-clear')!.getBoundingClientRect()
     assert(clear.height <= 30, 'Clear is still oversized')
     assert(
@@ -135,7 +186,7 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     const contrast = (luminance(correct.backgroundColor) + 0.05) / (luminance(correct.color) + 0.05)
     assert(contrast >= 7, 'Correct-answer contrast is below the 7:1 readability target')
     assert(parseFloat(correct.fontSize) >= 16, 'Scored answer text is too small')
-    return `${mode}: stable 4/5/6-choice start, compact Clear, review label and dark report text passed`
+    return `${mode}: ${typical ? 'typical' : 'short'} question, five reserved rows, ${wrapped ? 'wrapped sixth answer' : 'sixth row'} grows naturally, compact Clear, review label and dark report text passed`
   } finally {
     window.fetch = originalFetch
     click('Reports')

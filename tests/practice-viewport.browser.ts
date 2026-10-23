@@ -108,6 +108,10 @@ export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<strin
           navigation.getBoundingClientRect().bottom <= window.innerHeight,
           'Typical question requires scrolling to navigation',
         )
+        assert(
+          document.documentElement.scrollHeight <= window.innerHeight,
+          'Typical question causes unnecessary page scrolling',
+        )
       }
       if (index === 2) {
         assert(

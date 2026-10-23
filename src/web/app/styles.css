@@ -1382,7 +1382,7 @@ select {
   font-weight: 700;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1000px) {
   .practice-session .quiz-status {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas: 'progress save warning' 'timer pause actions';
