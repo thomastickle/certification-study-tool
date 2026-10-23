@@ -1,4 +1,4 @@
-import { openPracticePreset } from './practice-browser-helpers.ts'
+import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only reading/layout regression; use a disposable populated database. */
 export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string> {
@@ -72,8 +72,9 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       document.querySelectorAll<HTMLInputElement>('.choice input')[index]!.click()
       await new Promise((resolve) => window.setTimeout(resolve, 0))
       await until(
-        () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
-        'Answer did not save',
+        () =>
+          document.querySelector('.answer-save-status')?.textContent?.trim() === 'Unsaved changes',
+        'Answer should remain unsaved',
       )
     }
     const confident = [
@@ -82,10 +83,11 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     confident.click()
     await new Promise((resolve) => window.setTimeout(resolve, 0))
     await until(
-      () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
-      'Confidence did not save',
+      () =>
+        document.querySelector('.answer-save-status')?.textContent?.trim() === 'Unsaved changes',
+      'Confidence should remain unsaved',
     )
-    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    await openPracticeActions()
     click('Review answers')
     await until(() => !!document.querySelector('.review-list'), 'Review did not open')
     assert(
@@ -175,10 +177,11 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
       document.querySelector<HTMLInputElement>('.flag-control input')!.click()
       await new Promise((resolve) => window.setTimeout(resolve, 0))
       await until(
-        () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
-        'Review flag did not save',
+        () =>
+          document.querySelector('.answer-save-status')?.textContent?.trim() === 'Unsaved changes',
+        'Review flag should remain unsaved',
       )
-      document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+      await openPracticeActions()
       click('Review answers')
       await until(() => !!document.querySelector('.review-list'), 'Review did not reopen')
       const first = document.querySelector('.review-list li')!

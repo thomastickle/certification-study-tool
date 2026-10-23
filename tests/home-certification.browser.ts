@@ -91,8 +91,8 @@ export async function homeCertificationIntegrationTest() {
   )
   document.querySelector<HTMLInputElement>('.answer-choices input')!.click()
   await until(
-    () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-    'Answer did not save',
+    () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+    'Answer should remain unsaved',
   )
   const original = await current('DEA-C01')
   await home()

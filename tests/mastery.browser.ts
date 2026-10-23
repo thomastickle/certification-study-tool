@@ -1,3 +1,5 @@
+import { openPracticeActions } from './practice-browser-helpers.ts'
+
 /** Run against a new seed-mastery database from the home screen. Uses only synthetic data. */
 export async function masteryBrowserTest(): Promise<string> {
   const originalConfirm = window.confirm
@@ -76,8 +78,10 @@ export async function masteryBrowserTest(): Promise<string> {
         input.click()
         await new Promise((resolve) => setTimeout(resolve, 0))
         await until(
-          () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
-          'Choice did not autosave',
+          () =>
+            document.querySelector('.answer-save-status')?.textContent?.trim() ===
+            'Unsaved changes',
+          'Choice should remain unsaved',
         )
       }
     }
@@ -88,8 +92,9 @@ export async function masteryBrowserTest(): Promise<string> {
     assert(confident, 'No confidence control')
     confident.click()
     await until(
-      () => document.querySelector('.answer-save-status')?.textContent?.trim() === 'Saved',
-      'Answer was not saved',
+      () =>
+        document.querySelector('.answer-save-status')?.textContent?.trim() === 'Unsaved changes',
+      'Answer should remain unsaved',
     )
     button('Reports').click()
     await until(() => !!document.querySelector('.reports-page'), 'Navigation failed')
@@ -115,7 +120,7 @@ export async function masteryBrowserTest(): Promise<string> {
       resumed.id === active.id && resumed.questions[0].confidence === 'Confident',
       'Recovery lost submitted edits',
     )
-    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    await openPracticeActions()
     button('Submit and score').click()
     await until(() => !!document.querySelector('.result-score'), 'Review did not score')
     assert(

@@ -104,8 +104,8 @@ export async function practicePresetsTest() {
     document.querySelector<HTMLInputElement>('.choice input')!.click()
     await new Promise((resolve) => setTimeout(resolve, 50))
     await until(
-      () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-      'Answer not saved',
+      () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+      'Answer should remain unsaved',
     )
     await reports()
     button('Practice').click()

@@ -42,7 +42,9 @@ appear inline in the toolbar at 10 and 2 minutes remaining, including on the
 pre-submit review screen. Their reserved slot keeps the question from shifting;
 the 10-minute warning is yellow and the final warning is red. Each message
 disappears after 30 seconds; its toolbar space stays reserved.
-Answers are saved after each change. At expiry the server scores the saved
+Answers, confidence, and review marks stay local while editing. They save when
+clicking Previous or Next (including the final Review answers button), opening Actions,
+clicking Pause, or leaving through in-app navigation. Leaving also pauses the timer. At expiry the server scores the saved
 choices; unanswered questions and incomplete/incorrect multi-select sets are
 misses. Late changes are ignored. A running server checks deadlines every second;
 after a server restart it also scores overdue attempts. If a save fails, the UI
@@ -54,8 +56,8 @@ During an attempt the compact toolbar shows question progress, save status, an
 **HH:MM:SS** clock, Pause, and an Actions dropdown. The dropdown offers Review
 answers, Submit and score, and Abandon. The footer has compact, equal-width
 Previous and Next buttons at opposite edges. On the final question, Next becomes
-Review answers and opens answer review. Answers, confidence, and flags save
-immediately, without a lock-in step.
+Review answers and saves before opening answer review. A failed save keeps the
+current question or menu closed, retains local changes, and offers retry.
 The question screen omits the redundant mode heading, question count, and duration
 intro. Long content can still scroll naturally; question panels have no nested
 scroll containers. The review grid uses compact, equal-size clickable tiles with neutral
@@ -349,7 +351,7 @@ start), `lost-start`, `recovery-failure`, `save-failure`, `pause-failure`,
 `pending-save`, `pending-save-failure`, `pending-pause-failure`, `lost-pause`,
 `manual-race`, `resume-race`, and `submit-race`. It checks suspension, retained
 identity/edits, error/retry behavior, recovery, explicit resume, report exclusion,
-and eventual single completion. `tests/practice-controls.browser.ts` checks autosave,
+and eventual single completion. `tests/practice-controls.browser.ts` checks deferred saves,
 Previous/Next, review metadata, pause, recovery, resume, and menu abandonment.
 `tests/practice-reading.browser.ts` checks the final-question review transition,
 review highlighting, readable controls, and warning placement without layout shifts.
@@ -496,3 +498,8 @@ history, type markers, setup placement, compact header, and cross-preset result 
 Bundle it with its helper before evaluating in the browser; it soft-deletes its own
 fixtures afterward. `practicePresetsTest()` also checks counts, durations, bank selection,
 keyboard focus, and independent recovery with the presets inside setup.
+
+`tests/quiz-save-boundaries.browser.ts` exports `quizSaveBoundariesTest(mode, failures)`.
+Run for quiz and exam on disposable populated data, with and without injected save failures.
+It checks that editing and polling make no answer writes; Previous, Next, Actions, Pause,
+and in-app navigation save the latest state, and failed saves block those actions.
