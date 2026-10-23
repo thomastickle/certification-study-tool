@@ -1033,7 +1033,7 @@
 /* Typical questions share five lines of space; longer content grows with the page. */
 @media (min-width: 761px) {
   .practice-session {
-    padding-block: 16px;
+    padding-block: 12px;
   }
   .practice-session .quiz-panel {
     padding: 20px;
