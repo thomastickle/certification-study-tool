@@ -1029,3 +1029,34 @@
     font-size: 12px;
   }
 }
+
+/* Reserve the available desktop height so question length cannot move the controls. */
+@media (min-width: 701px) and (min-height: 501px) {
+  .practice-question-session {
+    block-size: calc(100dvh - 72px);
+    display: flex;
+    flex-direction: column;
+  }
+  .practice-question-session > :not(.quiz-question) {
+    flex-shrink: 0;
+  }
+  .practice-question-session .quiz-question {
+    flex: 1;
+    min-block-size: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .practice-question-session .question-reading {
+    flex: 1;
+    min-block-size: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 3px;
+  }
+  .practice-question-session .confidence-row {
+    flex-shrink: 0;
+  }
+  .practice-question-session .question-navigation {
+    margin-top: 0;
+  }
+}
