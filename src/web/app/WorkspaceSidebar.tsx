@@ -173,11 +173,6 @@ export function WorkspaceSidebar({ destination, onNavigate }: Props) {
             <span>Settings</span>
           </button>
         </div>
-        <p className="sidebar-note">
-          Your library and progress
-          <br />
-          stay on this device.
-        </p>
       </aside>
       <div className="sidebar-edge">
         <div
