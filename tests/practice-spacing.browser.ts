@@ -42,9 +42,10 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
 
   window.fetch = async (input, init) => {
     const response = await originalFetch(input, init)
-    if (input !== '/api/quizzes' || init?.method !== 'POST' || !response.ok) return response
-    const view = await response.json()
-    attemptId = view.id
+    if (!String(input).startsWith('/api/quizzes') || !response.ok) return response
+    const view = await response.clone().json()
+    if (input === '/api/quizzes' && init?.method === 'POST') attemptId = view.id
+    if (!view?.questions || view.id !== attemptId) return response
     for (let index = 0; index < 3; index++) {
       const question = view.questions[index]
       question.question = 'Synthetic answer-spacing question?'
@@ -83,12 +84,12 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
         () => document.querySelectorAll('.choice').length === index + 4,
         'Choice fixture did not load',
       )
-      tops.push(document.querySelector('.confidence-row')!.getBoundingClientRect().top)
+      tops.push(document.querySelector('.answer-choices')!.getBoundingClientRect().top)
       if (index < 2) click('Next question')
     }
     assert(
       Math.max(...tops) - Math.min(...tops) < 1,
-      'Confidence moved between four, five and six choices',
+      'Answer start moved between four, five and six choices',
     )
     const clear = document.querySelector('.confidence-clear')!.getBoundingClientRect()
     assert(clear.height <= 30, 'Clear is still oversized')
@@ -122,13 +123,19 @@ export async function practiceSpacingTest(mode: 'quiz' | 'exam'): Promise<string
     )
     await openPracticePreset(mode)
     await until(() => !!document.querySelector('.history-list'), 'Result history did not load')
-    click('Review results')
+    await until(
+      () => !!document.querySelector(`[data-result-id="${attemptId}"] a`),
+      'Scored result link did not load',
+    )
+    const result = document.querySelector<HTMLAnchorElement>(`[data-result-id="${attemptId}"] a`)
+    assert(result, 'Scored result link did not load')
+    result.click()
     await until(() => !!document.querySelector('.result-correct'), 'Scored report did not load')
     const correct = getComputedStyle(document.querySelector('.result-correct')!)
     const contrast = (luminance(correct.backgroundColor) + 0.05) / (luminance(correct.color) + 0.05)
     assert(contrast >= 7, 'Correct-answer contrast is below the 7:1 readability target')
     assert(parseFloat(correct.fontSize) >= 16, 'Scored answer text is too small')
-    return `${mode}: stable 4/5/6-choice spacing, compact Clear, review label and dark report text passed`
+    return `${mode}: stable 4/5/6-choice start, compact Clear, review label and dark report text passed`
   } finally {
     window.fetch = originalFetch
     click('Reports')

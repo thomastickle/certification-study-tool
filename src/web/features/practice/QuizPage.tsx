@@ -712,7 +712,7 @@ export function QuizPage({
 
   return (
     <main
-      className={`quiz-page ${stage === 'question' ? 'practice-question-session' : ''} ${stage === 'question' || stage === 'review' || stage === 'paused' ? 'practice-session' : ''}`}
+      className={`quiz-page ${stage === 'question' || stage === 'review' || stage === 'paused' ? 'practice-session' : ''}`}
     >
       {stage !== 'question' && stage !== 'review' && stage !== 'paused' && (
         <div
@@ -1132,42 +1132,32 @@ function QuestionEditor({
 
   return (
     <article className="quiz-panel quiz-question">
-      <div
-        className="question-reading"
-        key={question.questionId}
-        tabIndex={0}
-        aria-label="Question and answer choices"
-      >
-        <div className="question-meta">
-          <span>{question.domain ? `Domain ${question.domain}` : 'Domain not mapped'}</span>
-          <span>
-            {question.sourceName} ·{' '}
-            {question.sourceKind === 'official' ? 'Official' : 'Third-party'}
-          </span>
-        </div>
-        <h2>{question.question}</h2>
-        <ConceptLabels question={question} />
-        <p className="selection-instruction">
-          <strong>
-            {multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}
-          </strong>
-        </p>
-        <fieldset className="answer-choices" disabled={disabled}>
-          <legend className="sr-only">Answer choices</legend>
-          {question.answers.map((answer, index) => (
-            <label className="choice" key={answer.id}>
-              <input
-                type={multiple ? 'checkbox' : 'radio'}
-                name={`question-${question.questionId}`}
-                checked={question.selected.includes(answer.id)}
-                onChange={() => toggle(answer.id)}
-              />
-              <span className="choice-letter">{String.fromCharCode(65 + index)}</span>
-              <span>{answer.text}</span>
-            </label>
-          ))}
-        </fieldset>
+      <div className="question-meta">
+        <span>{question.domain ? `Domain ${question.domain}` : 'Domain not mapped'}</span>
+        <span>
+          {question.sourceName} · {question.sourceKind === 'official' ? 'Official' : 'Third-party'}
+        </span>
       </div>
+      <h2>{question.question}</h2>
+      <ConceptLabels question={question} />
+      <p className="selection-instruction">
+        <strong>{multiple ? `Select ${question.selectCount} answers` : 'Select one answer'}</strong>
+      </p>
+      <fieldset className="answer-choices" disabled={disabled}>
+        <legend className="sr-only">Answer choices</legend>
+        {question.answers.map((answer, index) => (
+          <label className="choice" key={answer.id}>
+            <input
+              type={multiple ? 'checkbox' : 'radio'}
+              name={`question-${question.questionId}`}
+              checked={question.selected.includes(answer.id)}
+              onChange={() => toggle(answer.id)}
+            />
+            <span className="choice-letter">{String.fromCharCode(65 + index)}</span>
+            <span>{answer.text}</span>
+          </label>
+        ))}
+      </fieldset>
       <div className="confidence-row">
         <fieldset disabled={disabled}>
           <legend>Confidence</legend>

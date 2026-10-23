@@ -59,8 +59,10 @@ Previous and Next buttons at opposite edges. On the final question, Next becomes
 Review answers and saves before opening answer review. A failed save keeps the
 current question or menu closed, retains local changes, and offers retry.
 The question screen omits the redundant mode heading, question count, and duration
-intro. Long content can still scroll naturally; question panels have no nested
-scroll containers. The review grid uses compact, equal-size clickable tiles with neutral
+intro. Desktop questions reserve five text lines so short and typical 3–5-line
+questions start the answers at the same position. Exceptionally long questions
+grow the whole page; question panels have no nested scroll containers. Answer
+choices use their actual height rather than reserving empty rows for six choices. The review grid uses compact, equal-size clickable tiles with neutral
 backgrounds and bold completion borders. The first row shows the number and status,
 for example **1. Answered**. Red borders mean **Not Answered**, yellow borders mean
 **Partial** (an incomplete multiple-select answer), and green borders mean **Answered**.
@@ -503,3 +505,8 @@ keyboard focus, and independent recovery with the presets inside setup.
 Run for quiz and exam on disposable populated data, with and without injected save failures.
 It checks that editing and polling make no answer writes; Previous, Next, Actions, Pause,
 and in-app navigation save the latest state, and failed saves block those actions.
+
+`practiceViewportTest(mode)` in `tests/practice-viewport.browser.ts` compares a short,
+3–5-line, and exceptionally long question. At 1100×740 or larger, the typical fixture
+keeps navigation on screen and answers aligned with the short fixture. Long content
+uses document scrolling at every viewport size.

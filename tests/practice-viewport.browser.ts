@@ -4,7 +4,6 @@ import { openPracticePreset } from './practice-browser-helpers.ts'
 export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<string> {
   const originalFetch = window.fetch
   const originalConfirm = window.confirm
-  const bounded = window.innerWidth > 760 && window.innerHeight > 500
   const total = mode === 'exam' ? 65 : 20
   let attemptId: string | undefined
   window.confirm = () => true
@@ -31,21 +30,25 @@ export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<strin
 
   window.fetch = async (input, init) => {
     const response = await originalFetch(input, init)
-    if (input !== '/api/quizzes' || init?.method !== 'POST' || !response.ok) return response
-    const view = await response.json()
-    attemptId = view.id
+    if (!String(input).startsWith('/api/quizzes') || !response.ok) return response
+    const view = await response.clone().json()
+    if (input === '/api/quizzes' && init?.method === 'POST') attemptId = view.id
+    if (!view?.questions || view.id !== attemptId) return response
     for (let index = 0; index < 3; index++) {
       const question = view.questions[index]
+      const moderate =
+        'A company is moving its ordering application to the cloud. Traffic increases during seasonal promotions, and background workers must scale independently. The operations team prefers managed services and needs to preserve accepted orders during an outage. The solution must keep the website responsive during sudden bursts of traffic. Which design best separates incoming requests from background processing?'
       question.question =
-        index === 1
-          ? 'A company is evaluating its cloud architecture. '.repeat(35) +
-            'Which option meets the requirement?'
-          : 'Synthetic short question?'
+        index === 0
+          ? 'Which service queues background work?'
+          : index === 1
+            ? moderate
+            : moderate.repeat(8)
       question.sourceName = 'Synthetic layout fixture'
       question.domain = 1
       question.type = 'single_select'
       question.selectCount = 1
-      question.answers = Array.from({ length: index + 4 }, (_, id) => ({
+      question.answers = Array.from({ length: 4 }, (_, id) => ({
         id,
         text: `Choice ${id + 1}`,
       }))
@@ -70,49 +73,62 @@ export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<strin
     )
     click(`Start ${total}-question ${mode}`)
     await until(() => !!document.querySelector('.answer-choices'), 'Question did not load')
-    const tops: number[] = []
+    const answerTops: number[] = []
+    let typicalLines = 0
     for (let index = 0; index < 3; index++) {
+      const expectedStart = index === 0 ? 'Which service' : 'A company'
       await until(
-        () => document.querySelectorAll('.choice').length === index + 4,
-        'Choice fixture did not load',
+        () =>
+          document.querySelector('.quiz-question h2')?.textContent?.startsWith(expectedStart) ===
+            true &&
+          (index < 2 || document.querySelector('.quiz-question h2')!.textContent!.length > 1000),
+        'Question fixture did not load',
       )
-      tops.push(document.querySelector('.confidence-row')!.getBoundingClientRect().top)
-      const navigation = document.querySelector('.question-navigation')!.getBoundingClientRect()
-      if (bounded) {
-        assert(navigation.bottom <= window.innerHeight, 'Navigation fell below the viewport')
-      } else {
-        const reading = document.querySelector('.question-reading')!
-        assert(
-          reading.scrollHeight <= reading.clientHeight + 1,
-          'Small viewport clipped reading content instead of using page scrolling',
-        )
-        document.querySelector('.question-navigation')!.scrollIntoView({ block: 'end' })
-        assert(
-          document.querySelector('.question-navigation')!.getBoundingClientRect().bottom <=
-            window.innerHeight + 1,
-          'Small viewport navigation cannot be reached',
-        )
-        window.scrollTo(0, 0)
+      const question = document.querySelector('.quiz-question')!
+      if (index === 1) {
+        const range = document.createRange()
+        range.selectNodeContents(question.querySelector('h2')!)
+        typicalLines = range.getClientRects().length
+        if (window.innerWidth >= 1100) {
+          assert(
+            typicalLines >= 3 && typicalLines <= 5,
+            'Fixture must exercise a 3–5-line question',
+          )
+        }
       }
-      if (index === 1 && bounded) {
-        const reading = document.querySelector('.question-reading')!
-        assert(reading.scrollHeight > reading.clientHeight, 'Long question should scroll')
-        reading.scrollTop = reading.scrollHeight
-        assert(reading.scrollTop > 0, 'Long question cannot be scrolled')
+      const choices = document.querySelector('.answer-choices')!
+      answerTops.push(choices.getBoundingClientRect().top + window.scrollY)
+      for (const element of [question, ...question.querySelectorAll('*')]) {
+        const overflow = getComputedStyle(element).overflowY
+        assert(overflow !== 'auto' && overflow !== 'scroll', 'Question has a nested scroller')
+      }
+      const navigation = document.querySelector('.question-navigation')!
+      if (index < 2 && window.innerWidth >= 1100 && window.innerHeight >= 740) {
+        assert(
+          navigation.getBoundingClientRect().bottom <= window.innerHeight,
+          'Typical question requires scrolling to navigation',
+        )
       }
       if (index === 2) {
         assert(
-          document.querySelector('.question-reading')!.scrollTop === 0,
-          'Next question retained the previous scroll position',
+          document.documentElement.scrollHeight > window.innerHeight,
+          'Very long question should extend the page',
         )
+        navigation.scrollIntoView({ block: 'end' })
+        assert(window.scrollY > 0, 'Very long question did not use page scrolling')
       }
-      if (index < 2) click('Next question')
+      if (index < 2) {
+        click('Next question')
+      }
     }
-    assert(
-      !bounded || Math.max(...tops) - Math.min(...tops) < 1,
-      'Confidence moved between short and long questions',
-    )
-    return `${mode}: stable controls passed`
+    if (window.innerWidth > 760 && typicalLines <= 5) {
+      assert(
+        Math.abs(answerTops[0]! - answerTops[1]!) < 1,
+        'Answers shifted between short and typical questions',
+      )
+    }
+    window.scrollTo(0, 0)
+    return `${mode}: stable typical questions and full-page long-content scrolling passed (${typicalLines}-line typical question)`
   } finally {
     window.fetch = originalFetch
     click('Reports')

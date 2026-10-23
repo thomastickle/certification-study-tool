@@ -1416,8 +1416,6 @@ select {
   flex-direction: column;
   gap: 6px;
   font-size: 16px;
-  /* Keep room for six single-line choices without shifting the confidence controls. */
-  min-block-size: calc(6 * (1.55em + 20px) + 5 * 6px);
 }
 .practice-session .answer-choices .choice {
   margin: 0;

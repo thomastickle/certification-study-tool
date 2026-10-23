@@ -1030,33 +1030,28 @@
   }
 }
 
-/* Reserve the available desktop height so question length cannot move the controls. */
-@media (min-width: 761px) and (min-height: 501px) {
-  .practice-question-session {
-    block-size: calc(100dvh - 72px);
-    display: flex;
-    flex-direction: column;
+/* Typical questions share five lines of space; longer content grows with the page. */
+@media (min-width: 761px) {
+  .practice-session {
+    padding-block: 16px;
   }
-  .practice-question-session > :not(.quiz-question) {
-    flex-shrink: 0;
+  .practice-session .quiz-panel {
+    padding: 20px;
   }
-  .practice-question-session .quiz-question {
-    flex: 1;
-    min-block-size: 0;
-    display: flex;
-    flex-direction: column;
+  .practice-session .quiz-question h2 {
+    font-size: 20px;
+    line-height: 1.35;
+    min-block-size: 5lh;
+    margin-block: 12px;
   }
-  .practice-question-session .question-reading {
-    flex: 1;
-    min-block-size: 0;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-    padding: 3px;
+  .practice-session .selection-instruction {
+    margin-block: 8px;
   }
-  .practice-question-session .confidence-row {
-    flex-shrink: 0;
+  .practice-session .choice {
+    padding: 6px 10px;
   }
-  .practice-question-session .question-navigation {
-    margin-top: 0;
+  .practice-session .confidence-row {
+    margin-top: 12px !important;
+    padding-top: 10px !important;
   }
 }
