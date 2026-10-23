@@ -1,4 +1,4 @@
-import { openPracticePreset } from './practice-browser-helpers.ts'
+import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
 export async function lostResumeCheck(
@@ -95,14 +95,14 @@ export async function lostResumeCheck(
     document.querySelector<HTMLInputElement>('.answer-choices input')!.click()
     await new Promise((resolve) => window.setTimeout(resolve, 0))
     await until(
-      () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-      'Answer did not save',
+      () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+      'Answer should remain unsaved',
     )
     document.querySelector<HTMLInputElement>('.flag-control input')!.click()
     await new Promise((resolve) => window.setTimeout(resolve, 0))
     await until(
-      () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-      'Review mark did not save',
+      () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+      'Review mark should remain unsaved',
     )
     click('Pause')
     await until(() => !!document.querySelector('.paused-panel'), 'Manual pause failed')
@@ -186,7 +186,7 @@ export async function lostResumeCheck(
         ),
       'Resumed actions did not become ready',
     )
-    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    await openPracticeActions()
     click('Submit and score')
     await until(
       () => document.querySelector('h1')?.textContent === `${title} results`,
