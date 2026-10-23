@@ -1031,7 +1031,7 @@
 }
 
 /* Reserve the available desktop height so question length cannot move the controls. */
-@media (min-width: 701px) and (min-height: 501px) {
+@media (min-width: 761px) and (min-height: 501px) {
   .practice-question-session {
     block-size: calc(100dvh - 72px);
     display: flex;

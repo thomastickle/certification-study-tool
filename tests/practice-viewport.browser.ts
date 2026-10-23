@@ -4,6 +4,7 @@ import { openPracticePreset } from './practice-browser-helpers.ts'
 export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<string> {
   const originalFetch = window.fetch
   const originalConfirm = window.confirm
+  const bounded = window.innerWidth > 760 && window.innerHeight > 500
   const total = mode === 'exam' ? 65 : 20
   let attemptId: string | undefined
   window.confirm = () => true
@@ -77,8 +78,23 @@ export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<strin
       )
       tops.push(document.querySelector('.confidence-row')!.getBoundingClientRect().top)
       const navigation = document.querySelector('.question-navigation')!.getBoundingClientRect()
-      assert(navigation.bottom <= window.innerHeight, 'Navigation fell below the viewport')
-      if (index === 1) {
+      if (bounded) {
+        assert(navigation.bottom <= window.innerHeight, 'Navigation fell below the viewport')
+      } else {
+        const reading = document.querySelector('.question-reading')!
+        assert(
+          reading.scrollHeight <= reading.clientHeight + 1,
+          'Small viewport clipped reading content instead of using page scrolling',
+        )
+        document.querySelector('.question-navigation')!.scrollIntoView({ block: 'end' })
+        assert(
+          document.querySelector('.question-navigation')!.getBoundingClientRect().bottom <=
+            window.innerHeight + 1,
+          'Small viewport navigation cannot be reached',
+        )
+        window.scrollTo(0, 0)
+      }
+      if (index === 1 && bounded) {
         const reading = document.querySelector('.question-reading')!
         assert(reading.scrollHeight > reading.clientHeight, 'Long question should scroll')
         reading.scrollTop = reading.scrollHeight
@@ -93,7 +109,7 @@ export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<strin
       if (index < 2) click('Next question')
     }
     assert(
-      Math.max(...tops) - Math.min(...tops) < 1,
+      !bounded || Math.max(...tops) - Math.min(...tops) < 1,
       'Confidence moved between short and long questions',
     )
     return `${mode}: stable controls passed`
