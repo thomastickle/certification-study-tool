@@ -59,8 +59,11 @@ Previous and Next buttons at opposite edges. On the final question, Next becomes
 Review answers and saves before opening answer review. A failed save keeps the
 current question or menu closed, retains local changes, and offers retry.
 The question screen omits the redundant mode heading, question count, and duration
-intro. Long content can still scroll naturally; question panels have no nested
-scroll containers. The review grid uses compact, equal-size clickable tiles with neutral
+intro. Desktop questions reserve five text lines so short and typical 3–5-line
+questions start the answers at the same position. Exceptionally long questions
+grow the whole page; question panels have no nested scroll containers. Desktop answer choices reserve five single-line rows before Confidence. Four-choice
+questions retain one blank row; a sixth choice or wrapped answer grows the page naturally.
+The toolbar stays on one row above 1000px to keep typical questions within shorter windows. The review grid uses compact, equal-size clickable tiles with neutral
 backgrounds and bold completion borders. The first row shows the number and status,
 for example **1. Answered**. Red borders mean **Not Answered**, yellow borders mean
 **Partial** (an incomplete multiple-select answer), and green borders mean **Answered**.
@@ -503,3 +506,14 @@ keyboard focus, and independent recovery with the presets inside setup.
 Run for quiz and exam on disposable populated data, with and without injected save failures.
 It checks that editing and polling make no answer writes; Previous, Next, Actions, Pause,
 and in-app navigation save the latest state, and failed saves block those actions.
+
+`practiceViewportTest(mode)` in `tests/practice-viewport.browser.ts` compares a short,
+3–5-line, and exceptionally long question. At 1100×740 or larger, the typical fixture
+keeps navigation on screen and answers aligned with the short fixture. Long content
+uses document scrolling at every viewport size.
+
+`practiceSpacingTest(mode, typical, wrapped)` exercises four, five, and six choices with either
+a short or typical 3–5-line stem. It checks the reserved fifth row, stable Confidence
+for four/five choices, a clear gap above Confidence, natural sixth-row growth, and
+no toolbar overflow. The optional wrapped flag tests a multi-line sixth answer. Run at 1100×740 and 1280×800, around the 1000px toolbar breakpoint,
+and at mobile widths alongside `practiceViewportTest`.

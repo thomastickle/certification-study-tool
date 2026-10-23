@@ -1382,7 +1382,7 @@ select {
   font-weight: 700;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1000px) {
   .practice-session .quiz-status {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas: 'progress save warning' 'timer pause actions';
@@ -1416,8 +1416,6 @@ select {
   flex-direction: column;
   gap: 6px;
   font-size: 16px;
-  /* Keep room for six single-line choices without shifting the confidence controls. */
-  min-block-size: calc(6 * (1.55em + 20px) + 5 * 6px);
 }
 .practice-session .answer-choices .choice {
   margin: 0;

@@ -1029,3 +1029,33 @@
     font-size: 12px;
   }
 }
+
+/* Typical questions share five lines of space; longer content grows with the page. */
+@media (min-width: 761px) {
+  .practice-session {
+    padding-block: 10px;
+  }
+  .practice-session .quiz-panel {
+    padding: 16px;
+  }
+  .practice-session .quiz-question h2 {
+    font-size: 20px;
+    line-height: 1.35;
+    min-block-size: 5lh;
+    margin-block: 12px;
+  }
+  .practice-session .selection-instruction {
+    margin-block: 8px;
+  }
+  .practice-session .choice {
+    padding: 6px 10px;
+  }
+  .practice-session .answer-choices {
+    /* Five one-line rows include each choice's padding, border, and the four gaps. */
+    min-block-size: calc(5 * (1.55em + 16px) + 4 * 6px);
+  }
+  .practice-session .confidence-row {
+    margin-top: 12px !important;
+    padding-top: 10px !important;
+  }
+}
