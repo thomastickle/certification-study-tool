@@ -1,4 +1,4 @@
-import { openPracticePreset } from './practice-browser-helpers.ts'
+import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only regression, evaluated in the app against a disposable populated database. */
 export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<string> {
@@ -76,16 +76,16 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
     const answer = document.querySelector<HTMLInputElement>('.choice input')!
     answer.click()
     await new Promise((resolve) => window.setTimeout(resolve, 0))
-    await until(saved, 'Answer did not autosave')
+    await until(() => !saved(), 'Answer should remain unsaved')
     const confidence = [
       ...document.querySelectorAll<HTMLInputElement>('.confidence-row input'),
     ].find((input) => input.parentElement?.textContent?.trim() === 'Unsure')!
     confidence.click()
     await new Promise((resolve) => window.setTimeout(resolve, 0))
-    await until(saved, 'Confidence did not save')
+    await until(() => !saved(), 'Confidence should remain unsaved')
     document.querySelector<HTMLInputElement>('.flag-control input')!.click()
     await new Promise((resolve) => window.setTimeout(resolve, 0))
-    await until(saved, 'Flag did not save')
+    await until(() => !saved(), 'Flag should remain unsaved')
     button('Next question').click()
     await until(
       () =>
@@ -104,7 +104,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
       document.querySelector<HTMLInputElement>('.choice input')?.checked,
       'Saved answer disappeared',
     )
-    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    await openPracticeActions()
     button('Review answers').click()
     await until(() => !!document.querySelector('.review-list'), 'Review did not open')
     assert(document.querySelectorAll('.review-list li').length === total, 'Review is incomplete')
@@ -197,7 +197,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
       }
       return response
     }
-    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    await openPracticeActions()
     button(`Abandon ${mode}`).click()
     await until(
       () =>
@@ -206,14 +206,14 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
           ?.textContent?.includes('Synthetic lost abandonment response') === true,
       'Lost response was not reported',
     )
-    document.querySelector<HTMLElement>('.practice-menu summary')!.click()
+    await openPracticeActions()
     button(`Abandon ${mode}`).click()
     await until(
       () => document.querySelector('h2')?.textContent === `${title} abandoned`,
       'Menu abandon did not close attempt',
     )
     assert((await current()) === null, 'Abandoned attempt is still recoverable')
-    return `${mode}: compact controls, autosave, review, pause, recovery, resume and menu abandon passed`
+    return `${mode}: compact controls, deferred saving, review, pause, recovery, resume and menu abandon passed`
   } finally {
     releaseResume()
     window.fetch = originalFetch

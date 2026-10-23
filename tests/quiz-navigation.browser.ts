@@ -1,4 +1,4 @@
-import { openPracticePreset } from './practice-browser-helpers.ts'
+import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
 export async function navigationCheck(
@@ -46,10 +46,6 @@ export async function navigationCheck(
   }
 
   function click(label: string) {
-    if (label === 'Actions') {
-      document.querySelector<HTMLElement>('.practice-menu summary')!.click()
-      return
-    }
     const button = [...document.querySelectorAll('button')].find(
       (item) => item.textContent?.trim() === label,
     )
@@ -210,6 +206,9 @@ export async function navigationCheck(
       const choice = document.querySelector<HTMLInputElement>('.answer-choices input')!
       choice.click()
       await new Promise((resolve) => window.setTimeout(resolve, 0))
+      if (['pending-save', 'pending-save-failure', 'save-failure'].includes(outcome)) {
+        click('Next question')
+      }
       if (outcome === 'pending-save' || outcome === 'pending-save-failure') {
         await until(() => mutationStarted, 'Save was not held')
       } else if (outcome === 'save-failure') {
@@ -219,8 +218,8 @@ export async function navigationCheck(
         )
       } else {
         await until(
-          () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-          'Save did not settle',
+          () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+          'Answer should remain unsaved',
         )
         const confidence = [
           ...document.querySelectorAll<HTMLInputElement>('.confidence-row input'),
@@ -228,14 +227,14 @@ export async function navigationCheck(
         confidence.click()
         await new Promise((resolve) => window.setTimeout(resolve, 0))
         await until(
-          () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-          'Confidence did not save',
+          () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+          'Confidence should remain unsaved',
         )
         document.querySelector<HTMLInputElement>('.flag-control input')!.click()
         await new Promise((resolve) => window.setTimeout(resolve, 0))
         await until(
-          () => document.querySelector('.answer-save-status')?.textContent === 'Saved',
-          'Flag did not save',
+          () => document.querySelector('.answer-save-status')?.textContent === 'Unsaved changes',
+          'Flag should remain unsaved',
         )
       }
       if (['manual-race', 'resume-race', 'pending-pause-failure'].includes(outcome)) {
@@ -247,7 +246,7 @@ export async function navigationCheck(
         await until(() => mutationStarted, 'Pause/resume was not held')
       }
       if (outcome === 'submit-race') {
-        click('Actions')
+        await openPracticeActions()
         click('Submit and score')
         await until(() => mutationStarted, 'Submit was not held')
       }
@@ -328,7 +327,10 @@ export async function navigationCheck(
       () => !!document.querySelector('.paused-panel'),
       'Recovery resumed timer implicitly',
     )
-    assert(document.body.innerText.includes('Total paused'), 'Pause timing missing')
+    assert(
+      document.querySelector('.attempt-timing')?.textContent?.includes('Pause time'),
+      'Pause timing missing',
+    )
     click(`Resume ${mode}`)
     await until(() => !!document.querySelector('.quiz-question'), 'Explicit resume failed')
     const resumed = await attempt()
@@ -337,7 +339,7 @@ export async function navigationCheck(
       resumed.deadline - resumed.serverNow <= saved.deadline - saved.pausedAt,
       'Resume extended remaining time',
     )
-    click('Actions')
+    await openPracticeActions()
     click('Submit and score')
     await until(
       () => document.querySelector('h1')?.textContent === `${title} results`,

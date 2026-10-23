@@ -98,7 +98,7 @@ export function QuizPage({
   const pendingAnswers = useRef(false)
   const pendingStart = useRef<Promise<boolean> | null>(null)
   const pendingSave = useRef<Promise<boolean> | null>(null)
-  const pendingAction = useRef<Promise<unknown> | null>(null)
+  const pendingAction = useRef<Promise<boolean> | null>(null)
   const pendingLoad = useRef<Promise<unknown> | null>(null)
   const pendingRecovery = useRef<Promise<boolean> | null>(null)
   // Undefined means unknown; only a successful current-attempt read can establish null.
@@ -669,7 +669,20 @@ export function QuizPage({
     pendingAnswers.current = true
     viewRef.current = next
     setView(next)
-    void saveAnswers(updatedQuestions.map(answerPayload))
+  }
+
+  /** Flush local edits before a question or menu transition; failures retain the editor. */
+  function saveBeforeAction(action?: () => void) {
+    if (leavingRef.current || busyRef.current) return Promise.resolve(false)
+    return track<boolean>(
+      pendingAction,
+      (async () => {
+        const current = viewRef.current
+        if (!current || !(await saveAnswers(current.questions.map(answerPayload)))) return false
+        action?.()
+        return true
+      })(),
+    )
   }
 
   let timerIndicatorLabel = 'More than 10 minutes remaining'
@@ -783,6 +796,7 @@ export function QuizPage({
             <PracticeActions
               mode={mode}
               disabled={busy || secondsLeft === 0}
+              onOpen={() => saveBeforeAction()}
               onReview={() => setStage('review')}
               onSubmit={() => {
                 if (
@@ -911,19 +925,21 @@ export function QuizPage({
           <div className="quiz-actions question-navigation">
             <button
               disabled={busy || questionIndex === 0}
-              onClick={() => setQuestionIndex((i) => i - 1)}
+              onClick={() => void saveBeforeAction(() => setQuestionIndex((i) => i - 1))}
             >
               Previous question
             </button>
             <button
               disabled={busy}
-              onClick={() => {
-                if (questionIndex === questions.length - 1) {
-                  setStage('review')
-                } else {
-                  setQuestionIndex((i) => i + 1)
-                }
-              }}
+              onClick={() =>
+                void saveBeforeAction(() => {
+                  if (questionIndex === questions.length - 1) {
+                    setStage('review')
+                  } else {
+                    setQuestionIndex((i) => i + 1)
+                  }
+                })
+              }
             >
               {questionIndex === questions.length - 1 ? 'Review answers' : 'Next question'}
             </button>
