@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createWorkspaceApi, InactiveWorkspaceError } from './api.ts'
-import { deferred } from '../../../../tests/deferred.ts'
+
+/** Keep the colocated test self-contained inside the application's build context. */
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((complete) => {
+    resolve = complete
+  })
+  return { promise, resolve }
+}
 
 test('browser requests keep their immutable account and preserve caller headers', async (t) => {
   const requests: Headers[] = []
