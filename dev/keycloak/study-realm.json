@@ -1,0 +1,31 @@
+{
+  "realm": "study",
+  "enabled": true,
+  "displayName": "Certification Study Tool (local development)",
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": false,
+  "clients": [
+    {
+      "clientId": "study-tool",
+      "name": "Certification Study Tool",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:3000/auth/callback",
+        "http://127.0.0.1:3100/auth/callback"
+      ],
+      "webOrigins": ["http://127.0.0.1:3000", "http://127.0.0.1:3100"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://127.0.0.1:3000/##http://127.0.0.1:3100/"
+      },
+      "defaultClientScopes": ["profile"]
+    }
+  ]
+}

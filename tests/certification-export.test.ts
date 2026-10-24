@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
+import { renderWorkspace as renderToStaticMarkup } from './render-workspace.ts'
 import ts from 'typescript'
 
 test('attempt exports identify the saved certification rather than the active workspace', () => {

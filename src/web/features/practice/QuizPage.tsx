@@ -18,7 +18,7 @@ import { DueReviewStatus } from './DueReviewStatus.tsx'
 import { PracticeActions } from './PracticeActions.tsx'
 import { PracticePresets } from './PracticePresets.tsx'
 import { QuizSourcePicker } from './QuizSourcePicker.tsx'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 import type { Certification } from '../certifications/certifications.ts'
 import { AttemptTiming } from '../../shared/ui/AttemptTiming.tsx'
 import { quizReport } from '../../../shared/quiz-report.ts'
@@ -56,6 +56,7 @@ export function QuizPage({
   onSourceIdsChange,
   focusPreset = false,
 }: Props) {
+  const api = useApi()
   let title = mode === 'exam' ? 'Exam' : 'Quiz'
   let plural = mode === 'exam' ? 'exams' : 'quizzes'
   if (mode === 'review') {

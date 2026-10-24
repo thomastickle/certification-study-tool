@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticeActions } from './practice-browser-helpers.ts'
 
 /** Run against a new seed-mastery database from the home screen. Uses only synthetic data. */
@@ -37,7 +39,7 @@ export async function masteryBrowserTest(): Promise<string> {
   }
 
   async function json(path: string) {
-    const response = await fetch(`/api/${path}`)
+    const response = await workspaceFetch(`/api/${path}`)
     assert(response.ok, `API failed: ${path}`)
     return response.json()
   }

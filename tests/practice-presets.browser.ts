@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Exercise the shared Practice entry against a disposable populated database. */
 export async function practicePresetsTest() {
   function assert(condition: unknown, message: string): asserts condition {
@@ -98,7 +100,7 @@ export async function practicePresetsTest() {
       !document.querySelector('[name="practice-preset"]'),
       'Active attempt allows preset mutation',
     )
-    const quiz = await (await fetch('/api/quizzes/current?mode=quiz')).json()
+    const quiz = await (await workspaceFetch('/api/quizzes/current?mode=quiz')).json()
     attempts.push(quiz.id)
     assert(quiz.questions.length === 20, 'Quiz question count changed')
     document.querySelector<HTMLInputElement>('.choice input')!.click()
@@ -112,13 +114,13 @@ export async function practicePresetsTest() {
     await until(() => !!document.querySelector('.recovery-panel'), 'Quiz recovery missing')
     await preset('exam')
     await until(() => !button('Start 65-question exam').disabled, 'Exam preset not ready')
-    const pausedQuiz = await (await fetch(`/api/quizzes/${quiz.id}`)).json()
+    const pausedQuiz = await (await workspaceFetch(`/api/quizzes/${quiz.id}`)).json()
     assert(pausedQuiz.status === 'paused', 'Preset change lost the paused quiz')
     assert(pausedQuiz.questions[0].selected.length === 1, 'Saved quiz answer lost')
 
     button('Start 65-question exam').click()
     await until(() => !!document.querySelector('.quiz-question'), 'Exam did not start')
-    const exam = await (await fetch('/api/quizzes/current?mode=exam')).json()
+    const exam = await (await workspaceFetch('/api/quizzes/current?mode=exam')).json()
     attempts.push(exam.id)
     assert(exam.questions.length === 65, 'Exam question count changed')
     await reports()
@@ -138,6 +140,7 @@ export async function practicePresetsTest() {
     return 'Shared Practice entry, preset counts/times, bank selection and independent attempt recovery passed'
   } finally {
     await reports()
-    for (const id of attempts) await fetch(`/api/quizzes/${id}/abandon`, { method: 'POST' })
+    for (const id of attempts)
+      await workspaceFetch(`/api/quizzes/${id}/abandon`, { method: 'POST' })
   }
 }

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CertificationProgress, HomeSummary } from '../../../shared/home-contracts.ts'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 
 /** Manage earned status independently from study readiness. */
 export function CertificationsPage() {
+  const api = useApi()
   const [summary, setSummary] = useState<HomeSummary>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState<string>()

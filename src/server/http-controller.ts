@@ -10,15 +10,23 @@ import { LibraryService } from './questions/library-service.ts'
 import { HomeService } from './home/home-service.ts'
 
 /** Prevent other websites from driving a local library through this server. */
-export function checkLocalRequest(request: IncomingMessage): void {
+export function checkLocalRequest(
+  request: IncomingMessage,
+  publicOrigin?: URL,
+  allowCallback = false,
+): void {
   const port = request.socket.localPort
-  const hosts = [`127.0.0.1:${port}`, `localhost:${port}`]
+  const hosts = publicOrigin ? [publicOrigin.host] : [`127.0.0.1:${port}`, `localhost:${port}`]
+  const origins = publicOrigin ? [publicOrigin.origin] : hosts.map((host) => `http://${host}`)
   if (!hosts.includes(request.headers.host ?? ''))
     throw new ApplicationError('Local access only.', 403)
   const origin = request.headers.origin
   if (
-    (origin && !hosts.map((host) => `http://${host}`).includes(origin)) ||
-    request.headers['sec-fetch-site'] === 'cross-site'
+    (origin && !origins.includes(origin)) ||
+    (!allowCallback && request.headers['sec-fetch-site'] === 'cross-site') ||
+    (publicOrigin &&
+      !['GET', 'HEAD'].includes(request.method ?? '') &&
+      origin !== publicOrigin.origin)
   ) {
     throw new ApplicationError('Cross-site requests are not allowed.', 403)
   }
@@ -71,16 +79,19 @@ function positiveInteger(text: string | null, fallback?: number): number {
   return Number(text)
 }
 
-export function apiController(repository: LibraryRepository) {
+export function apiController(
+  repository: LibraryRepository,
+  options: { origin?: URL; workspaceId?: string } = {},
+) {
   const concepts = new ConceptService(repository)
   const quizzes = new QuizService(repository)
   const reports = new ReportService(repository)
-  const importer = new ImportService(repository)
+  const importer = new ImportService(repository, options.workspaceId)
   const library = new LibraryService(repository)
   const home = new HomeService(repository)
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
-      checkLocalRequest(request)
+      checkLocalRequest(request, options.origin)
       const url = new URL(request.url ?? '/', 'http://localhost')
       const scope = {
         provider: url.searchParams.get('provider') ?? undefined,

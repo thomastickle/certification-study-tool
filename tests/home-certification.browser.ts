@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Run on new tests/seed-home-integration.ts fixtures to exercise Home/picker integration. */
 export async function homeCertificationIntegrationTest() {
   function assert(value: unknown, message: string): asserts value {
@@ -45,7 +47,7 @@ export async function homeCertificationIntegrationTest() {
   }
 
   async function current(code: string, provider = 'AWS') {
-    const response = await fetch(
+    const response = await workspaceFetch(
       `/api/quizzes/current?mode=quiz&provider=${provider}&certification=${code}`,
     )
     assert(response.ok, 'Could not inspect scoped attempt')
@@ -99,7 +101,7 @@ export async function homeCertificationIntegrationTest() {
   assert((await current('DEA-C01')).status === 'paused', 'Home navigation did not pause practice')
 
   await choose('AZ-900')
-  const response = await fetch('/api/quizzes', {
+  const response = await workspaceFetch('/api/quizzes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

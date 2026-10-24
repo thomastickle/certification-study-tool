@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Checks switching from Home with server-owned work recovered after a reload. */
 export async function certificationReloadSwitchTest() {
   function assert(value: unknown, message: string): asserts value {
@@ -36,11 +38,11 @@ export async function certificationReloadSwitchTest() {
   )
   const originalFetch = window.fetch
   const current = await (
-    await fetch('/api/quizzes/current?mode=quiz&provider=AWS&certification=DEA-C01')
+    await workspaceFetch('/api/quizzes/current?mode=quiz&provider=AWS&certification=DEA-C01')
   ).json()
   assert(current?.status === 'active', 'Reload precondition requires an active DEA-C01 attempt')
   const exam = await (
-    await fetch('/api/quizzes/current?mode=exam&provider=AWS&certification=DEA-C01')
+    await workspaceFetch('/api/quizzes/current?mode=exam&provider=AWS&certification=DEA-C01')
   ).json()
   assert(exam?.status === 'active', 'Reload precondition requires an active DEA-C01 exam')
   try {
@@ -81,19 +83,19 @@ export async function certificationReloadSwitchTest() {
           .querySelector('[aria-label="Current certification"]')
           ?.textContent?.includes('AZ-900') === true,
     )
-    const paused = await (await fetch(`/api/quizzes/${current.id}`)).json()
+    const paused = await (await workspaceFetch(`/api/quizzes/${current.id}`)).json()
     assert(paused.status === 'paused', 'Switching after reload left the previous timer active')
     assert(
       paused.pauseHistory.intervals.at(-1)?.cause === 'navigation',
       'Recovered pause must record navigation',
     )
-    const pausedExam = await (await fetch(`/api/quizzes/${exam.id}`)).json()
+    const pausedExam = await (await workspaceFetch(`/api/quizzes/${exam.id}`)).json()
     assert(pausedExam.status === 'paused', 'Switching left another mode’s timer active')
     assert(document.querySelector('.home-page'), 'Switch moved away from Home')
     return 'Reload-to-Home switching pauses recovered work; failed recovery retains the certification'
   } finally {
     window.fetch = originalFetch
-    await fetch(`/api/quizzes/${current.id}/abandon`, { method: 'POST' })
-    await fetch(`/api/quizzes/${exam.id}/abandon`, { method: 'POST' })
+    await workspaceFetch(`/api/quizzes/${current.id}/abandon`, { method: 'POST' })
+    await workspaceFetch(`/api/quizzes/${exam.id}/abandon`, { method: 'POST' })
   }
 }

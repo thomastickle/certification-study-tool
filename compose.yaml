@@ -5,6 +5,10 @@ services:
       - '127.0.0.1:3000:3000'
     volumes:
       - study-data:/data
+    environment:
+      STUDY_OIDC_ISSUER: ${STUDY_OIDC_ISSUER:?Set the HTTPS issuer URL of a Keycloak realm reachable from the container}
+      STUDY_OIDC_CLIENT_ID: ${STUDY_OIDC_CLIENT_ID:-study-tool}
+      STUDY_ORIGIN: ${STUDY_ORIGIN:-http://127.0.0.1:3000}
     restart: unless-stopped
     init: true
 

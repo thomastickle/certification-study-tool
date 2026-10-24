@@ -1,7 +1,7 @@
 # Certification Study Tool
 
-A local study-question library with a React interface, TypeScript application
-services, and SQLite storage. This first slice imports version-2 JSON banks,
+A study-question library with OIDC sign-in, a React interface, TypeScript application
+services, and private SQLite storage per user. This first slice imports version-2 JSON banks,
 shows their contents, and deletes individual source occurrences or whole sources.
 The library accepts question banks for different providers and certifications.
 Timed practice and performance reports follow the selected certification workspace.
@@ -21,11 +21,16 @@ Use Node **24.14 or later in the 24.x line** and npm.
 
 ```sh
 npm ci
+docker compose -f compose.keycloak.yaml up -d
 npm run dev
 ```
 
 Open **http://127.0.0.1:3000**. Frontend changes reload through Vite; changes to
 backend code, shared types, or the schema restart the local server.
+Choose **Sign in**, then **Register** on local Keycloak to create a development
+account. Each account starts with an empty private library. Keycloak is bound to
+loopback at port 8080 for development; no certificate or client secret is needed.
+See [authentication and user storage](docs/authentication.md).
 
 For a built frontend without the development server:
 
@@ -34,25 +39,35 @@ npm run build
 NODE_ENV=production npm start
 ```
 
-The database defaults to `private/app/library.sqlite3`. `STUDY_DB_PATH` selects a
-separate database path and `STUDY_PORT` selects a port. Do not point this app at
-the original Python app's database; existing unrelated databases are refused.
-The current schema is version 2 and uses an application identifier to recognize
-its own databases. No legacy database migration is implemented.
+`STUDY_DATA_DIR` defaults to `private/app`: `accounts.sqlite3` maps verified
+identities to internal user IDs and stores hashed session credentials;
+`users/<user-id>.sqlite3` holds that user's library and progress. Back up the
+whole directory together. `STUDY_PORT` selects a port; `STUDY_ORIGIN` is the exact
+browser origin and defaults to `http://127.0.0.1:<port>`. Use that origin
+consistently; `localhost` and `127.0.0.1` have different cookies and redirect URIs.
+The development realm also permits port 3100 for an isolated review instance.
+
+Existing `private/app/library.sqlite3` files are preserved but are not assigned
+to the first person who signs in. Existing-library migration remains a separate
+explicit operation; reimport banks to populate a new private library. The server
+no longer uses `STUDY_DB_PATH`; CLI commands still accept explicit database paths.
+Study databases retain schema version 2 and their existing application identifier.
 
 ## Run with Docker
 
-With Docker Engine/Desktop and Docker Compose running:
+For a containerized app, configure an OIDC issuer reachable from the container
+over HTTPS, with the app's exact callback URL registered:
 
 ```sh
-docker compose up --build -d
+STUDY_OIDC_ISSUER=https://identity.example/realms/study docker compose up --build -d
 ```
 
 Open **http://127.0.0.1:3000**. The image builds the frontend and runs the
 production server as a non-root user. Only the host loopback interface is
-published; keep this binding because the app has no user authentication.
-Port 3000 must be free. Keep host and container ports the same because the
-local Host/Origin checks use the server port.
+published. Port 3000 must be free. The separate `compose.keycloak.yaml` is for
+running Keycloak alongside a **native** Node development server: a container's
+`127.0.0.1` does not reach the host's Keycloak. For access from other computers,
+configure HTTPS for both browser-facing services; see the authentication guide.
 
 ```sh
 docker compose logs -f study  # View logs
@@ -69,8 +84,9 @@ usual. Private files, local databases, credentials, and Git history are excluded
 from the build context and image. No image publishing is required.
 
 For native runs, `STUDY_HOST` defaults to `127.0.0.1`; the image sets it to
-`0.0.0.0` so Docker can forward connections. Local Host/Origin protections remain
-active in either mode.
+`0.0.0.0` so Docker can forward connections. Host/Origin protections remain
+active in either mode. The public `/api/health` endpoint reports application
+liveness without reading study data; it does not check provider availability.
 
 ## Import and review
 
@@ -82,9 +98,10 @@ active in either mode.
    duplicate answer keys must be corrected in the input before importing.
 
 The prepared banks live in the Git-ignored `private/question-banks/` folder.
-Banks and databases must remain local. File contents are sent only to the
-loopback server; this app has no external API or upload destination, analytics,
-remote fonts, or cloud database. Imported data is persisted in SQLite; the app
+File contents are sent only to the application server; question banks and study
+history are never sent to the identity provider. The local development setup
+keeps both servers on loopback. There is no analytics, remote font, or cloud
+database integration. Imported data is persisted in SQLite; the app
 does not save a separate copy of the selected input file. Original files are
 never edited or deleted by the app.
 

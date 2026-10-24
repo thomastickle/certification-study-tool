@@ -1,48 +1,36 @@
 import { createServer } from 'node:http'
-import { mkdirSync, chmodSync, existsSync, statSync, createReadStream } from 'node:fs'
-import { resolve, dirname, extname, sep } from 'node:path'
-import { QuizService } from './quizzes/quiz-service.ts'
-import { apiController, checkLocalRequest } from './http-controller.ts'
-import { LibraryRepository } from './questions/library-repository.ts'
+import { existsSync, statSync, createReadStream } from 'node:fs'
+import { resolve, extname, sep } from 'node:path'
+import { StudyApplication } from './auth/study-application.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error('STUDY_PORT must be a valid port.')
-const databasePath = resolve(process.env.STUDY_DB_PATH ?? 'private/app/library.sqlite3')
-mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
-const repository = new LibraryRepository(databasePath)
-chmodSync(databasePath, 0o600)
-const api = apiController(repository)
-const quizzes = new QuizService(repository)
-quizzes.expireDue()
-const expiryTimer = setInterval(() => {
-  try {
-    quizzes.expireDue()
-  } catch {
-    console.error('Could not score an expired quiz; it will be retried.')
-  }
-}, 1000)
-expiryTimer.unref()
+const origin = new URL(process.env.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
+const application = new StudyApplication({
+  origin,
+  issuer: new URL(process.env.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study'),
+  clientId: process.env.STUDY_OIDC_CLIENT_ID ?? 'study-tool',
+  clientSecret: process.env.STUDY_OIDC_CLIENT_SECRET || undefined,
+  dataDirectory: process.env.STUDY_DATA_DIR ?? 'private/app',
+})
 const production = process.env.NODE_ENV === 'production'
 let webHandler: (
   request: import('node:http').IncomingMessage,
   response: import('node:http').ServerResponse,
 ) => void
 const server = createServer((request, response) => {
-  try {
-    checkLocalRequest(request)
-  } catch {
-    response.writeHead(403)
-    response.end('Local access only.')
-    return
-  }
-  if (request.url?.startsWith('/api/')) {
-    void api(request, response)
-    return
-  }
-  webHandler(request, response)
+  void handleRequest(request, response)
 })
+
+/** Authenticate API requests before letting Vite or static serving handle public assets. */
+async function handleRequest(
+  request: import('node:http').IncomingMessage,
+  response: import('node:http').ServerResponse,
+) {
+  if (!(await application.handle(request, response))) webHandler(request, response)
+}
 
 let closeWeb = async () => {}
 
@@ -91,14 +79,13 @@ if (!production) {
     }
   }
 }
-server.listen(port, host, () => console.log(`Certification Study Tool: http://127.0.0.1:${port}`))
+server.listen(port, host, () => console.log(`Certification Study Tool: ${origin.origin}`))
 
 async function shutdown() {
-  clearInterval(expiryTimer)
   // Vite owns upgraded HMR sockets; close those before awaiting HTTP shutdown.
   await closeWeb()
   server.close(() => {
-    repository.close()
+    application.close()
     process.exit(0)
   })
   server.closeAllConnections()

@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only regression, evaluated in the app against a disposable populated database. */
@@ -36,7 +38,7 @@ export async function practiceControlsTest(mode: 'quiz' | 'exam'): Promise<strin
   }
 
   async function current() {
-    return (await fetch(`/api/quizzes/current?mode=${mode}`)).json()
+    return (await workspaceFetch(`/api/quizzes/current?mode=${mode}`)).json()
   }
 
   try {

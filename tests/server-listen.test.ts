@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 // Exercise the actual entry point through a container-like, non-loopback connection.
-test('server can listen beyond loopback while retaining local Host restrictions', async (t) => {
+test('server can listen beyond loopback while requiring login and enforcing the configured Host', async (t) => {
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === 'IPv4' && !entry.internal)?.address
@@ -29,7 +29,8 @@ test('server can listen beyond loopback while retaining local Host restrictions'
       NODE_ENV: 'development',
       STUDY_HOST: '0.0.0.0',
       STUDY_PORT: String(port),
-      STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+      STUDY_DATA_DIR: directory,
+      STUDY_ORIGIN: `http://localhost:${port}`,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -62,7 +63,8 @@ test('server can listen beyond loopback while retaining local Host restrictions'
         req.end()
       })
 
-    assert.equal(await status(`localhost:${port}`), 200)
+    // Authentication is now required even when the request has an allowed Host.
+    assert.equal(await status(`localhost:${port}`), 401)
     assert.equal(await status(`untrusted.example:${port}`), 403)
   } finally {
     child.kill('SIGTERM')
