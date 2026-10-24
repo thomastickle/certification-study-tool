@@ -43,6 +43,7 @@ test('home dashboard groups real tracks and explains readiness without exposing 
               earned: true,
               dueCount: 3,
               readiness: {
+                basis: 'practice',
                 status: 'green',
                 score: 96,
                 blendedScore: 96,
@@ -83,9 +84,9 @@ test('home dashboard groups real tracks and explains readiness without exposing 
         onReview: () => {},
       }),
     )
-    assert.match(html, /1 \/ 2 tracks exam-ready/)
+    assert.match(html, /1 \/ 2 tracks ready/)
     assert.equal((html.match(/class="provider-card"/g) ?? []).length, 1)
-    assert.match(html, /aria-label="AWS tracks exam-ready"/)
+    assert.match(html, /aria-label="AWS tracks ready"/)
     assert.match(html, /Mastery: 97%/)
     assert.match(html, /Assessed exam average: 95%/)
     assert.match(html, /Green also requires 90% in every component/)
@@ -93,7 +94,8 @@ test('home dashboard groups real tracks and explains readiness without exposing 
     assert.match(html, /Cloud Practitioner/)
     assert.match(html, /CLF-C02/)
     assert.match(html, /96%/)
-    assert.match(html, /Exam-ready/)
+    assert.match(html, /Strong practice/)
+    assert.match(html, /Practice estimate/)
     assert.match(html, /Needs more data/)
     assert.match(html, /aria-label="Earned certification"/)
     assert.match(html, /Recent exam average is strong/)

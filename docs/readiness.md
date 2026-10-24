@@ -3,13 +3,21 @@
 Home groups tracked certifications into compact provider cards. A track is created
 from an imported bank, supported completed study history, or a user-recorded earned
 credential. Multiple banks for the same exact provider/code form one track. The
-provider summary counts **exam-ready tracks**, not credentials earned. No catalog,
+provider summary counts **ready tracks**, not credentials earned. No catalog,
 discovery, credential verification, or recertification integration is included.
 
-Readiness currently supports **AWS CLF-C02** only, the certification with a supported
-domain blueprint. Other imported tracks support generic practice and reports but
-appear with a neutral readiness assessment. They never borrow CLF-C02 scores or its
-domain blueprint. History and due counts use the exact provider/code pair; legacy
+Readiness supports every certification. AWS CLF-C02 uses its app-defined domain
+blueprint. Other certifications receive a **Practice estimate** based on overall
+practice performance, without borrowing AWS domains or claiming official exam
+coverage. Their green label is **Strong practice**, and provider summaries count
+**tracks ready**, including both assessment types. Generic estimates require 80
+distinct answered questions overall and the same three varied, uninterrupted
+65-question, 90-minute practice exams described below. Overall correct/total
+performance replaces weakest-domain performance in the score and green gate.
+Missing classifications do not block generic estimates. This is a product
+heuristic over the imported question pool, not a provider-specific blueprint.
+
+History and due counts use the exact provider/code pair; legacy
 snapshots without a saved scope retain their AWS CLF-C02 namespace. Completed
 history remains visible after banks are deleted. Aggregate API
 responses contain no questions, answers, keys, fingerprints, or internal identities.
@@ -60,6 +68,7 @@ The blended score is rounded down:
   using all reliable completed quiz, exam, and review appearances in that domain.
   Skips count as misses. One identity supplies at most one appearance per attempt.
 
+The same color thresholds apply to blueprint assessments and general practice estimates.
 Red is below **80**, yellow is **80–89**, and green begins at **90**. Green additionally
 requires current mastery, every domain score, and each assessed exam score to reach 90. Otherwise cap readiness at 89, even if the blend is higher. Show the component
 evidence and cap reason so the score can be explained.
@@ -87,6 +96,8 @@ use the API's existing local Host/Origin protections.
 
 ## Verification
 
+`tests/generic-readiness.test.ts` covers arbitrary certifications, scope isolation, all
+three colors, and insufficient or unreliable generic evidence.
 `tests/home.test.ts` exercises grouping, scoring boundaries, caps, evidence windows,
 distinct coverage, exam variation, timing eligibility, same-day retries, and privacy.
 `tests/home-http.test.ts` exercises local HTTP access, validation, persistence,

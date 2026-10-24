@@ -62,14 +62,14 @@ export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Pro
                   <div>
                     <h2>{provider.name}</h2>
                     <span>
-                      {provider.ready} / {provider.total} tracks exam-ready
+                      {provider.ready} / {provider.total} tracks ready
                     </span>
                   </div>
                 </header>
                 <div
                   className="summary-progress"
                   role="progressbar"
-                  aria-label={`${provider.name} tracks exam-ready`}
+                  aria-label={`${provider.name} tracks ready`}
                   aria-valuemin={0}
                   aria-valuemax={provider.total}
                   aria-valuenow={provider.ready}
@@ -79,6 +79,10 @@ export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Pro
                 <div className="track-list">
                   {provider.certifications.map((certification) => {
                     const { readiness } = certification
+                    const label =
+                      readiness.basis === 'practice' && readiness.status === 'green'
+                        ? 'Strong practice'
+                        : readinessLabels[readiness.status]
                     return (
                       <section className="track-row" key={certification.code}>
                         <div className="track-line">
@@ -108,9 +112,10 @@ export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Pro
                             )}
                           </div>
                           <div className="track-result">
+                            {readiness.basis === 'practice' && <span>Practice estimate</span>}
                             <span>{readiness.score === null ? '—' : `${readiness.score}%`}</span>
                             <span className={`readiness-label readiness-${readiness.status}`}>
-                              {readinessLabels[readiness.status]}
+                              {label}
                             </span>
                           </div>
                         </div>
@@ -122,9 +127,7 @@ export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Pro
                           aria-valuemax={100}
                           aria-valuenow={readiness.score ?? undefined}
                           aria-valuetext={
-                            readiness.score === null
-                              ? readinessLabels[readiness.status]
-                              : `${readiness.score}% ${readinessLabels[readiness.status]}`
+                            readiness.score === null ? label : `${readiness.score}% ${label}`
                           }
                         >
                           <span style={{ width: `${readiness.score ?? 0}%` }} />
@@ -208,12 +211,14 @@ export function HomeDashboard({ summary, onNavigate, onPractice, onReview }: Pro
           <summary>How readiness works</summary>
           <p>
             The initial score blends 50% recent exam performance, 25% current mastery, and 25%
-            weakest-domain performance. Green also requires {readinessThresholds.ready}% in every
-            component and each assessed exam.
+            weakest-domain performance for AWS CLF-C02. Other certifications use overall practice
+            performance in place of domain scores. Green also requires {readinessThresholds.ready}%
+            in every component and each assessed exam.
           </p>
           <p>
-            Assessment needs 20 distinct answered questions per domain and varied, uninterrupted
-            full exams on three study days within 30 days. Readiness is a study guide, not a
+            AWS CLF-C02 needs 20 distinct answered questions per domain; other certifications need
+            80 distinct answered questions overall. Both require varied, uninterrupted 65-question
+            practice exams on three study days within 30 days. Readiness is a study guide, not a
             guarantee of an official pass.
           </p>
         </details>

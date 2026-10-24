@@ -33,7 +33,7 @@ test('home groups real library certifications by provider, not one track per ban
     assert.equal(aws.ready, 0)
     assert.equal(aws.certifications[0]!.sourceIds.length, 2)
     assert.equal(aws.certifications[0]!.readiness.status, 'insufficient')
-    assert.equal(aws.certifications[1]!.readiness.status, 'unsupported')
+    assert.equal(aws.certifications[1]!.readiness.status, 'insufficient')
     assert.equal(aws.certifications[1]!.readiness.score, null)
     assert.doesNotMatch(JSON.stringify(home), /Which option|Example A|fingerprint|mastery:v1/)
   } finally {
@@ -41,7 +41,7 @@ test('home groups real library certifications by provider, not one track per ban
   }
 })
 
-test('foreign completed history never creates Cloud Practitioner readiness or borrows its blueprint', () => {
+test('foreign CLF-C02 history uses generic readiness without borrowing the AWS blueprint', () => {
   const repository = new LibraryRepository(':memory:')
   try {
     for (const age of [3, 2, 1]) {
@@ -56,8 +56,13 @@ test('foreign completed history never creates Cloud Practitioner readiness or bo
     )
     const track = summary.providers[0]!.certifications[0]!
     assert.equal(track.code, 'CLF-C02')
-    assert.equal(track.readiness.status, 'unsupported')
-    assert.equal(track.readiness.score, null)
+    assert.equal(track.readiness.status, 'green')
+    assert.equal(track.readiness.score, 100)
+    assert.equal(track.readiness.basis, 'practice')
+    assert.deepEqual(
+      track.readiness.domains.map((domain) => domain.name),
+      ['All practice questions'],
+    )
     assert.equal(track.dueCount, 0)
   } finally {
     repository.close()
