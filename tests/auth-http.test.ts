@@ -14,7 +14,12 @@ async function applicationFixture(secure = false) {
   const directory = mkdtempSync(join(tmpdir(), 'study-auth-http-'))
   let now = Date.now()
   const server = createServer((request, response) => {
-    void app.handle(request, response)
+    void app.handle(request, response).then((handled) => {
+      if (!handled) {
+        response.writeHead(200, { 'Content-Type': 'text/html' })
+        response.end('<!doctype html><title>Workspace</title>')
+      }
+    })
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
@@ -171,6 +176,17 @@ test('an HTTPS public origin produces host-only Secure session cookies', async (
     const session = await fixture.login('alice')
     assert.match(session, /^__Host-study_session=/)
     assert.equal((await fixture.call('/api/sources', session)).status, 200)
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('workspace documents preserve same-origin form origins while authorization responses suppress referrers', async () => {
+  const fixture = await applicationFixture()
+  try {
+    // no-referrer on the document makes browsers send Origin: null for native form POSTs.
+    assert.equal((await fixture.call('/')).headers.get('referrer-policy'), 'same-origin')
+    assert.equal((await fixture.call('/auth/login')).headers.get('referrer-policy'), 'no-referrer')
   } finally {
     await fixture.close()
   }

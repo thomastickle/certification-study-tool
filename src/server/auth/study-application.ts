@@ -45,8 +45,9 @@ export class StudyApplication {
       checkLocalRequest(request, this.options.origin, callback)
       if (url.origin !== this.options.origin.origin)
         throw new ApplicationError('Invalid request URL.', 403)
-      response.setHeader('Referrer-Policy', 'no-referrer')
+      response.setHeader('Referrer-Policy', 'same-origin')
       if (url.pathname.startsWith('/auth/')) {
+        response.setHeader('Referrer-Policy', 'no-referrer')
         await this.authRoute(request, response, url)
         return true
       }
