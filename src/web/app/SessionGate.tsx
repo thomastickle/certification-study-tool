@@ -4,6 +4,7 @@ import { App } from './App.tsx'
 import { useAppearance } from './use-appearance.ts'
 import { StudyIcon } from '../shared/ui/StudyIcon.tsx'
 import './sign-in.css'
+import { setApiAccount } from '../shared/lib/api.ts'
 
 /** Mount a fresh workspace only after the server confirms the browser's account. */
 export function SessionGate() {
@@ -23,11 +24,13 @@ export function SessionGate() {
         if (!response.ok) throw new Error('Could not check your sign-in status. Please retry.')
         const next: Session = await response.json()
         if (active && request === generation) {
+          setApiAccount(next.user?.id)
           setSession(next)
           setError('')
         }
       } catch (reason) {
         if (active && request === generation) {
+          setApiAccount(undefined)
           setSession(null)
           setError(
             reason instanceof Error ? reason.message : 'Could not check your sign-in status.',
@@ -38,6 +41,7 @@ export function SessionGate() {
 
     function expired() {
       generation++
+      setApiAccount(undefined)
       setSession({ user: null })
     }
 

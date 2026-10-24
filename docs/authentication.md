@@ -97,11 +97,17 @@ host's loopback is intended for the native Node server.
 - Anonymous API requests return 401. `/api/session` exposes only the current
   account's ID/name (or null), and `/api/health` reports liveness. Same-origin
   mutation checks and an exact Host allowlist protect cookie-authenticated APIs;
-  the GET callback permits the provider's cross-site navigation.
+  the GET callback and public app shell permit the provider's cross-site return
+  navigation. Study API requests keep their cross-site restriction.
 - On 401, the frontend removes the workspace and offers sign-in. Focus rechecks
   the browser's account, and changing accounts remounts the workspace. Signing out
   from practice uses the existing save/pause guard. The selected certification is
   remembered per account; appearance and sidebar layout remain browser preferences.
+- Every study API request must send `X-Study-Account` with the user ID returned by
+  `/api/session`. The frontend binds this to the displayed workspace before it
+  mounts. A stale tab's account cannot match a replacement login: reads and writes
+  return `409 workspace_changed` before opening study data, and the UI offers
+  sign-in again. Browser checks use the same `apiFetch` request boundary.
 
 ## Existing data and future sharing
 

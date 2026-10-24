@@ -183,7 +183,7 @@ export function App({ account }: { account: SessionUser }) {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-study-account={account.id}>
       <header className="workspace-header">
         <button
           className="brand-button"

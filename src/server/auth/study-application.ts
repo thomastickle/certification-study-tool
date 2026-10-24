@@ -41,8 +41,12 @@ export class StudyApplication {
   async handle(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
     try {
       const url = new URL(request.url ?? '/', this.options.origin)
-      const callback = request.method === 'GET' && url.pathname === '/auth/callback'
-      checkLocalRequest(request, this.options.origin, callback)
+      // Cross-site redirects from an issuer must reach both the callback and the public shell.
+      const publicNavigation =
+        request.method === 'GET' &&
+        (url.pathname === '/auth/callback' ||
+          (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/auth/')))
+      checkLocalRequest(request, this.options.origin, publicNavigation)
       if (url.origin !== this.options.origin.origin)
         throw new ApplicationError('Invalid request URL.', 403)
       response.setHeader('Referrer-Policy', 'same-origin')
@@ -63,6 +67,13 @@ export class StudyApplication {
         return true
       }
       if (!user) throw new ApplicationError('Sign in to access your private workspace.', 401)
+      if (request.headers['x-study-account'] !== user.id) {
+        send(response, 409, {
+          code: 'workspace_changed',
+          error: 'Your signed-in account changed. Sign in again to reopen the workspace.',
+        })
+        return true
+      }
       const path = join(this.options.dataDirectory, 'users', user.id + '.sqlite3')
       const repository = new LibraryRepository(path)
       try {

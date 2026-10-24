@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import type { QuizView } from '../src/shared/quiz-contracts.ts'
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
@@ -21,7 +23,7 @@ export async function practiceHistoryTest() {
 
   /** Create or submit a synthetic attempt through the public API. */
   async function request(path: string, body: unknown): Promise<QuizView> {
-    const response = await fetch(`/api${path}`, {
+    const response = await workspaceFetch(`/api${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -95,7 +97,7 @@ export async function practiceHistoryTest() {
     return 'Unified completed history, type markers, embedded presets, compact heading and cross-preset result navigation passed'
   } finally {
     for (const id of ids) {
-      await fetch(`/api/quizzes/${id}`, { method: 'DELETE' })
+      await workspaceFetch(`/api/quizzes/${id}`, { method: 'DELETE' })
     }
   }
 }

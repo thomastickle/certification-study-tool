@@ -35,12 +35,18 @@ async function applicationFixture(secure = false) {
     dataDirectory: directory,
     now: () => now,
   })
+  const accounts = new Map<string, string>()
 
   const call = (path: string, cookie = '', options: RequestInit = {}) =>
     fetch(base + path, {
       ...options,
       redirect: 'manual',
-      headers: { Origin: origin.origin, Cookie: cookie, ...options.headers },
+      headers: {
+        Origin: origin.origin,
+        Cookie: cookie,
+        'X-Study-Account': accounts.get(cookie) ?? '',
+        ...options.headers,
+      },
     })
 
   const login = async (user: string) => {
@@ -62,7 +68,10 @@ async function applicationFixture(secure = false) {
     assert.match(sessionCookie, /SameSite=Lax/)
     if (secure) assert.match(sessionCookie, /; Secure/)
     else assert.doesNotMatch(sessionCookie, /; Secure/)
-    return sessionCookie.split(';')[0]!
+    const cookie = sessionCookie.split(';')[0]!
+    const session = await (await call('/api/session', cookie)).json()
+    accounts.set(cookie, session.user.id)
+    return cookie
   }
 
   return {
@@ -170,6 +179,46 @@ test('HTTP login protects the API and gives each account a private library and h
   }
 })
 
+test('a stale workspace cannot read or mutate another account even when record IDs collide', async () => {
+  const fixture = await applicationFixture()
+  try {
+    const alice = await fixture.login('alice')
+    const bob = await fixture.login('bob')
+    const input = bank()
+    for (const cookie of [alice, bob]) {
+      const post = (path: string, body: unknown) =>
+        fixture.call(path, cookie, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+      const preview = await (await post('/api/imports/preview', { bank: input })).json()
+      assert.equal(
+        (await post('/api/imports/confirm', { bank: input, token: preview.token, reviewed: false }))
+          .status,
+        201,
+      )
+    }
+    const aliceSession = await (await fixture.call('/api/session', alice)).json()
+    const aliceQuestions = await (await fixture.call('/api/questions', alice)).json()
+    const bobQuestions = await (await fixture.call('/api/questions', bob)).json()
+    assert.equal(aliceQuestions.items[0].id, bobQuestions.items[0].id)
+    const stale = { 'X-Study-Account': aliceSession.user.id }
+    assert.equal((await fixture.call('/api/questions', bob, { headers: stale })).status, 409)
+    const rejected = await fixture.call(`/api/questions/${aliceQuestions.items[0].id}`, bob, {
+      method: 'DELETE',
+      headers: stale,
+    })
+    assert.equal(rejected.status, 409)
+    assert.equal((await rejected.json()).code, 'workspace_changed')
+    assert.equal((await (await fixture.call('/api/questions', bob)).json()).total, 1)
+    assert.equal((await (await fixture.call('/api/questions', alice)).json()).total, 1)
+  } finally {
+    await fixture.close()
+  }
+})
+
 test('an HTTPS public origin produces host-only Secure session cookies', async () => {
   const fixture = await applicationFixture(true)
   try {
@@ -187,6 +236,17 @@ test('workspace documents preserve same-origin form origins while authorization 
     // no-referrer on the document makes browsers send Origin: null for native form POSTs.
     assert.equal((await fixture.call('/')).headers.get('referrer-policy'), 'same-origin')
     assert.equal((await fixture.call('/auth/login')).headers.get('referrer-policy'), 'no-referrer')
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('cross-site OIDC return navigation can load the public shell while study APIs remain protected', async () => {
+  const fixture = await applicationFixture()
+  try {
+    const navigation = { headers: { 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'navigate' } }
+    assert.equal((await fixture.call('/', '', navigation)).status, 200)
+    assert.equal((await fixture.call('/api/sources', '', navigation)).status, 403)
   } finally {
     await fixture.close()
   }

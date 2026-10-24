@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only checks split around an actual restart of the disposable app server. */
@@ -35,7 +37,7 @@ export async function preparePauseRecovery(mode: 'quiz' | 'exam') {
   await until(() => !!document.querySelector('.quiz-question'))
   click('Reports')
   await until(() => !!document.querySelector('.reports-page'))
-  const paused = await (await fetch(`/api/quizzes/current?mode=${mode}`)).json()
+  const paused = await (await workspaceFetch(`/api/quizzes/current?mode=${mode}`)).json()
   if (paused.status !== 'paused') {
     throw new Error('Attempt was not suspended')
   }
@@ -78,7 +80,7 @@ export async function verifyPauseRecovery(saved: {
   await until(() => !!document.querySelector('.recovery-panel'))
   click(`Continue ${saved.mode}`)
   await until(() => !!document.querySelector('.paused-panel'))
-  const paused = await (await fetch(`/api/quizzes/${saved.id}`)).json()
+  const paused = await (await workspaceFetch(`/api/quizzes/${saved.id}`)).json()
   if (paused.status !== 'paused' || paused.deadline - paused.pausedAt !== saved.remaining) {
     throw new Error('Restart changed frozen remaining time')
   }
@@ -98,7 +100,7 @@ export async function verifyPauseRecovery(saved: {
   }
   click(`Resume ${saved.mode}`)
   await until(() => !!document.querySelector('.quiz-question'))
-  const resumed = await (await fetch(`/api/quizzes/${saved.id}`)).json()
+  const resumed = await (await workspaceFetch(`/api/quizzes/${saved.id}`)).json()
   if (
     resumed.status !== 'active' ||
     resumed.deadline - resumed.serverNow > saved.remaining ||
@@ -107,7 +109,7 @@ export async function verifyPauseRecovery(saved: {
     throw new Error('Explicit resume lost time or history')
   }
   // Finish through the normal HTTP boundary, then refresh via in-app navigation.
-  await fetch(`/api/quizzes/${saved.id}/submit`, {
+  await workspaceFetch(`/api/quizzes/${saved.id}/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ answers: resumed.questions }),

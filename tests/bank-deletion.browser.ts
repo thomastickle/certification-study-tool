@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Exercise ReportsPage with synthetic CLF history from deleted banks and no Due Reviews. */
 export async function bankDeletionReportCheck(): Promise<string> {
   /** Wait for the rendered page state rather than a fixed request delay. */
@@ -23,7 +25,7 @@ export async function bankDeletionReportCheck(): Promise<string> {
     await new Promise((resolve) => window.setTimeout(resolve, 0))
   }
 
-  const response = await fetch('/api/reports?mode=review')
+  const response = await workspaceFetch('/api/reports?mode=review')
   if (!response.ok) {
     throw new Error('Could not read the synthetic report fixture.')
   }
