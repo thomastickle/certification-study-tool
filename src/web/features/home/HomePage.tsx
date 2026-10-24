@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CertificationProgress, HomeSummary } from '../../../shared/home-contracts.ts'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 import { HomeDashboard, type HomeNavigation } from './HomeDashboard.tsx'
 
 type Props = {
@@ -11,6 +11,7 @@ type Props = {
 
 /** Load current readiness for the workspace home screen with an explicit retry path. */
 export function HomePage({ onNavigate, onPractice, onReview }: Props) {
+  const api = useApi()
   const [summary, setSummary] = useState<HomeSummary>()
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)

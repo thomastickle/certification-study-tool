@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { SessionUser } from '../../shared/auth-contracts.ts'
 import type { Source } from '../../shared/contracts.ts'
-import { api } from '../shared/lib/api.ts'
+import { useWorkspaceApi } from '../shared/lib/workspace-api.ts'
 import { CertificationPicker } from '../features/certifications/CertificationPicker.tsx'
 import {
   certificationKey,
@@ -26,6 +26,8 @@ type Page =
 
 /** Keep every workspace destination behind the existing practice suspension guard. */
 export function App({ account }: { account: SessionUser }) {
+  const workspace = useWorkspaceApi()
+  const { api } = workspace
   const appearance = useAppearance()
   const [page, setPage] = useState<Page>('home')
   const [practiceVisit, setPracticeVisit] = useState(0)
@@ -66,7 +68,7 @@ export function App({ account }: { account: SessionUser }) {
     } finally {
       setCatalogLoading(false)
     }
-  }, [account.id])
+  }, [account.id, api])
 
   useEffect(() => {
     void refreshCertifications()
@@ -94,8 +96,14 @@ export function App({ account }: { account: SessionUser }) {
       ) {
         return
       }
+      if (!workspace.isActive()) {
+        return
+      }
       if (selected && switching) {
-        await pauseCertificationAttempts(selected)
+        await pauseCertificationAttempts(selected, workspace)
+      }
+      if (!workspace.isActive()) {
+        return
       }
       selectedRef.current = next
       setSelected(next)
@@ -156,6 +164,9 @@ export function App({ account }: { account: SessionUser }) {
       if (inPractice && !(await leaveQuiz.current())) {
         return
       }
+      if (!workspace.isActive()) {
+        return
+      }
       if (next === 'quiz' || next === 'exam') setPracticeMode(next)
       setFocusPreset(presetChange)
       if (next === page) {
@@ -176,6 +187,9 @@ export function App({ account }: { account: SessionUser }) {
     try {
       const inPractice = page === 'quiz' || page === 'exam' || page === 'review'
       if (inPractice && !(await leaveQuiz.current())) return
+      if (!workspace.isActive()) {
+        return
+      }
       form.submit()
     } finally {
       navigating.current = false

@@ -3,7 +3,7 @@ import type { StudyReport, ReportMode } from '../../../shared/report-contracts.t
 import type { QuizView } from '../../../shared/quiz-contracts.ts'
 import { studyReportMarkdown } from '../../../shared/report-export.ts'
 import { quizReport } from '../../../shared/quiz-report.ts'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 import type { Certification } from '../certifications/certifications.ts'
 import { ReportDashboard } from './ReportDashboard.tsx'
 import { ReportAttemptReview } from './ReportAttemptReview.tsx'
@@ -22,6 +22,7 @@ function download(text: string, filename: string): void {
 
 /** Loads one consistent filtered report, cancelling superseded requests. */
 export function ReportsPage({ certification }: { certification: Certification }) {
+  const api = useApi()
   const [mode, setMode] = useState<ReportMode>('all')
   const [days, setDays] = useState('all')
   const [report, setReport] = useState<StudyReport>()

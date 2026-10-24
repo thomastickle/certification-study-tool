@@ -287,6 +287,27 @@ test('callbacks are browser-bound, single use, expire, and never expose protocol
   }
 })
 
+test('concurrent callback replay completes only one login', async () => {
+  const fixture = await applicationFixture()
+  try {
+    const start = await fixture.call('/auth/login')
+    const cookie = start.headers.getSetCookie()[0]!.split(';')[0]!
+    const authorized = await fetch(start.headers.get('location')!, { redirect: 'manual' })
+    const callback = new URL(authorized.headers.get('location')!)
+    const responses = await Promise.all([
+      fixture.call(callback.pathname + callback.search, cookie),
+      fixture.call(callback.pathname + callback.search, cookie),
+    ])
+    assert.deepEqual(responses.map((response) => response.status).sort(), [302, 400])
+    const sessions = responses
+      .flatMap((response) => response.headers.getSetCookie())
+      .filter((value) => value.startsWith('study_session='))
+    assert.equal(sessions.length, 1)
+  } finally {
+    await fixture.close()
+  }
+})
+
 test('logout and writes require same-origin requests; logout and session expiration revoke access', async () => {
   const fixture = await applicationFixture()
   try {

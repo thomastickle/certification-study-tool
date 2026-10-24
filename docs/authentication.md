@@ -107,7 +107,11 @@ host's loopback is intended for the native Node server.
   `/api/session`. The frontend binds this to the displayed workspace before it
   mounts. A stale tab's account cannot match a replacement login: reads and writes
   return `409 workspace_changed` before opening study data, and the UI offers
-  sign-in again. Browser checks use the same `apiFetch` request boundary.
+  sign-in again. Each mounted workspace receives an immutable API client through
+  React context. Replacing that workspace invalidates its client: old async actions
+  cannot start requests, and late results or failures cannot affect the new
+  workspace. Same-account focus checks preserve the current client. Browser checks
+  use the same account-bound request boundary.
 
 ## Existing data and future sharing
 

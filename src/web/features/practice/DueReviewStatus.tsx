@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { DueReviewSummary, QuizOptions } from '../../../shared/quiz-contracts.ts'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 
 /** Show outstanding obligations even when filters or library deletion prevent review. */
 export function DueReviewStatus({ options }: { options: QuizOptions }) {
+  const api = useApi()
   const [summary, setSummary] = useState<DueReviewSummary>()
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
