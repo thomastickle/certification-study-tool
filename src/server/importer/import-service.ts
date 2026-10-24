@@ -7,9 +7,11 @@ import { answerKey, canonical, digest, fingerprint, reference } from './bank-too
 /** File import use cases; no HTTP, UI or filesystem ownership. */
 export class ImportService {
   private repository: LibraryRepository
+  private workspaceId: string
 
-  constructor(repository: LibraryRepository) {
+  constructor(repository: LibraryRepository, workspaceId = 'local') {
     this.repository = repository
+    this.workspaceId = workspaceId
   }
 
   preview(input: unknown): Preview {
@@ -26,7 +28,7 @@ export class ImportService {
         .map((q) => [q.reference, q]),
     )
     const preview: Preview = {
-      token: digest([bank, this.repository.revision()]),
+      token: digest([bank, this.repository.revision(), this.workspaceId]),
       sourceName: bank.source.name,
       sourceKind: bank.source.type,
       certification: bank.certification.code,

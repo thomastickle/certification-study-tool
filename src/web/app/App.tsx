@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
+import type { SessionUser } from '../../shared/auth-contracts.ts'
 import type { Source } from '../../shared/contracts.ts'
 import { api } from '../shared/lib/api.ts'
 import { CertificationPicker } from '../features/certifications/CertificationPicker.tsx'
@@ -23,7 +25,7 @@ type Page =
   'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'certifications' | 'settings'
 
 /** Keep every workspace destination behind the existing practice suspension guard. */
-export function App() {
+export function App({ account }: { account: SessionUser }) {
   const appearance = useAppearance()
   const [page, setPage] = useState<Page>('home')
   const [practiceVisit, setPracticeVisit] = useState(0)
@@ -49,7 +51,7 @@ export function App() {
       if (!selectedRef.current) {
         let remembered: string | null = null
         try {
-          remembered = localStorage.getItem('study-certification')
+          remembered = localStorage.getItem(`study-certification:${account.id}`)
         } catch {
           // Storage is optional; the workspace still works for this session.
         }
@@ -64,7 +66,7 @@ export function App() {
     } finally {
       setCatalogLoading(false)
     }
-  }, [])
+  }, [account.id])
 
   useEffect(() => {
     void refreshCertifications()
@@ -98,7 +100,7 @@ export function App() {
       selectedRef.current = next
       setSelected(next)
       try {
-        localStorage.setItem('study-certification', certificationKey(next))
+        localStorage.setItem(`study-certification:${account.id}`, certificationKey(next))
       } catch {
         // Selection remains usable when storage is unavailable.
       }
@@ -165,6 +167,21 @@ export function App() {
     }
   }
 
+  /** Save and pause practice before the browser leaves to end the sign-in session. */
+  async function signOut(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (navigating.current) return
+    const form = event.currentTarget
+    navigating.current = true
+    try {
+      const inPractice = page === 'quiz' || page === 'exam' || page === 'review'
+      if (inPractice && !(await leaveQuiz.current())) return
+      form.submit()
+    } finally {
+      navigating.current = false
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="workspace-header">
@@ -185,10 +202,17 @@ export function App() {
           loading={catalogLoading}
           onSelect={selectCertification}
         />
-        <span className="local-badge">
-          <span aria-hidden="true" />
-          Local workspace
-        </span>
+        <form
+          className="workspace-account"
+          action="/auth/logout"
+          method="post"
+          onSubmit={(event) => {
+            void signOut(event)
+          }}
+        >
+          <span title={account.name}>{account.name}</span>
+          <button type="submit">Sign out</button>
+        </form>
       </header>
       <WorkspaceSidebar
         destination={destination}

@@ -1,0 +1,65 @@
+.sign-in-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.sign-in-card {
+  width: min(100%, 32rem);
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: var(--surface);
+}
+
+.sign-in-card h1,
+.sign-in-card p {
+  margin: 0;
+}
+
+.sign-in-card h1 {
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  line-height: 1.15;
+}
+
+.sign-in-brand {
+  font-weight: 700;
+}
+
+.sign-in-link {
+  display: block;
+  text-align: center;
+  padding: 0.8rem 1.2rem;
+  border-radius: 0.6rem;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.workspace-account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.workspace-account span {
+  max-width: 12rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-account button {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .workspace-account span {
+    display: none;
+  }
+}
