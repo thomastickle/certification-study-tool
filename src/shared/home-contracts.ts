@@ -3,6 +3,7 @@ export type ReadinessStatus = 'insufficient' | 'unsupported' | 'red' | 'yellow' 
 export const readinessThresholds = { marginal: 80, ready: 90 } as const
 
 export type Readiness = {
+  basis?: 'blueprint' | 'practice'
   status: ReadinessStatus
   score: number | null
   blendedScore: number | null

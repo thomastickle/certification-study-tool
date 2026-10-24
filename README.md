@@ -7,8 +7,8 @@ The library accepts question banks for different providers and certifications.
 Timed practice and performance reports follow the selected certification workspace.
 AWS CLF-C02 has domain mappings; other certifications use generic timed practice.
 Home groups imported certifications by provider with compact exam-readiness bars.
-Readiness assessment currently requires the AWS CLF-C02 domain blueprint; other
-tracks show neutral readiness while keeping their own practice and review history.
+Readiness uses the AWS CLF-C02 domain blueprint for that track; all other
+certifications receive a general practice estimate from their own completed history.
 The separate Certifications screen records earned credentials as stars without
 changing readiness. See [readiness rules and evidence](docs/readiness.md).
 The Reports page adds progress charts, domain and topic breakdowns, exam/quiz

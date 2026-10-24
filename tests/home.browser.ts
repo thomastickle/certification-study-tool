@@ -29,7 +29,7 @@ export async function homeDashboardTest() {
     () => document.querySelectorAll('.provider-card').length === 2,
     'Provider cards did not load',
   )
-  const summary = document.querySelector('[aria-label="AWS tracks exam-ready"]')!
+  const summary = document.querySelector('[aria-label="AWS tracks ready"]')!
   assert(
     summary.getAttribute('aria-valuenow') === '1' && summary.getAttribute('aria-valuemax') === '3',
     'Provider summary must count ready tracks',
@@ -85,9 +85,8 @@ export async function homeDashboardTest() {
       'Home kept an unearned star',
     )
     assert(
-      document
-        .querySelector('[aria-label="AWS tracks exam-ready"]')!
-        .getAttribute('aria-valuenow') === '1',
+      document.querySelector('[aria-label="AWS tracks ready"]')!.getAttribute('aria-valuenow') ===
+        '1',
       'Earned status changed readiness',
     )
 

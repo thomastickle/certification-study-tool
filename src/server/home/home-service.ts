@@ -82,9 +82,10 @@ export class HomeService {
     for (const [key, track] of tracks) {
       const history = histories.get(key) ?? []
       track.deletedBankAttemptCount = history.filter((quiz) => quiz.deletedBankNames?.length).length
-      if (isClf({ provider: track.provider, certification: track.code })) {
-        track.readiness = certificationReadiness(history, now)
-      }
+      track.readiness = certificationReadiness(history, now, {
+        provider: track.provider,
+        certification: track.code,
+      })
       track.dueCount = [...masteryHistory(history).states.values()].filter(
         (state) => state.dueDay !== null && state.dueDay <= day,
       ).length

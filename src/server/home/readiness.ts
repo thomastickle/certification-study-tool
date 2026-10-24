@@ -4,7 +4,8 @@ import { domainNames, examDomainQuotas } from '../quizzes/domain-mapping.ts'
 import { completedEvidence, masteryHistory } from '../quizzes/mastery-history.ts'
 import { studyDay } from '../quizzes/mastery.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
-import { isClf } from '../quizzes/certification-scope.ts'
+import { certificationScope, isClf, sameCertification } from '../quizzes/certification-scope.ts'
+import type { CertificationScope } from '../quizzes/certification-scope.ts'
 
 export const readinessPolicy = {
   days: 30,
@@ -47,17 +48,32 @@ export function readinessScore(mastery: number, weakestDomain: number, exams: nu
   return { score, blendedScore, examAverage, status }
 }
 
-/** Assess only the supported blueprint using reliable completed snapshots, never live bank keys. */
-export function certificationReadiness(completed: StoredQuiz[], now: number): Readiness {
+/** Assess scoped evidence; generic tracks use overall practice rather than an invented blueprint. */
+export function certificationReadiness(
+  completed: StoredQuiz[],
+  now: number,
+  scope: CertificationScope = {},
+): Readiness {
+  const selectedScope = certificationScope(scope)
+  const blueprint = isClf(selectedScope)
+  const names: readonly string[] = blueprint ? domainNames : ['All practice questions']
+  const coverage = blueprint ? readinessPolicy.questionsPerDomain : 80
+
+  const domainIndex = (question: StoredQuiz['questions'][number]) =>
+    blueprint ? question.domain - 1 : 0
+
   const lifetime = completed.filter(
-    (quiz) => isClf(quiz.options) && Number.isFinite(quiz.finishedAt) && quiz.finishedAt! <= now,
+    (quiz) =>
+      sameCertification(quiz.options, selectedScope) &&
+      Number.isFinite(quiz.finishedAt) &&
+      quiz.finishedAt! <= now,
   )
   const recent = lifetime.filter(
     (quiz) => quiz.finishedAt! >= now - readinessPolicy.days * 86400000,
   )
   const states = masteryHistory(lifetime).states
   const answered = new Set<string>()
-  const domains = domainNames.map((name) => ({
+  const domains = names.map((name) => ({
     name,
     answered: new Set<string>(),
     total: 0,
@@ -72,18 +88,18 @@ export function certificationReadiness(completed: StoredQuiz[], now: number): Re
         return
       }
       const mapped = identityDomains.get(evidence.identity) ?? new Set<number>()
-      mapped.add(question.domain)
+      mapped.add(domainIndex(question))
       identityDomains.set(evidence.identity, mapped)
     })
   }
   for (const quiz of recent) {
     const seen = new Set<string>()
-    const quotaCounts = [0, 0, 0, 0]
+    const quotaCounts = names.map(() => 0)
     let correct = 0
     let reliable = true
     quiz.questions.forEach((question, index) => {
       const evidence = completedEvidence(quiz, index)
-      const domain = domains[question.domain - 1]
+      const domain = domains[domainIndex(question)]
       if (
         !evidence ||
         !domain ||
@@ -94,7 +110,7 @@ export function certificationReadiness(completed: StoredQuiz[], now: number): Re
         return
       }
       seen.add(evidence.identity)
-      quotaCounts[question.domain - 1]!++
+      quotaCounts[domainIndex(question)]!++
       domain.total++
       if (evidence.correct) {
         domain.correct++
@@ -111,7 +127,7 @@ export function certificationReadiness(completed: StoredQuiz[], now: number): Re
       quiz.total !== 65 ||
       seen.size !== 65 ||
       quiz.correctCount !== correct ||
-      !examDomainQuotas.every((quota, index) => quotaCounts[index] === quota) ||
+      (blueprint && !examDomainQuotas.every((quota, index) => quotaCounts[index] === quota)) ||
       quiz.pauseHistory?.complete !== true ||
       quiz.pauseHistory.intervals.length !== 0 ||
       quiz.deadline - quiz.startedAt !== 90 * 60_000
@@ -130,6 +146,7 @@ export function certificationReadiness(completed: StoredQuiz[], now: number): Re
     .sort((a, b) => b.day.localeCompare(a.day))
     .slice(0, readinessPolicy.examDays)
   const result = emptyReadiness(true)
+  result.basis = blueprint ? 'blueprint' : 'practice'
   result.mastery = answered.size
     ? ([...answered].filter((identity) => states.get(identity)?.mastered).length / answered.size) *
       100
@@ -142,9 +159,9 @@ export function certificationReadiness(completed: StoredQuiz[], now: number): Re
   result.exams = selected.map(({ day, score }) => ({ day, score }))
   result.reasons = []
   for (const domain of result.domains) {
-    if (domain.distinctAnswered < readinessPolicy.questionsPerDomain) {
+    if (domain.distinctAnswered < coverage) {
       result.reasons.push(
-        `${domain.name}: ${domain.distinctAnswered}/${readinessPolicy.questionsPerDomain} distinct questions answered in the last ${readinessPolicy.days} days.`,
+        `${domain.name}: ${domain.distinctAnswered}/${coverage} distinct questions answered in the last ${readinessPolicy.days} days.`,
       )
     }
   }
