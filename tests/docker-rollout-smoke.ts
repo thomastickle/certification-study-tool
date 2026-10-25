@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { parseArgs } from 'node:util'
+import { waitForApplication } from './support/application-readiness.ts'
 
 const { values } = parseArgs({
   options: {
@@ -188,6 +189,7 @@ try {
   run('node', '--input-type=module', '-e', seed)
   const before = sourceHash()
   compose('up', '--no-build', '-d', '--wait', '--wait-timeout', '180')
+  await waitForApplication(app)
   const username = 'rollout-owner-' + randomUUID().slice(0, 8)
   const password = randomUUID() + '!aA1'
   const owner = await authenticate(username, password, true)
@@ -206,6 +208,7 @@ try {
   assert.ok(result.backup)
   assert.equal(sourceHash(), before)
   compose('up', '--no-build', '-d', '--wait', '--wait-timeout', '180')
+  await waitForApplication(app)
   assert.equal((await api<{ total: number }>(owner, '/questions')).total, 20)
   assert.equal(
     (await api<unknown[]>(owner, '/quizzes?provider=Example&certification=DEMO-1')).length,
@@ -213,6 +216,7 @@ try {
   )
   assert.equal((await api<{ total: number }>(other, '/questions')).total, 0)
   compose('up', '--no-build', '--force-recreate', '-d', '--wait', '--wait-timeout', '180')
+  await waitForApplication(app)
   const signedInAgain = await authenticate(username, password, false)
   assert.equal(signedInAgain.id, owner.id)
   assert.equal((await api<{ total: number }>(signedInAgain, '/questions')).total, 20)
