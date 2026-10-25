@@ -8,13 +8,14 @@ const port = Number(process.env.STUDY_PORT ?? '3000')
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error('STUDY_PORT must be a valid port.')
 const origin = new URL(process.env.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
-const application = new StudyApplication({
+const applicationOptions = {
   origin,
   issuer: new URL(process.env.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study'),
   clientId: process.env.STUDY_OIDC_CLIENT_ID ?? 'study-tool',
   clientSecret: process.env.STUDY_OIDC_CLIENT_SECRET || undefined,
   dataDirectory: process.env.STUDY_DATA_DIR ?? 'private/app',
-})
+}
+const application = new StudyApplication(applicationOptions)
 const production = process.env.NODE_ENV === 'production'
 let webHandler: (
   request: import('node:http').IncomingMessage,
@@ -29,7 +30,10 @@ async function handleRequest(
   request: import('node:http').IncomingMessage,
   response: import('node:http').ServerResponse,
 ) {
-  if (!(await application.handle(request, response))) webHandler(request, response)
+  const handled = await application.handle(request, response)
+  if (!handled) {
+    webHandler(request, response)
+  }
 }
 
 let closeWeb = async () => {}
