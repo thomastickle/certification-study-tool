@@ -58,7 +58,8 @@ export function App({ account }: { account: SessionUser }) {
   /** Refresh after imports without replacing the workspace that is currently in use. */
   const refreshCertifications = useCallback(async () => {
     try {
-      const items = certificationsFromSources(await api<Source[]>('/sources'))
+      const sources = await api<Source[]>('/sources')
+      const items = certificationsFromSources(sources)
       setCertifications(items)
       if (!selectedRef.current) {
         let remembered: string | null = null
@@ -136,21 +137,23 @@ export function App({ account }: { account: SessionUser }) {
     if (transition.kind === 'page' && transition.next === page && !inPractice) {
       return
     }
-    if (
-      transition.kind === 'certification' &&
-      selected &&
-      certificationKey(transition.next) === certificationKey(selected) &&
-      !transition.studyPage
-    ) {
-      return
+    if (transition.kind === 'certification') {
+      const sameSelection =
+        selected && certificationKey(transition.next) === certificationKey(selected)
+      if (sameSelection && !transition.studyPage) {
+        return
+      }
     }
     navigating.current = true
     if (transition.kind === 'certification') {
       setSelectionError('')
     }
     try {
-      if (inPractice && !(await leaveQuiz.current())) {
-        return
+      if (inPractice) {
+        const canLeave = await leaveQuiz.current()
+        if (!canLeave) {
+          return
+        }
       }
       if (!workspace.isActive()) {
         return

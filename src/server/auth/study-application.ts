@@ -45,9 +45,9 @@ export class StudyApplication {
       this.releaseData()
       throw error
     }
-    this.sessionName =
-      options.origin.protocol === 'https:' ? '__Host-study_session' : 'study_session'
-    this.loginName = options.origin.protocol === 'https:' ? '__Secure-study_login' : 'study_login'
+    const secure = options.origin.protocol === 'https:'
+    this.sessionName = secure ? '__Host-study_session' : 'study_session'
+    this.loginName = secure ? '__Secure-study_login' : 'study_login'
   }
 
   /** Validate the request before routing authentication, public assets, or private study APIs. */
@@ -60,17 +60,16 @@ export class StudyApplication {
         await this.authRoute(request, response, url)
         return true
       }
-      if (!url.pathname.startsWith('/api/')) return false
+      if (!url.pathname.startsWith('/api/')) {
+        return false
+      }
       await this.handleStudyApi(request, response, url)
       return true
     } catch (error) {
-      const status = error instanceof ApplicationError ? error.status : 500
-      sendJson(response, status, {
-        error:
-          error instanceof ApplicationError
-            ? error.message
-            : 'The request could not be completed. Please retry.',
-      })
+      const expected = error instanceof ApplicationError
+      const status = expected ? error.status : 500
+      const message = expected ? error.message : 'The request could not be completed. Please retry.'
+      sendJson(response, status, { error: message })
       return true
     }
   }
@@ -79,13 +78,13 @@ export class StudyApplication {
   private validateRequest(request: IncomingMessage): URL {
     const url = new URL(request.url ?? '/', this.options.origin)
     // Cross-site redirects from an issuer must reach both the callback and the public shell.
-    const publicNavigation =
-      request.method === 'GET' &&
-      (url.pathname === '/auth/callback' ||
-        (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/auth/')))
+    const callback = url.pathname === '/auth/callback'
+    const publicPage = !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/auth/')
+    const publicNavigation = request.method === 'GET' && (callback || publicPage)
     checkLocalRequest(request, this.options.origin, publicNavigation)
-    if (url.origin !== this.options.origin.origin)
+    if (url.origin !== this.options.origin.origin) {
       throw new ApplicationError('Invalid request URL.', 403)
+    }
     return url
   }
 
@@ -105,7 +104,9 @@ export class StudyApplication {
       sendJson(response, 200, { user: user ?? null })
       return
     }
-    if (!user) throw new ApplicationError('Sign in to access your private workspace.', 401)
+    if (!user) {
+      throw new ApplicationError('Sign in to access your private workspace.', 401)
+    }
     if (request.headers['x-study-account'] !== user.id) {
       sendJson(response, 409, {
         code: 'workspace_changed',
@@ -118,10 +119,8 @@ export class StudyApplication {
     try {
       chmodSync(path, 0o600)
       new QuizService(repository).expireDue()
-      await apiController(repository, { origin: this.options.origin, workspaceId: user.id })(
-        request,
-        response,
-      )
+      const api = apiController(repository, { origin: this.options.origin, workspaceId: user.id })
+      await api(request, response)
     } finally {
       repository.close()
     }
@@ -149,12 +148,18 @@ export class StudyApplication {
   /** Supersede the browser's old attempt and reserve capacity across asynchronous provider work. */
   private async startLogin(request: IncomingMessage, response: ServerResponse): Promise<void> {
     for (const [key, value] of this.pending) {
-      if (value.expiresAt <= this.now()) this.pending.delete(key)
+      if (value.expiresAt <= this.now()) {
+        this.pending.delete(key)
+      }
     }
     const previous = cookie(request, this.loginName)
-    if (previous) this.pending.delete(previous)
-    if (this.pending.size + this.startingLogins >= 1000)
+    if (previous) {
+      this.pending.delete(previous)
+    }
+    const pendingCount = this.pending.size + this.startingLogins
+    if (pendingCount >= 1000) {
       throw new ApplicationError('Too many pending logins. Please retry shortly.', 429)
+    }
     let started: Awaited<ReturnType<OidcLogin['begin']>>
     this.startingLogins++
     try {
@@ -179,7 +184,9 @@ export class StudyApplication {
   ): Promise<void> {
     const key = cookie(request, this.loginName)
     const pending = key ? this.pending.get(key) : undefined
-    if (key) this.pending.delete(key)
+    if (key) {
+      this.pending.delete(key)
+    }
     response.setHeader('Set-Cookie', this.makeLoginCookies('', 0))
     if (!pending || pending.expiresAt <= this.now()) {
       throw new ApplicationError(
@@ -195,7 +202,9 @@ export class StudyApplication {
     }
     const account = this.accounts.identify(identity)
     const previous = cookie(request, this.sessionName)
-    if (previous) this.accounts.revokeSession(previous)
+    if (previous) {
+      this.accounts.revokeSession(previous)
+    }
     const token = randomBytes(32).toString('base64url')
     const now = this.now()
     this.accounts.pruneExpiredSessions(now)
@@ -211,11 +220,14 @@ export class StudyApplication {
   /** Revoke local access before attempting provider logout, including during provider outages. */
   private async logout(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const token = cookie(request, this.sessionName)
-    if (token) this.accounts.revokeSession(token)
+    if (token) {
+      this.accounts.revokeSession(token)
+    }
     response.setHeader('Set-Cookie', this.makeCookie(this.sessionName, '', 0, '/'))
     let destination = '/'
     try {
-      destination = (await this.login.logoutUrl())?.href ?? '/'
+      const providerLogout = await this.login.logoutUrl()
+      destination = providerLogout?.href ?? '/'
     } catch {
       // Provider outages must not prevent invalidating the local session.
     }
@@ -232,7 +244,8 @@ export class StudyApplication {
   }
 
   private makeCookie(name: string, value: string, seconds: number, path: string): string {
-    return `${name}=${value}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${seconds}${this.options.origin.protocol === 'https:' ? '; Secure' : ''}`
+    const secure = this.options.origin.protocol === 'https:' ? '; Secure' : ''
+    return `${name}=${value}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${seconds}${secure}`
   }
 
   close(): void {

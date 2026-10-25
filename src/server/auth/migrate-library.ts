@@ -46,15 +46,17 @@ export function migrationAccounts(dataDirectory: string): MigrationAccount[] {
   }
   const accounts = new DatabaseSync(path, { readOnly: true })
   try {
-    if (
-      Number(accounts.prepare('PRAGMA application_id').get()?.application_id) !== 1096242005 ||
-      Number(accounts.prepare('PRAGMA user_version').get()?.user_version) !== 1
-    ) {
+    const appId = Number(accounts.prepare('PRAGMA application_id').get()?.application_id)
+    const version = Number(accounts.prepare('PRAGMA user_version').get()?.user_version)
+    if (appId !== 1096242005 || version !== 1) {
       throw new Error('Unrecognized account registry.')
     }
-    return accounts
-      .prepare('SELECT id, name, issuer FROM accounts ORDER BY name, id')
-      .all() as MigrationAccount[]
+    const listAccounts = accounts.prepare(`
+      SELECT id, name, issuer
+      FROM accounts
+      ORDER BY name, id
+    `)
+    return listAccounts.all() as MigrationAccount[]
   } finally {
     accounts.close()
   }
@@ -178,10 +180,8 @@ async function backupAndInstall(
 /** Validate recognized app data without opening the original through a migrating repository. */
 function assertLibrary(db: DatabaseSync): void {
   const version = Number(db.prepare('PRAGMA user_version').get()?.user_version)
-  if (
-    Number(db.prepare('PRAGMA application_id').get()?.application_id) !== 1096242004 ||
-    ![1, 2].includes(version)
-  ) {
+  const appId = Number(db.prepare('PRAGMA application_id').get()?.application_id)
+  if (appId !== 1096242004 || ![1, 2].includes(version)) {
     throw new Error('The source or workspace is not a recognized study database.')
   }
   if (db.prepare('PRAGMA integrity_check').get()?.integrity_check !== 'ok') {
@@ -225,7 +225,8 @@ function assertSafeTargetFile(target: string): boolean {
 /** Reject unknown schemas and any revision or content indicating prior workspace use. */
 function assertEmptyLibraryContents(db: DatabaseSync): void {
   assertLibrary(db)
-  if (Number(db.prepare('SELECT revision FROM library_state WHERE id = 1').get()?.revision) !== 0) {
+  const state = db.prepare('SELECT revision FROM library_state WHERE id = 1').get()
+  if (Number(state?.revision) !== 0) {
     throw new Error(
       'The target workspace is not empty. Migration never overwrites used workspaces.',
     )
@@ -240,9 +241,12 @@ function assertEmptyLibraryContents(db: DatabaseSync): void {
     'dismissed_concept_suggestions',
     'earned_certifications',
   ])
-  const tables = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-    .all()
+  const listTables = db.prepare(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+  `)
+  const tables = listTables.all()
   for (const row of tables) {
     const table = String(row.name)
     if (metadata.has(table)) {
@@ -252,7 +256,8 @@ function assertEmptyLibraryContents(db: DatabaseSync): void {
       throw new Error('Unsupported target workspace schema. Use the current app version.')
     }
     // Only fixed names from the allowlist above are interpolated into SQL.
-    if (Number(db.prepare(`SELECT count(*) AS total FROM ${table}`).get()?.total) !== 0) {
+    const countRows = db.prepare(`SELECT count(*) AS total FROM ${table}`)
+    if (Number(countRows.get()?.total) !== 0) {
       throw new Error(
         'The target workspace is not empty. Migration never overwrites used workspaces.',
       )
