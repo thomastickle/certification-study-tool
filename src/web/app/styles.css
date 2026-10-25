@@ -984,6 +984,8 @@ select {
 }
 
 .library-page {
+  /* Keep importer instructions and metadata as readable as question text. */
+  --muted: var(--ink);
   padding-top: 30px;
 }
 .library-page .page-heading {
