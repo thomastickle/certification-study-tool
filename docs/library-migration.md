@@ -4,7 +4,9 @@ Each user owns a separate SQLite database. New accounts start empty. This comman
 copies the previous single-user library and its complete study history into one
 explicitly selected account. It never seeds other users or distributes question banks.
 
-Sign in once so the app creates your account. Before importing anything into that
+Sign in once so the app creates your account. In that same browser, open
+`/api/session` on the app and note `user.id`; this identifies the account you just
+signed in to, even if display names repeat. Before importing anything into that
 account, list the available owners:
 
 ```sh
