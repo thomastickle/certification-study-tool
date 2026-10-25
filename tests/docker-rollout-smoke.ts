@@ -98,7 +98,8 @@ async function openLogin(browser: Browser): Promise<AuthenticationScreen> {
   const url = new URL(start.headers.get('location')!)
   const login = await browser.follow(url)
   assert.equal(login.status, 200, 'Keycloak login screen was not available.')
-  return { url, html: await login.text() }
+  const html = await login.text()
+  return { url, html }
 }
 
 /** Use the same browser and cookie jar if the scenario needs a new Keycloak account. */
@@ -114,7 +115,8 @@ async function openRegistrationIfRequested(
   const url = new URL(path, issuer)
   const response = await browser.follow(url)
   assert.equal(response.status, 200, 'Keycloak registration screen was not available.')
-  return { url, html: await response.text() }
+  const html = await response.text()
+  return { url, html }
 }
 
 /** Submit only the pinned provider's form; the application still performs the code/PKCE exchange. */
@@ -151,7 +153,8 @@ async function submitCredentials(
 async function completeAppSession(browser: Browser, callback: URL): Promise<AuthenticatedUser> {
   const landing = await browser.follow(callback)
   assert.equal(landing.status, 200, 'Application callback did not return its public page.')
-  const session = await (await browser.request(new URL('/api/session', app))).json()
+  const response = await browser.request(new URL('/api/session', app))
+  const session = await response.json()
   assert.ok(session.user?.id, 'The real OIDC callback did not establish a user session.')
   return { browser, id: session.user.id }
 }
@@ -176,28 +179,75 @@ async function api<T>(client: AuthenticatedUser, path: string): Promise<T> {
   return response.json()
 }
 
-const seed = `
-import { existsSync } from 'node:fs';
-import { LibraryRepository } from './src/server/questions/library-repository.ts';
-import { ImportService } from './src/server/importer/import-service.ts';
-import { QuizService } from './src/server/quizzes/quiz-service.ts';
-if (existsSync('/data/library.sqlite3')) throw new Error('Use a fresh disposable volume for the rollout smoke test.');
-const repo = new LibraryRepository('/data/library.sqlite3');
-const bank = {schema_version:2,certification:{provider:'Example',code:'DEMO-1',name:'Legacy rollout fixture'},source:{key:'legacy-rollout',name:'Synthetic legacy rollout',type:'third_party',verification_status:'unverified'},questions:Array.from({length:20},(_,i)=>({source_ref:String(i),question:'Synthetic legacy question '+i+'?',type:'single_select',select_count:1,answers:[{text:'Correct example',correct:true},{text:'Other example',correct:false}]}))};
-const importer = new ImportService(repo); importer.confirm(bank, importer.preview(bank).token, false);
-const service = new QuizService(repo); const quiz = service.start({provider:'Example',certification:'DEMO-1',sourceFilter:'mixed',questionType:'mixed'});
-service.submit(quiz.id,{answers:quiz.questions.map(q=>({questionId:q.questionId,selected:[],confidence:'Unsure',flagged:false}))});
-repo.certificationStore().setEarned({provider:'Example',code:'DEMO-1',name:'Legacy rollout fixture'},true);
-repo.close();
+// This script runs inside the image, where only application modules are available.
+const legacySeedScript = `
+import { existsSync } from 'node:fs'
+import { LibraryRepository } from './src/server/questions/library-repository.ts'
+import { ImportService } from './src/server/importer/import-service.ts'
+import { QuizService } from './src/server/quizzes/quiz-service.ts'
+
+if (existsSync('/data/library.sqlite3')) {
+  throw new Error('Use a fresh disposable volume for the rollout smoke test.')
+}
+const repo = new LibraryRepository('/data/library.sqlite3')
+const certification = { provider: 'Example', code: 'DEMO-1', name: 'Legacy rollout fixture' }
+const questions = Array.from({ length: 20 }, (_, index) => ({
+  source_ref: String(index),
+  question: 'Synthetic legacy question ' + index + '?',
+  type: 'single_select',
+  select_count: 1,
+  answers: [
+    { text: 'Correct example', correct: true },
+    { text: 'Other example', correct: false },
+  ],
+}))
+const bank = {
+  schema_version: 2,
+  certification,
+  source: {
+    key: 'legacy-rollout',
+    name: 'Synthetic legacy rollout',
+    type: 'third_party',
+    verification_status: 'unverified',
+  },
+  questions,
+}
+const importer = new ImportService(repo)
+const preview = importer.preview(bank)
+importer.confirm(bank, preview.token, false)
+
+const service = new QuizService(repo)
+const options = {
+  provider: 'Example',
+  certification: 'DEMO-1',
+  sourceFilter: 'mixed',
+  questionType: 'mixed',
+}
+const quiz = service.start(options)
+const submission = {
+  answers: quiz.questions.map(question => ({
+    questionId: question.questionId,
+    selected: [],
+    confidence: 'Unsure',
+    flagged: false,
+  })),
+}
+service.submit(quiz.id, submission)
+repo.certificationStore().setEarned(certification, true)
+repo.close()
 `
 
-const sourceHash = () =>
-  run(
-    'node',
-    '--input-type=module',
-    '-e',
-    "import {readFileSync} from 'node:fs'; import {createHash} from 'node:crypto'; console.log(createHash('sha256').update(readFileSync('/data/library.sqlite3')).digest('hex'))",
-  ).trim()
+/** Hash the legacy database in place without copying private contents into the host checkout. */
+function sourceHash(): string {
+  const script = `
+    import { readFileSync } from 'node:fs'
+    import { createHash } from 'node:crypto'
+
+    const contents = readFileSync('/data/library.sqlite3')
+    console.log(createHash('sha256').update(contents).digest('hex'))
+  `
+  return run('node', '--input-type=module', '-e', script).trim()
+}
 
 const migration = (accountId: string, apply = false) =>
   JSON.parse(
@@ -215,7 +265,7 @@ const migration = (accountId: string, apply = false) =>
 /** Seed only the explicitly named disposable volume, retaining its hash for all later checks. */
 function seedLegacyLibrary(): string {
   compose('stop', 'study')
-  run('node', '--input-type=module', '-e', seed)
+  run('node', '--input-type=module', '-e', legacySeedScript)
   return sourceHash()
 }
 
@@ -241,12 +291,15 @@ async function registerIsolatedUsers(): Promise<RolloutUsers> {
     password: randomUUID() + '!aA1',
   }
   const owner = await authenticate(ownerCredentials, true)
-  const other = await authenticate(
-    { username: 'rollout-other-' + randomUUID().slice(0, 8), password: randomUUID() + '!aA1' },
-    true,
-  )
-  assert.equal((await api<{ total: number }>(owner, '/questions')).total, 0)
-  assert.equal((await api<{ total: number }>(other, '/questions')).total, 0)
+  const otherCredentials = {
+    username: 'rollout-other-' + randomUUID().slice(0, 8),
+    password: randomUUID() + '!aA1',
+  }
+  const other = await authenticate(otherCredentials, true)
+  const ownerLibrary = await api<{ total: number }>(owner, '/questions')
+  assert.equal(ownerLibrary.total, 0)
+  const otherLibrary = await api<{ total: number }>(other, '/questions')
+  assert.equal(otherLibrary.total, 0)
   return { owner, other, ownerCredentials }
 }
 
@@ -267,12 +320,12 @@ async function verifyMigratedWorkspaces(
   owner: AuthenticatedUser,
   other: AuthenticatedUser,
 ): Promise<void> {
-  assert.equal((await api<{ total: number }>(owner, '/questions')).total, 20)
-  assert.equal(
-    (await api<unknown[]>(owner, '/quizzes?provider=Example&certification=DEMO-1')).length,
-    1,
-  )
-  assert.equal((await api<{ total: number }>(other, '/questions')).total, 0)
+  const ownerLibrary = await api<{ total: number }>(owner, '/questions')
+  assert.equal(ownerLibrary.total, 20)
+  const ownerHistory = await api<unknown[]>(owner, '/quizzes?provider=Example&certification=DEMO-1')
+  assert.equal(ownerHistory.length, 1)
+  const otherLibrary = await api<{ total: number }>(other, '/questions')
+  assert.equal(otherLibrary.total, 0)
 }
 
 /** Recreate both containers and prove provider identity, study data, and local sessions survive. */
@@ -291,16 +344,15 @@ try {
   await migrateToOwner(users.owner, originalHash)
   await verifyMigratedWorkspaces(users.owner, users.other)
   await verifyAfterRecreation(users, originalHash)
-  console.log(
-    JSON.stringify({
-      login: 'passed',
-      migratedQuestions: 20,
-      completedHistory: 1,
-      otherUserQuestions: 0,
-      usersAndDataSurviveRecreation: true,
-      legacySourceUnchanged: true,
-    }),
-  )
+  const summary = {
+    login: 'passed',
+    migratedQuestions: 20,
+    completedHistory: 1,
+    otherUserQuestions: 0,
+    usersAndDataSurviveRecreation: true,
+    legacySourceUnchanged: true,
+  }
+  console.log(JSON.stringify(summary))
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Rollout smoke test failed.')
   process.exitCode = 1
