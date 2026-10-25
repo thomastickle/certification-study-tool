@@ -61,13 +61,17 @@ export class AccountRepository {
   }
 
   session(token: string, now: number): Account | undefined {
-    this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now)
     return this.db
       .prepare(
         `SELECT a.id, a.name FROM sessions s JOIN accounts a ON a.id = s.account_id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
       )
       .get(tokenHash(token), now) as Account | undefined
+  }
+
+  /** Reclaim expired records during explicit session housekeeping, never during lookup. */
+  pruneExpiredSessions(now: number): void {
+    this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now)
   }
 
   revokeSession(token: string): void {
