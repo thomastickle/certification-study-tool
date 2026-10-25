@@ -1,4 +1,4 @@
-/** Run on the Importer page in the collaborative preview. */
+/** Run on the Library page in the collaborative preview. */
 export function importerContrastTest() {
   function luminance(color: string) {
     const channels = color
@@ -15,7 +15,7 @@ export function importerContrastTest() {
   const selectors = ['.privacy-note', '.page-heading p', '.result-count', '.file-row']
   for (const selector of selectors) {
     const element = document.querySelector<HTMLElement>(`.library-page ${selector}`)
-    if (!element) throw new Error(`Missing importer content: ${selector}`)
+    if (!element) throw new Error(`Missing library content: ${selector}`)
     let surface: Element | null = element
     while (surface && getComputedStyle(surface).backgroundColor === 'rgba(0, 0, 0, 0)')
       surface = surface.parentElement
@@ -25,5 +25,5 @@ export function importerContrastTest() {
     const ratio = (Math.max(text, background) + 0.05) / (Math.min(text, background) + 0.05)
     if (ratio < 7) throw new Error(`${selector}: ${ratio.toFixed(2)}:1 contrast; expected 7:1`)
   }
-  return 'Importer supporting text meets 7:1 contrast'
+  return 'Library supporting text meets 7:1 contrast'
 }

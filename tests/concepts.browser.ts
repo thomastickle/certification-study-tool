@@ -36,7 +36,7 @@ export async function conceptsBrowserTest(): Promise<string> {
     return response.json()
   }
 
-  button('Importer').click()
+  button('Library').click()
   await until(() => !!document.querySelector('.concept-panel'), 'Library did not load')
   const panel = document.querySelector<HTMLDetailsElement>('.concept-panel')!
   panel.open = true

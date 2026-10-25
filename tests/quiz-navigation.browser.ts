@@ -147,7 +147,7 @@ export async function navigationCheck(
     await until(() => started, 'Start request was not sent')
     if (['leave', 'failure', 'lost-start', 'recovery-failure'].includes(outcome)) {
       click('Reports')
-      click('Importer')
+      click('Library')
       await new Promise((resolve) => window.setTimeout(resolve, 50))
       assert(
         document.querySelector('[aria-current=page]')?.textContent === 'Practice',

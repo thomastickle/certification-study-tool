@@ -49,7 +49,7 @@ export async function workspaceNavigationTest() {
   for (const destination of [
     { label: 'Practice', target: '.quiz-page' },
     { label: 'Due Review', target: '.quiz-page' },
-    { label: 'Importer', target: '.library-page' },
+    { label: 'Library', target: '.library-page' },
   ]) {
     button(destination.label, nav).click()
     await until(
