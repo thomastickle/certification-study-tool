@@ -156,7 +156,7 @@ export function WorkspaceSidebar({ destination, onNavigate }: Props) {
               title={layout.collapsed ? link.label : undefined}
               onClick={() => onNavigate(link.id)}
             >
-              <StudyIcon name={link.id === 'certifications' ? 'reports' : link.id} />
+              <StudyIcon name={link.id} />
               <span>{link.label}</span>
             </button>
           ))}
