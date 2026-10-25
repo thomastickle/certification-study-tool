@@ -16,7 +16,7 @@ const links: { id: Destination; label: string }[] = [
   { id: 'practice', label: 'Practice' },
   { id: 'review', label: 'Due Review' },
   { id: 'certifications', label: 'Certifications' },
-  { id: 'importer', label: 'Importer' },
+  { id: 'importer', label: 'Library' },
   { id: 'reports', label: 'Reports' },
 ]
 

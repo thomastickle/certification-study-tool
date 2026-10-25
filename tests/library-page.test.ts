@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import ts from 'typescript'
 import type { Source } from '../src/shared/contracts.ts'
 
-test('importer renders page content without duplicating the application header', async () => {
+test('library renders page content without duplicating the application header', async () => {
   // Node strips TS but not TSX; compile JSX using the project's existing compiler.
   const hooks = registerHooks({
     load(url, context, nextLoad) {

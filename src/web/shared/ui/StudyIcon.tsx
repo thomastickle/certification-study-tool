@@ -8,7 +8,7 @@ const paths = {
   quiz: 'M8 3h8l4 4v14H4V3h4m8 0v5h4M8 12h8M8 16h5',
   exam: 'M9 4H5v17h14V4h-4M9 2h6v5H9zM8 12l2 2 5-5M8 18h8',
   review: 'M3 11a9 9 0 1 1 2.7 7M3 4v7h7M12 7v5l3 2',
-  importer: 'M4 4h6l2 3h8v14H4zM12 11v6m-3-3 3 3 3-3',
+  importer: 'M3 4h5v16H3zM8 6h5v14H8zM14 5l4-1 4 15-4 1zM3 8h5M8 10h5m3-1 4-1',
   reports: 'M4 3v18h17M9 16v-4m5 4V8m5 8V5',
   cloud: 'M7 18a5 5 0 1 1 .6-10A6 6 0 0 1 19 10a4 4 0 0 1-1 8H7',
   arrow: 'M5 12h14m-5-5 5 5-5 5',

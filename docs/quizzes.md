@@ -11,7 +11,7 @@ The selection survives reloads and scopes Practice, Due Review, and Reports.
 Switching keeps the current destination and saves and pauses an unfinished session
 before changing scope; a failed save or pause retains the current certification.
 Question-bank choices are kept separately for each certification during the session.
-Imports refresh the picker automatically. The Importer remains the workspace-wide
+Imports refresh the picker automatically. The Library remains the workspace-wide
 library so new certifications can be added there.
 
 The start page opens Practice,

@@ -29,7 +29,7 @@ export async function themeBrowserTest() {
   const dark = getComputedStyle(canvas).backgroundColor
   assert(light !== dark, 'Theme control did not change the rendered canvas')
   assert(localStorage.getItem('study-theme') === 'dark', 'Dark choice was not saved')
-  for (const label of ['Home', 'Practice', 'Due Review', 'Certifications', 'Importer', 'Reports']) {
+  for (const label of ['Home', 'Practice', 'Due Review', 'Certifications', 'Library', 'Reports']) {
     document.querySelector<HTMLButtonElement>(`nav button[aria-label="${label}"]`)!.click()
     await new Promise((resolve) => setTimeout(resolve, 150))
     assert(getComputedStyle(canvas).backgroundColor === dark, `${label} lost the dark canvas`)

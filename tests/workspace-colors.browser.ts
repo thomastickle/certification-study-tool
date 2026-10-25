@@ -19,7 +19,7 @@ export async function workspaceColorsTest() {
     ['Practice', '.practice-setup'],
     ['Reports', '.report-panel, .report-empty'],
     ['Certifications', '.management-card'],
-    ['Importer', '.source-panel'],
+    ['Library', '.source-panel'],
   ]
   let canvas = ''
   for (const [label, selector] of destinations) {

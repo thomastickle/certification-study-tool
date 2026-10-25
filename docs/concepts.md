@@ -1,6 +1,6 @@
 # Reviewed concept groups
 
-Open **Importer → Reviewed concept groups** to review local label suggestions or
+Open **Library → Reviewed concept groups** to review local label suggestions or
 create a named group manually. Suggestions use complete, identical study area
 and topic labels within one provider/certification. The app explains those shared
 labels; it does not claim that they prove equivalent meaning. Missing labels do
