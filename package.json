@@ -17,7 +17,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint src tests vite.config.ts eslint.config.mjs --max-warnings 0",
     "check": "npm run format:check && npm run lint && npm test && npm run build",
-    "import:curated": "node src/server/importer/curated-batch-cli.ts"
+    "import:curated": "node src/server/importer/curated-batch-cli.ts",
+    "migrate:library": "node src/server/auth/migrate-library-cli.ts"
   },
   "dependencies": {
     "ajv": "^8.17.1",

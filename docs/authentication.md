@@ -117,10 +117,11 @@ host's loopback is intended for the native Node server.
 
 The previous `library.sqlite3` stays untouched. No account silently acquires it.
 New users get empty databases; reimporting banks starts their private libraries.
-An explicit, backed-up migration is needed to retain a previous library's quiz
-history. Do not copy databases while either server has them open or overwrite a
-new user's study data. Back up the account registry and all user databases as one
-unit while the application is stopped.
+Use the [explicit migration command](library-migration.md) to retain the previous
+library and its complete quiz history in one chosen account. It previews by
+default, preserves the original, creates backups, and refuses a used destination.
+Back up the account registry and all user databases as one unit while the
+application is stopped.
 
 Separate study files reuse the existing tested repository/service boundaries and
 avoid relying on a tenant filter in every query. This is a single-instance SQLite

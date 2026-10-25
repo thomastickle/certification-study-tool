@@ -10,6 +10,7 @@ import { apiController, checkLocalRequest } from '../http-controller.ts'
 import { LibraryRepository } from '../questions/library-repository.ts'
 import { QuizService } from '../quizzes/quiz-service.ts'
 import { ApplicationError } from '../errors.ts'
+import { lockDataDirectory } from './data-lock.ts'
 
 export type StudyApplicationOptions = OidcSettings & { dataDirectory: string; now?: () => number }
 
@@ -22,16 +23,26 @@ export class StudyApplication {
   private pending = new Map<string, { transaction: LoginTransaction; expiresAt: number }>()
   private sessionName: string
   private loginName: string
+  private releaseData: () => void
 
   constructor(options: StudyApplicationOptions) {
     this.login = new OidcLogin(options)
     this.options = { ...options, dataDirectory: resolve(options.dataDirectory) }
     this.now = options.now ?? Date.now
     const directory = this.options.dataDirectory
-    mkdirSync(join(directory, 'users'), { recursive: true, mode: 0o700 })
-    const path = join(directory, 'accounts.sqlite3')
-    this.accounts = new AccountRepository(path)
-    chmodSync(path, 0o600)
+    this.releaseData = lockDataDirectory(directory)
+    let accounts: AccountRepository | undefined
+    try {
+      mkdirSync(join(directory, 'users'), { recursive: true, mode: 0o700 })
+      const path = join(directory, 'accounts.sqlite3')
+      accounts = new AccountRepository(path)
+      chmodSync(path, 0o600)
+      this.accounts = accounts
+    } catch (error) {
+      accounts?.close()
+      this.releaseData()
+      throw error
+    }
     this.sessionName =
       options.origin.protocol === 'https:' ? '__Host-study_session' : 'study_session'
     this.loginName = options.origin.protocol === 'https:' ? '__Secure-study_login' : 'study_login'
@@ -176,7 +187,11 @@ export class StudyApplication {
 
   close(): void {
     this.pending.clear()
-    this.accounts.close()
+    try {
+      this.accounts.close()
+    } finally {
+      this.releaseData()
+    }
   }
 }
 
