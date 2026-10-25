@@ -64,7 +64,9 @@ class Browser {
     let current = new URL(url)
     for (let hop = 0; hop < 12; hop++) {
       const response = await this.request(current)
-      if (![301, 302, 303].includes(response.status)) return response
+      if (![301, 302, 303].includes(response.status)) {
+        return response
+      }
       current = new URL(response.headers.get('location')!, current)
     }
     throw new Error('Unexpected redirect loop in local login.')
@@ -77,30 +79,55 @@ function attribute(html: string, pattern: RegExp): string {
   return value.replaceAll('&amp;', '&')
 }
 
-/** Submit the pinned Keycloak HTML forms, exercising the app's real code/PKCE callback. */
-async function authenticate(
-  username: string,
-  password: string,
-  register: boolean,
-): Promise<{ browser: Browser; id: string }> {
-  const browser = new Browser()
+type Credentials = { username: string; password: string }
+
+type AuthenticatedUser = { browser: Browser; id: string }
+
+type AuthenticationScreen = { url: URL; html: string }
+
+type RolloutUsers = {
+  owner: AuthenticatedUser
+  other: AuthenticatedUser
+  ownerCredentials: Credentials
+}
+
+/** Start the application's real PKCE flow and fetch the provider's login screen. */
+async function openLogin(browser: Browser): Promise<AuthenticationScreen> {
   const start = await browser.request(new URL('/auth/login', app))
-  assert.equal(start.status, 302)
-  const loginUrl = new URL(start.headers.get('location')!)
-  const login = await browser.follow(loginUrl)
-  assert.equal(login.status, 200)
-  let html = await login.text()
-  let formUrl = loginUrl
-  if (register) {
-    const path = attribute(html, /href="([^"]*login-actions\/registration[^"]*)"/)
-    formUrl = new URL(path, issuer)
-    const registration = await browser.follow(formUrl)
-    assert.equal(registration.status, 200)
-    html = await registration.text()
+  assert.equal(start.status, 302, 'Application did not start login.')
+  const url = new URL(start.headers.get('location')!)
+  const login = await browser.follow(url)
+  assert.equal(login.status, 200, 'Keycloak login screen was not available.')
+  return { url, html: await login.text() }
+}
+
+/** Use the same browser and cookie jar if the scenario needs a new Keycloak account. */
+async function openRegistrationIfRequested(
+  browser: Browser,
+  screen: AuthenticationScreen,
+  register: boolean,
+): Promise<AuthenticationScreen> {
+  if (!register) {
+    return screen
   }
-  const form = html.match(/<form\b[^>]*id="kc-(?:register|form-login)[^"]*"[^>]*>/)?.[0]
+  const path = attribute(screen.html, /href="([^"]*login-actions\/registration[^"]*)"/)
+  const url = new URL(path, issuer)
+  const response = await browser.follow(url)
+  assert.equal(response.status, 200, 'Keycloak registration screen was not available.')
+  return { url, html: await response.text() }
+}
+
+/** Submit only the pinned provider's form; the application still performs the code/PKCE exchange. */
+async function submitCredentials(
+  browser: Browser,
+  screen: AuthenticationScreen,
+  credentials: Credentials,
+  register: boolean,
+): Promise<URL> {
+  const form = screen.html.match(/<form\b[^>]*id="kc-(?:register|form-login)[^"]*"[^>]*>/)?.[0]
   assert.ok(form, 'Expected the Keycloak account form.')
-  const action = new URL(attribute(form, /action="([^"]+)"/), formUrl)
+  const action = new URL(attribute(form, /action="([^"]+)"/), screen.url)
+  const { username, password } = credentials
   const fields = new URLSearchParams({ username, password })
   if (register) {
     fields.set('password-confirm', password)
@@ -117,14 +144,31 @@ async function authenticate(
     [302, 303].includes(submitted.status),
     'Keycloak did not accept the synthetic account form.',
   )
-  const landing = await browser.follow(new URL(submitted.headers.get('location')!, action))
-  assert.equal(landing.status, 200)
+  return new URL(submitted.headers.get('location')!, action)
+}
+
+/** Follow the real callback and verify the application's own authenticated session. */
+async function completeAppSession(browser: Browser, callback: URL): Promise<AuthenticatedUser> {
+  const landing = await browser.follow(callback)
+  assert.equal(landing.status, 200, 'Application callback did not return its public page.')
   const session = await (await browser.request(new URL('/api/session', app))).json()
   assert.ok(session.user?.id, 'The real OIDC callback did not establish a user session.')
   return { browser, id: session.user.id }
 }
 
-async function api<T>(client: { browser: Browser; id: string }, path: string): Promise<T> {
+/** Keep one browser through every phase of registration or returning-user authentication. */
+async function authenticate(
+  credentials: Credentials,
+  register: boolean,
+): Promise<AuthenticatedUser> {
+  const browser = new Browser()
+  const login = await openLogin(browser)
+  const screen = await openRegistrationIfRequested(browser, login, register)
+  const callback = await submitCredentials(browser, screen, credentials, register)
+  return completeAppSession(browser, callback)
+}
+
+async function api<T>(client: AuthenticatedUser, path: string): Promise<T> {
   const response = await client.browser.request(new URL('/api' + path, app), {
     headers: { 'X-Study-Account': client.id },
   })
@@ -168,44 +212,85 @@ const migration = (accountId: string, apply = false) =>
     ),
   )
 
-try {
+/** Seed only the explicitly named disposable volume, retaining its hash for all later checks. */
+function seedLegacyLibrary(): string {
   compose('stop', 'study')
   run('node', '--input-type=module', '-e', seed)
-  const before = sourceHash()
-  compose('up', '--no-build', '-d', '--wait', '--wait-timeout', '180')
+  return sourceHash()
+}
+
+/** Wait for live HTTP readiness after both ordinary starts and full service recreation. */
+async function startApplication({ recreate = false }: { recreate?: boolean } = {}): Promise<void> {
+  compose(
+    'up',
+    '--no-build',
+    ...(recreate ? ['--force-recreate'] : []),
+    '-d',
+    '--wait',
+    '--wait-timeout',
+    '180',
+  )
   await waitForApplication(app)
-  const username = 'rollout-owner-' + randomUUID().slice(0, 8)
-  const password = randomUUID() + '!aA1'
-  const owner = await authenticate(username, password, true)
+}
+
+/** Register separate identities and prove both begin with private empty libraries. */
+async function registerIsolatedUsers(): Promise<RolloutUsers> {
+  await startApplication()
+  const ownerCredentials = {
+    username: 'rollout-owner-' + randomUUID().slice(0, 8),
+    password: randomUUID() + '!aA1',
+  }
+  const owner = await authenticate(ownerCredentials, true)
   const other = await authenticate(
-    'rollout-other-' + randomUUID().slice(0, 8),
-    randomUUID() + '!aA1',
+    { username: 'rollout-other-' + randomUUID().slice(0, 8), password: randomUUID() + '!aA1' },
     true,
   )
   assert.equal((await api<{ total: number }>(owner, '/questions')).total, 0)
   assert.equal((await api<{ total: number }>(other, '/questions')).total, 0)
+  return { owner, other, ownerCredentials }
+}
+
+/** Refuse online migration, then preview and apply offline without changing the legacy source. */
+async function migrateToOwner(owner: AuthenticatedUser, originalHash: string): Promise<void> {
   assert.throws(() => migration(owner.id, true), /in use/)
   compose('stop', 'study')
   assert.equal(migration(owner.id).applied, false)
   const result = migration(owner.id, true)
   assert.equal(result.applied, true)
   assert.ok(result.backup)
-  assert.equal(sourceHash(), before)
-  compose('up', '--no-build', '-d', '--wait', '--wait-timeout', '180')
-  await waitForApplication(app)
+  assert.equal(sourceHash(), originalHash)
+  await startApplication()
+}
+
+/** Check ownership and complete history independently of the way the services were started. */
+async function verifyMigratedWorkspaces(
+  owner: AuthenticatedUser,
+  other: AuthenticatedUser,
+): Promise<void> {
   assert.equal((await api<{ total: number }>(owner, '/questions')).total, 20)
   assert.equal(
     (await api<unknown[]>(owner, '/quizzes?provider=Example&certification=DEMO-1')).length,
     1,
   )
   assert.equal((await api<{ total: number }>(other, '/questions')).total, 0)
-  compose('up', '--no-build', '--force-recreate', '-d', '--wait', '--wait-timeout', '180')
-  await waitForApplication(app)
-  const signedInAgain = await authenticate(username, password, false)
-  assert.equal(signedInAgain.id, owner.id)
-  assert.equal((await api<{ total: number }>(signedInAgain, '/questions')).total, 20)
-  assert.equal((await api<{ total: number }>(other, '/questions')).total, 0)
-  assert.equal(sourceHash(), before)
+}
+
+/** Recreate both containers and prove provider identity, study data, and local sessions survive. */
+async function verifyAfterRecreation(users: RolloutUsers, originalHash: string): Promise<void> {
+  await startApplication({ recreate: true })
+  const signedInAgain = await authenticate(users.ownerCredentials, false)
+  assert.equal(signedInAgain.id, users.owner.id)
+  await verifyMigratedWorkspaces(signedInAgain, users.other)
+  assert.equal(sourceHash(), originalHash)
+}
+
+// The caller/CI owns final cleanup of this explicitly named disposable Compose project.
+try {
+  const originalHash = seedLegacyLibrary()
+  const users = await registerIsolatedUsers()
+  await migrateToOwner(users.owner, originalHash)
+  await verifyMigratedWorkspaces(users.owner, users.other)
+  await verifyAfterRecreation(users, originalHash)
   console.log(
     JSON.stringify({
       login: 'passed',

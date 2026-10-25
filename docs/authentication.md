@@ -76,7 +76,9 @@ the loopback issuer is reachable by both the browser and the app container. See
 - The browser receives an opaque HttpOnly, SameSite=Lax session cookie. Only its
   SHA-256 hash is stored in `accounts.sqlite3`. OIDC tokens are discarded after
   validation and are never sent to React or stored in browser storage.
-- Application sessions persist across app restarts, expire after eight hours,
+- Session lookups are read-only and reject expired credentials immediately; expired
+  records are pruned explicitly when a new application session is created.
+  Application sessions persist across app restarts, expire after eight hours,
   and are revoked by same-origin POST logout. Logout also redirects to the
   provider's end-session endpoint when available; Keycloak may ask for logout
   confirmation because the app does not retain an ID token. Local revocation
