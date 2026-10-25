@@ -6,6 +6,7 @@ import practice from './icons/practice.svg?raw'
 import exam from './icons/exam.svg?raw'
 import review from './icons/review.svg?raw'
 import library from './icons/library.svg?raw'
+import certifications from './icons/certifications.svg?raw'
 import reports from './icons/reports.svg?raw'
 import cloud from './icons/cloud.svg?raw'
 import arrow from './icons/arrow.svg?raw'
@@ -22,6 +23,7 @@ const icons = {
   exam,
   review,
   importer: library,
+  certifications,
   reports,
   cloud,
   arrow,

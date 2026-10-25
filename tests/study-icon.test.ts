@@ -34,6 +34,7 @@ test('study icons remain inline, decorative, theme-colored and scalable', async 
       'exam',
       'review',
       'importer',
+      'certifications',
       'reports',
       'cloud',
       'arrow',
@@ -51,6 +52,25 @@ test('study icons remain inline, decorative, theme-colored and scalable', async 
       assert.match(html, /<path\s+d="[^"]+"/, name)
       assert.doesNotMatch(html, /<img|<script|\bon\w+=/, name)
     }
+    const { WorkspaceSidebar } = await import('../src/web/app/WorkspaceSidebar.tsx')
+    const sidebar = renderToStaticMarkup(
+      createElement(WorkspaceSidebar, { destination: 'certifications', onNavigate: () => {} }),
+    )
+    const certificationButton = sidebar.match(
+      /<button[^>]*aria-label="Certifications"[\s\S]*?<\/button>/,
+    )?.[0]
+    const reportsButton = sidebar.match(/<button[^>]*aria-label="Reports"[\s\S]*?<\/button>/)?.[0]
+    assert.ok(certificationButton, 'Certifications navigation must exist')
+    assert.ok(reportsButton, 'Reports navigation must exist')
+    const certificationSvg = certificationButton.match(/<svg[\s\S]*?<\/svg>/)?.[0]
+    const reportsSvg = reportsButton.match(/<svg[\s\S]*?<\/svg>/)?.[0]
+    assert.ok(certificationSvg, 'Certifications needs an icon')
+    assert.ok(reportsSvg, 'Reports needs an icon')
+    assert.notEqual(
+      certificationSvg,
+      reportsSvg,
+      'Certifications and Reports need distinct artwork',
+    )
   } finally {
     hooks.deregister()
   }
