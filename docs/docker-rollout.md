@@ -35,10 +35,9 @@ and writes the archive only into the Git-ignored `private/backups` directory:
 ```sh
 umask 077
 mkdir -p private/backups
-docker run --rm --user "$(id -u):$(id -g)" \
+docker run --rm \
   --mount type=volume,source=certification-study-tool_study-data,target=/data,readonly \
-  --mount type=bind,source="$PWD/private/backups",target=/backup \
-  node:24.17.0-bookworm-slim tar -czf /backup/study-before-oidc.tgz -C /data .
+  node:24.17.0-bookworm-slim tar -czf - -C /data . > private/backups/study-before-oidc.tgz
 ```
 
 Do not remove the data volume. Stop any review identity provider using port 8080
@@ -59,6 +58,8 @@ Open http://127.0.0.1:3000, choose **Sign in**, and **Register** your own accoun
 The image contains no pre-created accounts or passwords. The account initially
 has a private, empty workspace; do not import anything into it before migrating.
 The old `/data/library.sqlite3` is retained without being assigned automatically.
+While signed in, open http://127.0.0.1:3000/api/session and note `user.id`; match
+that ID to the maintenance command's account list below.
 
 Stop only the application, leaving Keycloak running so the maintenance container
 can use the same Compose configuration:
