@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
+import { renderWorkspace as renderToStaticMarkup } from './render-workspace.ts'
 import ts from 'typescript'
 import type { Source } from '../src/shared/contracts.ts'
 

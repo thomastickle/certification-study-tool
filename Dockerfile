@@ -11,7 +11,7 @@ FROM node:24.17.0-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     STUDY_HOST=0.0.0.0 \
     STUDY_PORT=3000 \
-    STUDY_DB_PATH=/data/library.sqlite3
+    STUDY_DATA_DIR=/data
 WORKDIR /app
 COPY --chown=node:node --from=build /app/package.json ./
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
@@ -23,5 +23,5 @@ RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD node -e "fetch('http://127.0.0.1:3000/api/questions').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+    CMD node -e "const origin = new URL(process.env.STUDY_ORIGIN || 'http://127.0.0.1:3000'); require('node:http').get({host:'127.0.0.1',port:3000,path:'/api/health',headers:{Host:origin.host}},r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 CMD ["node", "src/server/main.ts"]

@@ -7,7 +7,7 @@ import type {
   Source,
   StoredQuestion,
 } from '../../../shared/contracts.ts'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 import { ConceptPanel } from './ConceptPanel.tsx'
 
 type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?: number }
@@ -15,6 +15,7 @@ type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?
 const emptyPage: QuestionPage = { items: [], total: 0, page: 1, pageSize: 25 }
 
 export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promise<void> }) {
+  const api = useApi()
   const [sources, setSources] = useState<Source[]>([])
   const [questions, setQuestions] = useState<QuestionPage>(emptyPage)
   const [sourceId, setSourceId] = useState<number>()

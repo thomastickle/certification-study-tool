@@ -1,7 +1,8 @@
 # Initial architecture
 
-The application runs locally. A single loopback HTTP server serves the React
-frontend and the API. SQLite is a local file. Only the GUI is implemented.
+The application runs locally by default. One HTTP server serves React and the API.
+OIDC login resolves an application account before API requests open a private
+SQLite study database. Only the GUI and the curated-import CLI are implemented.
 
 ```mermaid
 flowchart LR
@@ -24,8 +25,10 @@ flowchart LR
   and duplicate comparisons. The service receives parsed content, not paths.
 - `src/server/questions/` owns library queries, deletion, and persistence. SQL
   and initial schema creation live in the repository; services own transactions.
+- `src/server/auth/` uses the standard OIDC client, maps issuer/subject identities
+  to internal accounts, manages browser sessions, and selects private study storage.
 - `src/server/http-controller.ts` translates HTTP requests into service calls.
-  It enforces local host/origin access and request limits.
+  It enforces the configured host/origin boundary and request limits.
 - `src/server/main.ts` owns startup, the database connection, and frontend serving.
 - `src/web/` owns React presentation, file selection, and confirmation dialogs.
 - `src/shared/` contains TypeScript request/result types used across boundaries.
@@ -66,8 +69,8 @@ completion. See [quiz rules](quizzes.md).
 - **Preview:** proposed import changes, with a token binding the input to the
   current database revision. A preview is not a saved import.
 
-No external hosting or runtime integrations are configured. No independent
-review has been performed for this bootstrap.
+Keycloak is the initial OIDC provider. See [authentication](authentication.md)
+for local development, session limits, existing-data handling, and future sharing.
 
 ## Reporting
 

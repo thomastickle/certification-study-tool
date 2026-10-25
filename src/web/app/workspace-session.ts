@@ -1,12 +1,16 @@
 import type { QuizView } from '../../shared/quiz-contracts.ts'
 import type { Certification } from '../features/certifications/certifications.ts'
-import { api } from '../shared/lib/api.ts'
+import type { WorkspaceApi } from '../shared/lib/api.ts'
 
 /**
  * Suspend server-owned work even when a reload left no practice page mounted.
  * @throws {Error} When recovery or a pause fails; callers must retain the current workspace.
  */
-export async function pauseCertificationAttempts(certification: Certification): Promise<void> {
+export async function pauseCertificationAttempts(
+  certification: Certification,
+  workspace: WorkspaceApi,
+): Promise<void> {
+  const { api } = workspace
   const scope = new URLSearchParams({
     provider: certification.provider,
     certification: certification.code,

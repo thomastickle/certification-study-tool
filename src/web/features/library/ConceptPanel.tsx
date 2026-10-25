@@ -5,7 +5,7 @@ import type {
   ConceptScope,
   ConceptSuggestion,
 } from '../../../shared/concept-contracts.ts'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 
 type ScopeLibrary = ConceptScope & { members: ConceptMember[] }
 
@@ -19,6 +19,7 @@ type Editor = ConceptScope & { id?: string; name: string; members: ConceptMember
 
 /** Keep suggestions inactive until the user reviews content and explicitly saves membership. */
 export function ConceptPanel({ refreshKey }: { refreshKey: number }) {
+  const api = useApi()
   const [data, setData] = useState<ReviewData>({ groups: [], suggestions: [], library: [] })
   const [editor, setEditor] = useState<Editor>()
   const [search, setSearch] = useState('')
