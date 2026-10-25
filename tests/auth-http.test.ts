@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { DatabaseSync } from 'node:sqlite'
 import { StudyApplication } from '../src/server/auth/study-application.ts'
 import { closeServer, oidcFixture } from './oidc-fixture.ts'
 import { bank } from './fixtures.ts'
@@ -226,6 +227,27 @@ test('an HTTPS public origin produces host-only Secure session cookies', async (
     const session = await fixture.login('alice')
     assert.match(session, /^__Host-study_session=/)
     assert.equal((await fixture.call('/api/sources', session)).status, 200)
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('creating a new login prunes expired sessions while ordinary lookups leave them stored', async () => {
+  const fixture = await applicationFixture()
+  try {
+    const expired = await fixture.login('alice')
+    fixture.advance(8 * 60 * 60_000)
+    assert.deepEqual(await (await fixture.call('/api/session', expired)).json(), { user: null })
+    const registry = new DatabaseSync(join(fixture.directory, 'accounts.sqlite3'), {
+      readOnly: true,
+    })
+    try {
+      assert.equal(registry.prepare('SELECT count(*) AS total FROM sessions').get()?.total, 1)
+      await fixture.login('alice')
+      assert.equal(registry.prepare('SELECT count(*) AS total FROM sessions').get()?.total, 1)
+    } finally {
+      registry.close()
+    }
   } finally {
     await fixture.close()
   }
