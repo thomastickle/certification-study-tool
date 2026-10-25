@@ -668,8 +668,8 @@
     justify-content: center;
     padding-inline: 0;
   }
-  .sidebar-collapsed .app-nav button > span,
-  .sidebar-collapsed .sidebar-toggle > span {
+  .sidebar-collapsed .app-nav button > span:not(.study-icon),
+  .sidebar-collapsed .sidebar-toggle > span:not(.study-icon) {
     display: none;
   }
   .sidebar-collapsed .sidebar-toggle .study-icon {
@@ -1012,7 +1012,7 @@
     justify-content: center;
     padding-inline: 0;
   }
-  .sidebar-collapsed .settings-trigger > span {
+  .sidebar-collapsed .settings-trigger > span:not(.study-icon) {
     display: none;
   }
 }
