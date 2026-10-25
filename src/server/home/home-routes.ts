@@ -17,7 +17,8 @@ export async function homeRoute(
   }
   if (request.method === 'PUT' && url.pathname === '/api/certifications/earned') {
     quizzes.expireDue()
-    return { status: 200, value: service.setEarned(await readJsonBody(request)) }
+    const input = await readJsonBody(request)
+    return { status: 200, value: service.setEarned(input) }
   }
   return undefined
 }

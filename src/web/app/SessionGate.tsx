@@ -55,7 +55,8 @@ export function SessionGate() {
       current.current?.client.invalidate()
       current.current = null
       setWorkspace(undefined)
-      setError(reason instanceof Error ? reason.message : 'Could not check your sign-in status.')
+      const message = 'Could not check your sign-in status.'
+      setError(reason instanceof Error ? reason.message : message)
     }
 
     /** Acquire the session and discard responses superseded by focus checks or expiration. */
@@ -94,6 +95,16 @@ export function SessionGate() {
       </WorkspaceApiContext>
     )
   }
+  let sessionAction = <p role="status">Checking sign-in…</p>
+  if (workspace === null) {
+    sessionAction = (
+      <a className="sign-in-link" href="/auth/login">
+        Sign in
+      </a>
+    )
+  } else if (error) {
+    sessionAction = <button onClick={() => window.location.reload()}>Retry</button>
+  }
   return (
     <main className="sign-in-page">
       <section className="sign-in-card">
@@ -106,15 +117,7 @@ export function SessionGate() {
             {error}
           </p>
         )}
-        {workspace === null ? (
-          <a className="sign-in-link" href="/auth/login">
-            Sign in
-          </a>
-        ) : error ? (
-          <button onClick={() => window.location.reload()}>Retry</button>
-        ) : (
-          <p role="status">Checking sign-in…</p>
-        )}
+        {sessionAction}
       </section>
     </main>
   )
