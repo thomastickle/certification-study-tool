@@ -10,15 +10,15 @@ export function reportRoute(
   request: IncomingMessage,
   url: URL,
 ): RouteResponse | undefined {
-  if (request.method !== 'GET' || url.pathname !== '/api/reports') return undefined
-  quizzes.expireDue()
-  return {
-    status: 200,
-    value: service.get({
-      mode: url.searchParams.get('mode'),
-      days: url.searchParams.get('days'),
-      provider: url.searchParams.get('provider') ?? undefined,
-      certification: url.searchParams.get('certification') ?? undefined,
-    }),
+  if (request.method !== 'GET' || url.pathname !== '/api/reports') {
+    return undefined
   }
+  quizzes.expireDue()
+  const filters = {
+    mode: url.searchParams.get('mode'),
+    days: url.searchParams.get('days'),
+    provider: url.searchParams.get('provider') ?? undefined,
+    certification: url.searchParams.get('certification') ?? undefined,
+  }
+  return { status: 200, value: service.get(filters) }
 }

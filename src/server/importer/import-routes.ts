@@ -10,15 +10,18 @@ export async function importRoute(
   request: IncomingMessage,
   url: URL,
 ): Promise<RouteResponse | undefined> {
-  if (request.method !== 'POST') return undefined
+  if (request.method !== 'POST') {
+    return undefined
+  }
   if (url.pathname === '/api/imports/preview') {
     const input = await readJsonBody(request)
     return { status: 200, value: service.preview(input.bank) }
   }
   if (url.pathname === '/api/imports/confirm') {
     const input = await readJsonBody(request)
-    if (typeof input.token !== 'string' || typeof input.reviewed !== 'boolean')
+    if (typeof input.token !== 'string' || typeof input.reviewed !== 'boolean') {
       throw new ApplicationError('Preview token and review confirmation are required.')
+    }
     return { status: 201, value: service.confirm(input.bank, input.token, input.reviewed) }
   }
   return undefined
