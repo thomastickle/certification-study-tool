@@ -48,45 +48,40 @@ consistently; `localhost` and `127.0.0.1` have different cookies and redirect UR
 The development realm also permits port 3100 for an isolated review instance.
 
 Existing `private/app/library.sqlite3` files are preserved but are not assigned
-to the first person who signs in. Existing-library migration remains a separate
-explicit operation; reimport banks to populate a new private library. The server
+to the first person who signs in. Use the explicit
+[migration command](docs/library-migration.md) to retain the old library and history
+in one chosen account; reimporting banks starts a new private library instead. The server
 no longer uses `STUDY_DB_PATH`; CLI commands still accept explicit database paths.
 Study databases retain schema version 2 and their existing application identifier.
 
 ## Run with Docker
 
-For a containerized app, configure an OIDC issuer reachable from the container
-over HTTPS, with the app's exact callback URL registered:
+From the normal checkout, use Docker Engine/Desktop with Compose:
 
 ```sh
-STUDY_OIDC_ISSUER=https://identity.example/realms/study docker compose up --build -d
+docker compose up --build -d --wait
 ```
 
-Open **http://127.0.0.1:3000**. The image builds the frontend and runs the
-production server as a non-root user. Only the host loopback interface is
-published. Port 3000 must be free. The separate `compose.keycloak.yaml` is for
-running Keycloak alongside a **native** Node development server: a container's
-`127.0.0.1` does not reach the host's Keycloak. For access from other computers,
-configure HTTPS for both browser-facing services; see the authentication guide.
+This starts the production application image and a local development Keycloak.
+Open **http://127.0.0.1:3000**, choose **Sign in**, and register an account. Both
+host ports (3000 and 8080) bind only to loopback; no certificate is needed locally.
+Keycloak must become ready before the app starts. The image contains no passwords
+or pre-created users. This development identity stack is not for public hosting.
 
-```sh
-docker compose logs -f study  # View logs
-docker compose down           # Stop; retain your library
-docker compose up -d          # Start again
-```
+**Upgrading an existing installation:** follow the [backup, account migration,
+and rollback steps](docs/docker-rollout.md) before replacing the old container.
+Keep the same Compose project and existing `study-data` volume. The old
+`library.sqlite3` is retained; it is copied only to the account you explicitly
+select with the migration command. New accounts start with empty private libraries.
 
-The `study-data` Docker volume stores SQLite data across container rebuilds and
-recreation. `docker compose down --volumes` **permanently deletes that library**.
-Back up the volume while the service is stopped before removing volumes or
-moving machines. This starts a new, empty library; your existing
-`private/app/library.sqlite3` is not copied. Import banks through the browser as
-usual. Private files, local databases, credentials, and Git history are excluded
-from the build context and image. No image publishing is required.
+Both `study-data` and `keycloak-data` survive container rebuilds and recreation.
+Stop services before filesystem backups and preserve both volumes together.
+`docker compose down --volumes` permanently removes that data. Use
+`docker compose down` to stop/remove containers while retaining it.
 
-For native runs, `STUDY_HOST` defaults to `127.0.0.1`; the image sets it to
-`0.0.0.0` so Docker can forward connections. Host/Origin protections remain
-active in either mode. The public `/api/health` endpoint reports application
-liveness without reading study data; it does not check provider availability.
+The public `/api/health` endpoint reports application liveness without accessing
+study data; it does not check provider availability. See
+[authentication](docs/authentication.md) for issuer configuration and session limits.
 
 ## Import and review
 

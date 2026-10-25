@@ -62,9 +62,9 @@ secret in browser code, realm exports, or committed configuration.
 Behind a TLS reverse proxy, set the public HTTPS origin and preserve its Host
 header. The app does not trust forwarded host/protocol headers. Restrict direct
 access to the backend. HTTPS origins produce Secure cookies; the Node listener
-can use HTTP behind that trusted proxy. Docker Compose requires an issuer URL
-reachable from inside the app container; the local development provider on the
-host's loopback is intended for the native Node server.
+can use HTTP behind that trusted proxy. The default Compose stack shares its local network namespace with Keycloak, so
+the loopback issuer is reachable by both the browser and the app container. See
+[Docker rollout](docker-rollout.md) for startup, migration, and rollback.
 
 ## Identity, sessions, and ownership
 

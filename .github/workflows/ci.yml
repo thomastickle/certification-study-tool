@@ -66,3 +66,22 @@ jobs:
       - name: Remove test container
         if: always()
         run: docker rm --force study-tool || true
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+          check-latest: true
+      - name: Verify local Compose login, migration, and persistent users
+        env:
+          STUDY_IMAGE: study-tool:ci
+          STUDY_WEB_PORT: '13000'
+          STUDY_KEYCLOAK_PORT: '18080'
+        run: |
+          docker compose -p study-auth-ci up --no-build -d --wait --wait-timeout 180
+          node tests/docker-rollout-smoke.ts --project study-auth-ci --app-url http://127.0.0.1:13000 --issuer http://127.0.0.1:18080/realms/study
+      - name: Remove disposable Compose stack
+        if: always()
+        env:
+          STUDY_IMAGE: study-tool:ci
+          STUDY_WEB_PORT: '13000'
+          STUDY_KEYCLOAK_PORT: '18080'
+        run: docker compose -p study-auth-ci down --volumes --remove-orphans
