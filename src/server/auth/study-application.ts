@@ -125,7 +125,7 @@ export class StudyApplication {
       }
       const key = randomBytes(32).toString('base64url')
       this.pending.set(key, { transaction: started.transaction, expiresAt: this.now() + 600_000 })
-      response.setHeader('Set-Cookie', this.makeCookie(this.loginName, key, 600, '/auth/callback'))
+      response.setHeader('Set-Cookie', this.makeLoginCookies(key, 600))
       redirect(response, started.url.href)
       return
     }
@@ -133,7 +133,7 @@ export class StudyApplication {
       const key = cookie(request, this.loginName)
       const pending = key ? this.pending.get(key) : undefined
       if (key) this.pending.delete(key)
-      response.setHeader('Set-Cookie', this.makeCookie(this.loginName, '', 0, '/auth/callback'))
+      response.setHeader('Set-Cookie', this.makeLoginCookies('', 0))
       if (!pending || pending.expiresAt <= this.now()) {
         throw new ApplicationError(
           'This sign-in request expired or belongs to another browser. Start sign-in again.',
@@ -152,7 +152,7 @@ export class StudyApplication {
       const token = randomBytes(32).toString('base64url')
       this.accounts.saveSession(token, account.id, this.now() + 8 * 60 * 60_000)
       response.setHeader('Set-Cookie', [
-        this.makeCookie(this.loginName, '', 0, '/auth/callback'),
+        ...this.makeLoginCookies('', 0),
         this.makeCookie(this.sessionName, token, 8 * 60 * 60, '/'),
       ])
       redirect(response, '/')
@@ -172,6 +172,14 @@ export class StudyApplication {
       return
     }
     throw new ApplicationError('Not found.', 404)
+  }
+
+  /** Share the login cookie across auth routes and remove the former callback-only cookie. */
+  private makeLoginCookies(value: string, seconds: number): string[] {
+    return [
+      this.makeCookie(this.loginName, value, seconds, '/auth'),
+      this.makeCookie(this.loginName, '', 0, '/auth/callback'),
+    ]
   }
 
   private makeCookie(name: string, value: string, seconds: number, path: string): string {

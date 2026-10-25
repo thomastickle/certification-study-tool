@@ -7,6 +7,7 @@ import { test } from 'node:test'
 import { StudyApplication } from '../src/server/auth/study-application.ts'
 import { closeServer, oidcFixture } from './oidc-fixture.ts'
 import { bank } from './fixtures.ts'
+import { BrowserCookies } from './support/browser-cookies.ts'
 
 /** Use the real HTTP, OIDC, account registry, and study repositories together. */
 async function applicationFixture(secure = false) {
@@ -282,6 +283,76 @@ test('callbacks are browser-bound, single use, expire, and never expose protocol
         assert.doesNotMatch(text, /attacker-state|synthetic-token|code_verifier|id_token/)
       }
     }
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('browser-scoped consecutive login starts replace old attempts without exhausting capacity', async () => {
+  const fixture = await applicationFixture()
+  const cookies = new BrowserCookies()
+  let first: Response | undefined
+  let firstCookie = ''
+  let latest: Response | undefined
+  try {
+    for (let restart = 0; restart <= 1000; restart++) {
+      latest = await fixture.call('/auth/login', cookies.header('/auth/login'))
+      assert.equal(latest.status, 302, `Login start ${restart + 1} must replace its predecessor.`)
+      cookies.accept(latest)
+      if (!first) {
+        first = latest
+        firstCookie = cookies.header('/auth/callback')
+      }
+    }
+    const oldAuthorization = await fetch(first!.headers.get('location')!, { redirect: 'manual' })
+    const oldCallback = new URL(oldAuthorization.headers.get('location')!)
+    const obsolete = await fixture.call(oldCallback.pathname + oldCallback.search, firstCookie)
+    assert.equal(obsolete.status, 400)
+    const authorized = await fetch(latest!.headers.get('location')!, { redirect: 'manual' })
+    const callback = new URL(authorized.headers.get('location')!)
+    const completed = await fixture.call(
+      callback.pathname + callback.search,
+      cookies.header('/auth/callback'),
+    )
+    assert.equal(completed.status, 302)
+    cookies.accept(completed)
+    assert.equal(cookies.header('/auth/login').includes('study_login='), false)
+    assert.equal(cookies.header('/auth/callback').includes('study_login='), false)
+    const session = await fixture.call('/api/session', cookies.header('/api/session'))
+    assert.ok((await session.json()).user)
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('login replaces legacy callback-only cookies and callbacks clear both cookie paths', async () => {
+  const fixture = await applicationFixture()
+  const cookies = new BrowserCookies()
+  const legacy = new Response(null, {
+    headers: {
+      'Set-Cookie': 'study_login=obsolete-login; Path=/auth/callback; HttpOnly; Max-Age=600',
+    },
+  })
+  try {
+    cookies.accept(legacy)
+    const started = await fixture.call('/auth/login', cookies.header('/auth/login'))
+    assert.equal(started.status, 302)
+    cookies.accept(started)
+    const authorized = await fetch(started.headers.get('location')!, { redirect: 'manual' })
+    const callback = new URL(authorized.headers.get('location')!)
+    const completed = await fixture.call(
+      callback.pathname + callback.search,
+      cookies.header('/auth/callback'),
+    )
+    assert.equal(completed.status, 302)
+    cookies.accept(completed)
+    assert.equal(cookies.header('/auth/callback').includes('study_login='), false)
+    assert.equal(cookies.header('/auth/login').includes('study_login='), false)
+    cookies.accept(legacy)
+    const rejected = await fixture.call('/auth/callback', cookies.header('/auth/callback'))
+    assert.equal(rejected.status, 400)
+    cookies.accept(rejected)
+    assert.equal(cookies.header('/auth/callback').includes('study_login='), false)
   } finally {
     await fixture.close()
   }
