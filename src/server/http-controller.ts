@@ -24,16 +24,15 @@ export function checkLocalRequest(
   const port = request.socket.localPort
   const hosts = publicOrigin ? [publicOrigin.host] : [`127.0.0.1:${port}`, `localhost:${port}`]
   const origins = publicOrigin ? [publicOrigin.origin] : hosts.map((host) => `http://${host}`)
-  if (!hosts.includes(request.headers.host ?? ''))
+  if (!hosts.includes(request.headers.host ?? '')) {
     throw new ApplicationError('Local access only.', 403)
+  }
   const origin = request.headers.origin
-  if (
-    (origin && !origins.includes(origin)) ||
-    (!allowCallback && request.headers['sec-fetch-site'] === 'cross-site') ||
-    (publicOrigin &&
-      !['GET', 'HEAD'].includes(request.method ?? '') &&
-      origin !== publicOrigin.origin)
-  ) {
+  const foreignOrigin = origin && !origins.includes(origin)
+  const crossSite = !allowCallback && request.headers['sec-fetch-site'] === 'cross-site'
+  const mutation = !['GET', 'HEAD'].includes(request.method ?? '')
+  const missingMutationOrigin = publicOrigin && mutation && origin !== publicOrigin.origin
+  if (foreignOrigin || crossSite || missingMutationOrigin) {
     throw new ApplicationError('Cross-site requests are not allowed.', 403)
   }
 }
@@ -66,15 +65,16 @@ export function apiController(
       }
       throw new ApplicationError('Not found.', 404)
     } catch (error) {
-      if (error instanceof ApplicationError)
+      if (error instanceof ApplicationError) {
         sendJson(response, error.status, {
           error: error.message.split('\n')[0],
           details: error.details,
         })
-      else
+      } else {
         sendJson(response, 500, {
           error: 'The local operation failed. No partial import was saved.',
         })
+      }
     }
   }
 }
