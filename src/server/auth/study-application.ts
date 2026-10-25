@@ -21,6 +21,7 @@ export class StudyApplication {
   private options: StudyApplicationOptions
   private now: () => number
   private pending = new Map<string, { transaction: LoginTransaction; expiresAt: number }>()
+  private startingLogins = 0
   private sessionName: string
   private loginName: string
   private releaseData: () => void
@@ -122,13 +123,16 @@ export class StudyApplication {
       }
       const previous = cookie(request, this.loginName)
       if (previous) this.pending.delete(previous)
-      if (this.pending.size >= 1000)
+      if (this.pending.size + this.startingLogins >= 1000)
         throw new ApplicationError('Too many pending logins. Please retry shortly.', 429)
       let started: Awaited<ReturnType<OidcLogin['begin']>>
+      this.startingLogins++
       try {
         started = await this.login.begin()
       } catch {
         throw new ApplicationError('The sign-in provider is unavailable. Please retry.', 503)
+      } finally {
+        this.startingLogins--
       }
       const key = randomBytes(32).toString('base64url')
       this.pending.set(key, { transaction: started.transaction, expiresAt: this.now() + 600_000 })
