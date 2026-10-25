@@ -17,7 +17,15 @@
   z-index: 10;
 }
 .study-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
+}
+.study-icon > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .brand-button {
   display: flex;

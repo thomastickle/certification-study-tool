@@ -95,3 +95,14 @@ weighted draw's priority tier and domain while preferring eligible reviewed
 variations. Due Review retains its actual due identities. Attempt snapshots save
 concept labels for historical reporting. See [reviewed concept groups](concepts.md)
 for the UI, migration, HTTP contracts and verification workflow.
+
+## Shared icons
+
+`src/web/shared/ui/icons/` contains the standalone SVG artwork used by `StudyIcon`.
+Vite's `?raw` imports bundle these files into JavaScript at build time; the component
+renders the bundled markup inline, without fetching icons at runtime. Only trusted,
+repository-owned SVG files belong in this registry; never pass imported question-bank
+content or other user-supplied markup to it. SVG strokes use `currentColor`, and the
+shared wrapper controls size so navigation and action icons follow their theme.
+The quiz and practice destinations share the same artwork. Existing artwork is
+preserved by this extraction; it is not attributed to an external icon set.
