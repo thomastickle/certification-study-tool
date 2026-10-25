@@ -358,7 +358,7 @@ p {
 }
 .question-card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 2px solid color-mix(in srgb, var(--ink) 60%, var(--surface));
   border-radius: 9px;
   padding: 17px 19px 8px;
 }

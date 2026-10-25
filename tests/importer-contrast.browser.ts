@@ -27,3 +27,34 @@ export function importerContrastTest() {
   }
   return 'Importer supporting text meets 7:1 contrast'
 }
+
+/** Require visible question boundaries on a populated importer in either appearance. */
+export function importerQuestionBoundaryTest() {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')!
+
+  function luminance(color: string) {
+    context.fillStyle = color
+    context.fillRect(0, 0, 1, 1)
+    const channels = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3)
+    const linear = channels.map((channel) => {
+      const value = channel / 255
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    })
+    return linear[0]! * 0.2126 + linear[1]! * 0.7152 + linear[2]! * 0.0722
+  }
+
+  const cards = [...document.querySelectorAll('.library-page .question-card')]
+  if (cards.length < 2)
+    throw new Error('Load at least two sample questions before checking boundaries')
+  for (const card of cards) {
+    const style = getComputedStyle(card)
+    const border = luminance(style.borderTopColor)
+    const surface = luminance(style.backgroundColor)
+    const ratio = (Math.max(border, surface) + 0.05) / (Math.min(border, surface) + 0.05)
+    if (ratio < 3) throw new Error(`Question border contrast ${ratio.toFixed(2)}:1; expected 3:1`)
+    if (parseFloat(style.borderTopWidth) < 2)
+      throw new Error('Question border should be at least 2px')
+  }
+  return `${cards.length} question cards have distinct borders`
+}
