@@ -22,43 +22,57 @@ export function SessionGate() {
     let active = true
     let generation = 0
 
-    /** Ignore obsolete responses after an expiration event or a newer session check. */
+    /** An expiration belongs only to the client that reported it, not a replacement workspace. */
+    function expireWorkspace(client: WorkspaceApi) {
+      if (!active || current.current?.client !== client) {
+        return
+      }
+      generation++
+      current.current.client.invalidate()
+      current.current = null
+      setWorkspace(null)
+    }
+
+    /** Apply missing, same-user, and replacement identities while preserving client lifetimes. */
+    function transitionSession(user: Session['user']) {
+      const previous = current.current
+      if (!user) {
+        previous?.client.invalidate()
+        current.current = null
+      } else if (previous?.user.id === user.id) {
+        current.current = { ...previous, user }
+      } else {
+        previous?.client.invalidate()
+        const client = createWorkspaceApi(user.id, () => expireWorkspace(client))
+        current.current = { user, client, generation: ++workspaceGeneration.current }
+      }
+      setWorkspace(current.current)
+      setError('')
+    }
+
+    /** A failed current check closes the old workspace and presents retry rather than sign-in. */
+    function failSessionCheck(reason: unknown) {
+      current.current?.client.invalidate()
+      current.current = null
+      setWorkspace(undefined)
+      setError(reason instanceof Error ? reason.message : 'Could not check your sign-in status.')
+    }
+
+    /** Acquire the session and discard responses superseded by focus checks or expiration. */
     async function refresh() {
       const request = ++generation
       try {
         const response = await fetch('/api/session', { cache: 'no-store' })
-        if (!response.ok) throw new Error('Could not check your sign-in status. Please retry.')
+        if (!response.ok) {
+          throw new Error('Could not check your sign-in status. Please retry.')
+        }
         const next: Session = await response.json()
         if (active && request === generation) {
-          if (!next.user) {
-            current.current?.client.invalidate()
-            current.current = null
-            setWorkspace(null)
-          } else if (current.current?.user.id === next.user.id) {
-            current.current = { ...current.current, user: next.user }
-            setWorkspace(current.current)
-          } else {
-            current.current?.client.invalidate()
-            const client = createWorkspaceApi(next.user.id, () => {
-              if (active && current.current?.client === client) {
-                generation++
-                current.current = null
-                setWorkspace(null)
-              }
-            })
-            current.current = { user: next.user, client, generation: ++workspaceGeneration.current }
-            setWorkspace(current.current)
-          }
-          setError('')
+          transitionSession(next.user)
         }
       } catch (reason) {
         if (active && request === generation) {
-          current.current?.client.invalidate()
-          current.current = null
-          setWorkspace(undefined)
-          setError(
-            reason instanceof Error ? reason.message : 'Could not check your sign-in status.',
-          )
+          failSessionCheck(reason)
         }
       }
     }

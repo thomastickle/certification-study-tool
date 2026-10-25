@@ -8,6 +8,12 @@ import { ImportService } from './importer/import-service.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import { LibraryService } from './questions/library-service.ts'
 import { HomeService } from './home/home-service.ts'
+import { homeRoute } from './home/home-routes.ts'
+import { reportRoute } from './reports/report-routes.ts'
+import { quizRoute } from './quizzes/quiz-routes.ts'
+import { importRoute } from './importer/import-routes.ts'
+import { libraryRoute } from './questions/library-routes.ts'
+import { readJsonBody, sendJson } from './http-messages.ts'
 
 /** Prevent other websites from driving a local library through this server. */
 export function checkLocalRequest(
@@ -32,53 +38,7 @@ export function checkLocalRequest(
   }
 }
 
-function send(response: ServerResponse, status: number, value: unknown): void {
-  response.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-  })
-  response.end(JSON.stringify(value))
-}
-
-async function body(
-  request: IncomingMessage,
-  allowEmpty = false,
-): Promise<Record<string, unknown>> {
-  if (
-    allowEmpty &&
-    !request.headers['transfer-encoding'] &&
-    Number(request.headers['content-length'] ?? 0) === 0
-  ) {
-    return {}
-  }
-  if (!request.headers['content-type']?.startsWith('application/json'))
-    throw new ApplicationError('Expected application/json.', 415)
-  let size = 0
-  const chunks: Buffer[] = []
-  for await (const chunk of request) {
-    const buffer = Buffer.from(chunk)
-    size += buffer.length
-    if (size > 10 * 1024 * 1024)
-      throw new ApplicationError('Files must be smaller than 10 MB.', 413)
-    chunks.push(buffer)
-  }
-  try {
-    const value: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error()
-    return value as Record<string, unknown>
-  } catch {
-    throw new ApplicationError('Invalid JSON request. Nothing was imported.')
-  }
-}
-
-function positiveInteger(text: string | null, fallback?: number): number {
-  if (text === null && fallback !== undefined) return fallback
-  if (!text || !/^[1-9]\d*$/.test(text) || !Number.isSafeInteger(Number(text)))
-    throw new ApplicationError('Expected a positive integer.')
-  return Number(text)
-}
-
+/** Compose domain routes behind the shared request gate and HTTP error boundary. */
 export function apiController(
   repository: LibraryRepository,
   options: { origin?: URL; workspaceId?: string } = {},
@@ -93,130 +53,28 @@ export function apiController(
     try {
       checkLocalRequest(request, options.origin)
       const url = new URL(request.url ?? '/', 'http://localhost')
-      const scope = {
-        provider: url.searchParams.get('provider') ?? undefined,
-        certification: url.searchParams.get('certification') ?? undefined,
-      }
-      const conceptResponse = await conceptRoute(concepts, request, url, body)
-      if (conceptResponse) {
-        return send(response, conceptResponse.status, conceptResponse.value)
-      }
-      if (request.method === 'GET' && url.pathname === '/api/home') {
-        quizzes.expireDue()
-        return send(response, 200, home.get())
-      }
-      if (request.method === 'PUT' && url.pathname === '/api/certifications/earned') {
-        quizzes.expireDue()
-        return send(response, 200, home.setEarned(await body(request)))
-      }
-      if (request.method === 'GET' && url.pathname === '/api/reports') {
-        quizzes.expireDue()
-        return send(
-          response,
-          200,
-          reports.get({
-            mode: url.searchParams.get('mode'),
-            days: url.searchParams.get('days'),
-            ...scope,
-          }),
-        )
-      }
-      if (request.method === 'GET' && url.pathname === '/api/quizzes/due') {
-        const ids = url.searchParams.get('sourceIds')
-        return send(
-          response,
-          200,
-          quizzes.due({
-            ...scope,
-            sourceFilter: url.searchParams.get('sourceFilter') ?? 'mixed',
-            questionType: url.searchParams.get('questionType') ?? 'mixed',
-            ...(ids === null ? {} : { sourceIds: ids.split(',').map(Number) }),
-          }),
-        )
-      }
-      if (url.pathname === '/api/quizzes') {
-        if (request.method === 'GET') return send(response, 200, quizzes.recent(scope))
-        if (request.method === 'POST')
-          return send(response, 201, quizzes.start(await body(request)))
-      }
-      if (request.method === 'GET' && url.pathname === '/api/quizzes/current') {
-        const mode = url.searchParams.get('mode') ?? 'quiz'
-        if (mode !== 'quiz' && mode !== 'exam' && mode !== 'review')
-          throw new ApplicationError('Choose a valid practice mode.')
-        return send(response, 200, quizzes.current(mode, scope))
-      }
-      if (request.method === 'GET' && url.pathname === '/api/quizzes/deleted') {
-        return send(response, 200, quizzes.deletedResults(scope))
-      }
-      const quizRoute = url.pathname.match(
-        /^\/api\/quizzes\/([a-f0-9-]{36})(?:\/(answers|submit|abandon|pause|resume|restore))?$/,
-      )
-      if (quizRoute) {
-        const id = quizRoute[1]!
-        if (request.method === 'DELETE' && !quizRoute[2]) {
-          const permanent = url.searchParams.get('permanent')
-          if (permanent !== null && permanent !== 'true' && permanent !== 'false') {
-            throw new ApplicationError('Choose a valid permanent deletion option.')
-          }
-          return send(response, 200, quizzes.deleteResult(id, permanent === 'true'))
-        }
-        if (request.method === 'POST' && quizRoute[2] === 'restore') {
-          return send(response, 200, quizzes.restoreResult(id))
-        }
-        if (request.method === 'GET' && !quizRoute[2]) return send(response, 200, quizzes.get(id))
-        if (request.method === 'PUT' && quizRoute[2] === 'answers')
-          return send(response, 200, quizzes.save(id, await body(request)))
-        if (request.method === 'POST' && quizRoute[2] === 'submit')
-          return send(response, 200, quizzes.submit(id, await body(request)))
-        if (request.method === 'POST' && quizRoute[2] === 'pause')
-          return send(response, 200, quizzes.pause(id, await body(request, true)))
-        if (request.method === 'POST' && quizRoute[2] === 'resume')
-          return send(response, 200, quizzes.resume(id))
-        if (request.method === 'POST' && quizRoute[2] === 'abandon')
-          return send(response, 200, quizzes.abandon(id))
-      }
-      if (request.method === 'GET' && url.pathname === '/api/sources')
-        return send(response, 200, repository.sources())
-      if (request.method === 'GET' && url.pathname === '/api/questions') {
-        const source = url.searchParams.get('sourceId')
-        return send(
-          response,
-          200,
-          repository.questions(
-            source === null ? undefined : positiveInteger(source),
-            url.searchParams.get('search') ?? '',
-            positiveInteger(url.searchParams.get('page'), 1),
-          ),
-        )
-      }
-      if (request.method === 'POST' && url.pathname === '/api/imports/preview') {
-        const input = await body(request)
-        return send(response, 200, importer.preview(input.bank))
-      }
-      if (request.method === 'POST' && url.pathname === '/api/imports/confirm') {
-        const input = await body(request)
-        if (typeof input.token !== 'string' || typeof input.reviewed !== 'boolean')
-          throw new ApplicationError('Preview token and review confirmation are required.')
-        return send(response, 201, importer.confirm(input.bank, input.token, input.reviewed))
-      }
-      const match = url.pathname.match(/^\/api\/(questions|sources)\/(\d+)$/)
-      if (request.method === 'DELETE' && match) {
-        const id = positiveInteger(match[2]!)
-        if (match[1] === 'questions') library.deleteQuestion(id)
-        else library.deleteSource(id)
-        response.writeHead(204, { 'Cache-Control': 'no-store' })
-        response.end()
+      const result =
+        (await conceptRoute(concepts, request, url, readJsonBody)) ??
+        (await homeRoute(home, quizzes, request, url)) ??
+        reportRoute(reports, quizzes, request, url) ??
+        (await quizRoute(quizzes, request, url)) ??
+        (await importRoute(importer, request, url)) ??
+        libraryRoute(repository, library, request, url)
+      if (result) {
+        sendJson(response, result.status, result.value)
         return
       }
       throw new ApplicationError('Not found.', 404)
     } catch (error) {
       if (error instanceof ApplicationError)
-        send(response, error.status, {
+        sendJson(response, error.status, {
           error: error.message.split('\n')[0],
           details: error.details,
         })
       else
-        send(response, 500, { error: 'The local operation failed. No partial import was saved.' })
+        sendJson(response, 500, {
+          error: 'The local operation failed. No partial import was saved.',
+        })
     }
   }
 }
