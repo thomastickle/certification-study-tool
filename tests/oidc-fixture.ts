@@ -13,29 +13,30 @@ export async function oidcFixture() {
 
   /** Publish the endpoints and capabilities consumed by standard OIDC discovery. */
   function respondToDiscovery(response: ServerResponse): void {
-    response.end(
-      JSON.stringify({
-        issuer,
-        authorization_endpoint: issuer + '/authorize',
-        token_endpoint: issuer + '/token',
-        jwks_uri: issuer + '/jwks',
-        end_session_endpoint: issuer + '/logout',
-        response_types_supported: ['code'],
-        subject_types_supported: ['public'],
-        id_token_signing_alg_values_supported: ['RS256'],
-        token_endpoint_auth_methods_supported: ['none'],
-        code_challenge_methods_supported: ['S256'],
-      }),
-    )
+    const metadata = {
+      issuer,
+      authorization_endpoint: issuer + '/authorize',
+      token_endpoint: issuer + '/token',
+      jwks_uri: issuer + '/jwks',
+      end_session_endpoint: issuer + '/logout',
+      response_types_supported: ['code'],
+      subject_types_supported: ['public'],
+      id_token_signing_alg_values_supported: ['RS256'],
+      token_endpoint_auth_methods_supported: ['none'],
+      code_challenge_methods_supported: ['S256'],
+    }
+    response.end(JSON.stringify(metadata))
   }
 
   /** Expose only the public key used to validate the synthetic issuer's signatures. */
   function respondToSigningKeys(response: ServerResponse): void {
-    response.end(
-      JSON.stringify({
-        keys: [{ ...publicKey.export({ format: 'jwk' }), kid: 'test', alg: 'RS256', use: 'sig' }],
-      }),
-    )
+    const signingKey = {
+      ...publicKey.export({ format: 'jwk' }),
+      kid: 'test',
+      alg: 'RS256',
+      use: 'sig',
+    }
+    response.end(JSON.stringify({ keys: [signingKey] }))
   }
 
   /** Bind a single-use authorization code to the browser's PKCE challenge and nonce. */
@@ -69,11 +70,8 @@ export async function oidcFixture() {
     const payload = [{ alg: 'RS256', kid: 'test' }, claims]
       .map((part) => Buffer.from(JSON.stringify(part)).toString('base64url'))
       .join('.')
-    const signature = sign(
-      'RSA-SHA256',
-      Buffer.from(payload),
-      tokenError === 'signature' ? otherKey : privateKey,
-    ).toString('base64url')
+    const signingKey = tokenError === 'signature' ? otherKey : privateKey
+    const signature = sign('RSA-SHA256', Buffer.from(payload), signingKey).toString('base64url')
     return payload + '.' + signature
   }
 
@@ -83,29 +81,27 @@ export async function oidcFixture() {
     response: ServerResponse,
   ): Promise<void> {
     const chunks: Buffer[] = []
-    for await (const chunk of request) chunks.push(Buffer.from(chunk))
+    for await (const chunk of request) {
+      chunks.push(Buffer.from(chunk))
+    }
     const params = new URLSearchParams(Buffer.concat(chunks).toString())
     const code = params.get('code')!
     const grant = codes.get(code)
     codes.delete(code)
-    if (
-      !grant ||
-      createHash('sha256')
-        .update(params.get('code_verifier') ?? '')
-        .digest('base64url') !== grant.challenge
-    ) {
+    const verifier = params.get('code_verifier') ?? ''
+    const challenge = createHash('sha256').update(verifier).digest('base64url')
+    if (!grant || challenge !== grant.challenge) {
       response.writeHead(400)
       response.end(JSON.stringify({ error: 'invalid_grant' }))
       return
     }
-    response.end(
-      JSON.stringify({
-        token_type: 'Bearer',
-        access_token: 'synthetic-token',
-        expires_in: 300,
-        id_token: createIdToken(grant),
-      }),
-    )
+    const tokens = {
+      token_type: 'Bearer',
+      access_token: 'synthetic-token',
+      expires_in: 300,
+      id_token: createIdToken(grant),
+    }
+    response.end(JSON.stringify(tokens))
   }
 
   /** Route each protocol phase while keeping keys, codes, and fault selection in the fixture. */
@@ -129,7 +125,9 @@ export async function oidcFixture() {
   const server = createServer(handleRequest)
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
-  if (!address || typeof address === 'string') throw new Error('Missing fixture port')
+  if (!address || typeof address === 'string') {
+    throw new Error('Missing fixture port')
+  }
   const issuer = `http://127.0.0.1:${address.port}/realms/test`
   return {
     issuer: new URL(issuer),
