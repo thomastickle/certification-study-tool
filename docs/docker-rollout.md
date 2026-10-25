@@ -14,6 +14,16 @@ host-network access, or broader HTTP exception is needed. Keycloak owns the port
 publications; its readiness check gates application startup. Recreate both
 services together when changing the Keycloak image or networking.
 
+If Keycloak is replaced independently and sign-in stops responding, recreate both
+services together so the app joins the current network namespace:
+
+```sh
+docker compose up -d --force-recreate --wait
+```
+
+This retains both named data volumes. Container recreation is covered by the
+rollout smoke test; it is not a backup-and-restore drill.
+
 ## Before the first upgrade
 
 Run from your normal checkout with the **same Compose project name** as the old

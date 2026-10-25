@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { waitForApplication } from './support/application-readiness.ts'
+import { BrowserCookies } from './support/browser-cookies.ts'
 
 const { values } = parseArgs({
   options: {
@@ -44,7 +45,7 @@ assert.equal(config.services.study.network_mode, 'service:keycloak')
 
 /** Cookie handling is test-only HTML automation; production OAuth remains in openid-client. */
 class Browser {
-  private cookies = new Map<string, { value: string; path: string }>()
+  private cookies = new BrowserCookies()
 
   async request(url: URL | string, options: RequestInit = {}): Promise<Response> {
     const target = new URL(url)
@@ -53,26 +54,9 @@ class Browser {
       'Unexpected redirect outside the test stack.',
     )
     const headers = new Headers(options.headers)
-    headers.set(
-      'Cookie',
-      [...this.cookies]
-        .filter(([, cookie]) => target.pathname.startsWith(cookie.path))
-        .map(([name, cookie]) => `${name}=${cookie.value}`)
-        .join('; '),
-    )
+    headers.set('Cookie', this.cookies.header(target.pathname))
     const response = await fetch(target, { ...options, headers, redirect: 'manual' })
-    for (const raw of response.headers.getSetCookie()) {
-      const [pair, ...attributes] = raw.split(';')
-      const split = pair!.indexOf('=')
-      const name = pair!.slice(0, split)
-      const value = pair!.slice(split + 1)
-      const path =
-        attributes
-          .find((part) => /^\s*path=/i.test(part))
-          ?.trim()
-          .slice(5) ?? '/'
-      this.cookies.set(name, { value, path })
-    }
+    this.cookies.accept(response)
     return response
   }
 
