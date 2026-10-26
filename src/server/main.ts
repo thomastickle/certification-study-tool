@@ -2,7 +2,6 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { mkdirSync, chmodSync, existsSync, statSync, createReadStream } from 'node:fs'
 import { resolve, dirname, extname, sep } from 'node:path'
-import { QuizService } from './quizzes/quiz-service.ts'
 import { apiController } from './http-controller.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import { ApplicationAuthentication } from './auth/application-authentication.ts'
@@ -11,6 +10,7 @@ import { applicationRequestHandler } from './request-handler.ts'
 import type { ApplicationHandlers } from './request-handler.ts'
 import type { SessionUser } from '../shared/auth-contracts.ts'
 import { PrivateLibraries } from './questions/private-libraries.ts'
+import { expireStudyWork } from './questions/study-housekeeping.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
@@ -49,19 +49,13 @@ try {
 chmodSync(databasePath, 0o600)
 try {
   privateLibraries.migrateFrom(repository)
-  expireStudyWork()
+  expireStudyWork(repository, privateLibraries)
 } catch (error) {
   repository.close()
   authentication.close()
   throw error
 }
-const expiryTimer = setInterval(() => {
-  try {
-    expireStudyWork()
-  } catch {
-    console.error('Could not score an expired quiz; it will be retried.')
-  }
-}, 1000)
+const expiryTimer = setInterval(() => expireStudyWork(repository, privateLibraries), 1000)
 expiryTimer.unref()
 const production = process.env.NODE_ENV === 'production'
 let webHandler: (
@@ -84,20 +78,6 @@ async function serveStudy(user: SessionUser, request: IncomingMessage, response:
     await api(request, response)
   } finally {
     privateLibrary.close()
-  }
-}
-
-/** Score overdue attempts and reconcile shared deletions in each owner’s file without exposing history. */
-function expireStudyWork(): void {
-  for (const accountId of privateLibraries.accounts()) {
-    const privateLibrary = privateLibraries.open(accountId)
-    try {
-      const study = repository.forAccount(accountId, privateLibrary)
-      study.synchronizeDeletions()
-      new QuizService(study).expireDue()
-    } finally {
-      privateLibrary.close()
-    }
   }
 }
 

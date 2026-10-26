@@ -35,6 +35,13 @@ owner marker. A copied foreign file, symlink or private file configured as the
 shared database is rejected. Each request owns and closes its private connection.
 Anonymous and stale-workspace requests cannot create or open user files.
 
+Routine expiry and shared-deletion reconciliation isolate failures per account.
+A damaged private file is never replaced or repaired automatically. Its canonical
+internal account ID is logged without database errors or study content. Other
+accounts remain available, and later housekeeping passes retry the failed account. Directory
+discovery failures are also logged and retried. Schema/data migration and physical
+cleanup still fail startup rather than serving a partially separated layout.
+
 History is private even when its questions came from shared banks. Private
 question snapshots never enter the shared database. Shared deletions append a
 public bank-provenance event atomically with deletion. Each private database
