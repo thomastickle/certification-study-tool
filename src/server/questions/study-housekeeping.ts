@@ -1,8 +1,9 @@
+import { setImmediate as yieldTurn } from 'node:timers/promises'
 import { QuizService } from '../quizzes/quiz-service.ts'
 import type { LibraryRepository } from './library-repository.ts'
 import type { PrivateLibraries } from './private-libraries.ts'
 
-/** Schedule maintenance without retaining private connections between ticks. */
+/** Schedule maintenance without retaining private connections between owner-sized slices. */
 export class StudyHousekeeping {
   private shared: LibraryRepository
   private libraries: PrivateLibraries
@@ -10,6 +11,10 @@ export class StudyHousekeeping {
   private now: () => number
   private nextReconciliation = -Infinity
   private deadlines = new Map<string, number>()
+  private attempted = new Set<string>()
+  private running: Promise<void> | undefined
+  private requested = false
+  private stopped = false
 
   constructor(
     shared: LibraryRepository,
@@ -23,50 +28,40 @@ export class StudyHousekeeping {
     this.now = now
   }
 
-  /** Reconstruct after downtime, then reconcile unattended changes every five seconds. */
-  tick(): void {
-    const due = new Set(
-      [...this.deadlines].filter(([, deadline]) => deadline <= this.now()).map(([id]) => id),
-    )
-    const elapsed = this.monotonicNow()
-    if (elapsed >= this.nextReconciliation) {
-      this.nextReconciliation = elapsed + 5000
-      try {
-        const accounts = this.libraries.accounts()
-        const persisted = new Set(accounts)
-        for (const id of this.deadlines.keys()) {
-          if (!persisted.has(id)) {
-            this.deadlines.delete(id)
-            due.delete(id)
-          }
-        }
-        for (const id of accounts) {
-          due.add(id)
-        }
-      } catch {
-        console.error('Could not discover private libraries for housekeeping; it will be retried.')
-      }
+  /** Coalesce overlapping ticks; startup awaits this same promise before accepting HTTP. */
+  tick(): Promise<void> {
+    if (this.stopped) {
+      return Promise.resolve()
     }
-    for (const accountId of due) {
-      try {
-        const personal = this.libraries.open(accountId)
-        try {
-          const study = this.shared.forAccount(accountId, personal)
-          study.synchronizeDeletions()
-          new QuizService(study, this.now).expireDue()
-          this.observe(accountId, personal)
-        } finally {
-          personal.close()
-        }
-      } catch {
-        // Log only the canonical internal ID, never errors, paths or private snapshots.
-        console.error(`Private study upkeep failed for ${accountId}; it will be retried.`)
-      }
+    this.requested = true
+    if (!this.running) {
+      this.running = this.run().finally(() => {
+        this.running = undefined
+      })
+    }
+    return this.running
+  }
+
+  /** Cancel unstarted owners and drain the current pass before closing the shared repository. */
+  async stop(): Promise<void> {
+    this.stopped = true
+    await this.running
+  }
+
+  /** Reads can expire existing work but cannot create an earlier deadline; observe attempted writes. */
+  observeRequest(method: string | undefined, accountId: string, personal: LibraryRepository): void {
+    if (method !== 'GET' && method !== 'HEAD') {
+      this.observe(accountId, personal)
     }
   }
 
   /** Refresh after foreground work without owning, sharing or retaining the request connection. */
   observe(accountId: string, personal: LibraryRepository): void {
+    if (this.stopped) {
+      return
+    }
+    // A mutation between slices can create earlier work even for an already visited owner.
+    this.attempted.delete(accountId)
     try {
       const deadline = personal.quizStore().nextHousekeepingAt()
       if (deadline === null) {
@@ -80,9 +75,75 @@ export class StudyHousekeeping {
       console.error(`Private study upkeep failed for ${accountId}; it will be retried.`)
     }
   }
-}
 
-/** Run a complete recovery pass; callers wanting recurring upkeep must retain the scheduler. */
-export function expireStudyWork(shared: LibraryRepository, libraries: PrivateLibraries): void {
-  new StudyHousekeeping(shared, libraries).tick()
+  /** Give due owners priority between every closed-connection reconciliation slice. */
+  private async run(): Promise<void> {
+    do {
+      this.requested = false
+      this.attempted.clear()
+      const sweep = this.discover()
+      while (!this.stopped) {
+        const accountId = this.nextDue() ?? sweep.values().next().value
+        if (accountId === undefined) {
+          break
+        }
+        sweep.delete(accountId)
+        this.maintain(accountId)
+        this.attempted.add(accountId)
+        // One owner's synchronous SQLite work is indivisible; never carry its connection over a yield.
+        await yieldTurn()
+      }
+    } while (this.requested && !this.stopped)
+  }
+
+  /** Select due work afresh so deadlines observed or reached during a sweep can take priority. */
+  private nextDue(): string | undefined {
+    const now = this.now()
+    for (const [id, deadline] of this.deadlines) {
+      if (deadline <= now && !this.attempted.has(id)) {
+        return id
+      }
+    }
+    return undefined
+  }
+
+  /** Reconstruct after downtime and retry unattended changes on a monotonic five-second cadence. */
+  private discover(): Set<string> {
+    const elapsed = this.monotonicNow()
+    if (elapsed < this.nextReconciliation) {
+      return new Set()
+    }
+    this.nextReconciliation = elapsed + 5000
+    try {
+      const persisted = new Set(this.libraries.accounts())
+      for (const id of this.deadlines.keys()) {
+        if (!persisted.has(id)) {
+          this.deadlines.delete(id)
+        }
+      }
+      return persisted
+    } catch {
+      console.error('Could not discover private libraries for housekeeping; it will be retried.')
+      return new Set()
+    }
+  }
+
+  /** Isolate failures, close each returned connection, and retry failed work on a later tick. */
+  private maintain(accountId: string): void {
+    try {
+      const personal = this.libraries.open(accountId)
+      try {
+        const study = this.shared.forAccount(accountId, personal)
+        study.synchronizeDeletions()
+        new QuizService(study, this.now).expireDue()
+        this.observe(accountId, personal)
+      } finally {
+        personal.close()
+      }
+    } catch {
+      this.deadlines.set(accountId, -Infinity)
+      // Log only the canonical internal ID, never errors, paths or private snapshots.
+      console.error(`Private study upkeep failed for ${accountId}; it will be retried.`)
+    }
+  }
 }

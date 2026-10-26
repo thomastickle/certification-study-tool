@@ -4,16 +4,17 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { setImmediate as yieldTurn } from 'node:timers/promises'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import { StudyLibrary } from '../src/server/questions/study-library.ts'
-import { expireStudyWork, StudyHousekeeping } from '../src/server/questions/study-housekeeping.ts'
+import { StudyHousekeeping } from '../src/server/questions/study-housekeeping.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { populate } from './quiz-fixtures.ts'
 import { LibraryService } from '../src/server/questions/library-service.ts'
 
 for (const failure of ['reconciliation', 'expiry', 'close'] as const) {
-  test(`housekeeping closes connections, continues and retries after a ${failure} failure`, (t) => {
+  test(`housekeeping closes connections, continues and retries after a ${failure} failure`, async (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'study-upkeep-'))
     const shared = new LibraryRepository(join(directory, 'library.sqlite3'))
     const libraries = new PrivateLibraries(join(directory, 'users'))
@@ -57,18 +58,26 @@ for (const failure of ['reconciliation', 'expiry', 'close'] as const) {
     } else if (failure === 'expiry') {
       t.mock.method(QuizService.prototype, 'expireDue', failOnce)
     }
+    let monotonic = 0
+    const scheduler = new StudyHousekeeping(shared, libraries, () => monotonic)
     try {
-      expireStudyWork(shared, libraries)
+      await scheduler.tick()
       assert.deepEqual(opened, ordered)
       assert.deepEqual(closed, ordered)
       assert.equal(logged.length, 1)
       assert.deepEqual(logged[0], [
         `Private study upkeep failed for ${ordered[0]}; it will be retried.`,
       ])
-      expireStudyWork(shared, libraries)
-      assert.deepEqual(opened, [...ordered, ...ordered])
-      assert.deepEqual(closed, [...ordered, ...ordered])
+      await scheduler.tick()
+      assert.deepEqual(opened, [...ordered, ordered[0]])
+      assert.deepEqual(closed, [...ordered, ordered[0]])
       assert.equal(logged.length, 1, 'A successful retry does not repeat the error')
+      // Exercise the retained runtime, then preserve the original full-pass recovery assertions.
+      monotonic = 5000
+      await scheduler.tick()
+      assert.deepEqual(opened, [...ordered, ordered[0], ...ordered])
+      assert.deepEqual(closed, [...ordered, ordered[0], ...ordered])
+      assert.equal(logged.length, 1)
     } finally {
       shared.close()
       rmSync(directory, { recursive: true, force: true })
@@ -76,7 +85,7 @@ for (const failure of ['reconciliation', 'expiry', 'close'] as const) {
   })
 }
 
-test('routine directory discovery failure is sanitized and does not abort startup', (t) => {
+test('routine directory discovery failure is sanitized and does not abort startup', async (t) => {
   const shared = new LibraryRepository(':memory:')
   const libraries = new PrivateLibraries('/unused-synthetic-directory')
   const logged: unknown[][] = []
@@ -85,7 +94,7 @@ test('routine directory discovery failure is sanitized and does not abort startu
     throw new Error('Sensitive private directory')
   })
   try {
-    assert.doesNotThrow(() => expireStudyWork(shared, libraries))
+    await new StudyHousekeeping(shared, libraries).tick()
     assert.deepEqual(logged, [
       ['Could not discover private libraries for housekeeping; it will be retried.'],
     ])
@@ -94,7 +103,7 @@ test('routine directory discovery failure is sanitized and does not abort startu
   }
 })
 
-test('scheduler skips idle opens between reconciliation passes and scores observed deadlines', (t) => {
+test('scheduler skips idle opens between reconciliation passes and scores observed deadlines', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-scheduled-'))
   const shared = new LibraryRepository(':memory:')
   const libraries = new PrivateLibraries(directory)
@@ -110,10 +119,10 @@ test('scheduler skips idle opens between reconciliation passes and scores observ
   )
   const open = t.mock.method(libraries, 'open')
   try {
-    housekeeping.tick()
+    await housekeeping.tick()
     monotonic = 1000
     time += 1000
-    housekeeping.tick()
+    await housekeeping.tick()
     assert.equal(open.mock.callCount(), 1, 'Idle ticks must not open or verify private files')
     populate(personal)
     const study = shared.forAccount(id, personal)
@@ -125,7 +134,7 @@ test('scheduler skips idle opens between reconciliation passes and scores observ
     housekeeping.observe(id, personal)
     monotonic = 2000
     time += 1000
-    housekeeping.tick()
+    await housekeeping.tick()
     assert.equal(personal.quizStore().find(active.id)!.status, 'completed')
     assert.equal(open.mock.callCount(), 2, 'A due owner is opened without rescanning idle owners')
     const paused = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' })
@@ -133,11 +142,11 @@ test('scheduler skips idle opens between reconciliation passes and scores observ
     housekeeping.observe(id, personal)
     monotonic = 3000
     time += 30 * 60_000
-    housekeeping.tick()
+    await housekeeping.tick()
     assert.equal(personal.quizStore().find(paused.id)!.status, 'paused')
     assert.equal(open.mock.callCount(), 2)
     monotonic = 5000
-    housekeeping.tick()
+    await housekeeping.tick()
     assert.equal(open.mock.callCount(), 3, 'Reconciliation uses monotonic elapsed time')
   } finally {
     personal.close()
@@ -146,7 +155,7 @@ test('scheduler skips idle opens between reconciliation passes and scores observ
   }
 })
 
-test('scheduler reconstructs expiry, retention and shared deletions after downtime', () => {
+test('scheduler reconstructs expiry, retention and shared deletions after downtime', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-recovery-'))
   const shared = new LibraryRepository(':memory:')
   const libraries = new PrivateLibraries(directory)
@@ -178,10 +187,10 @@ test('scheduler reconstructs expiry, retention and shared deletions after downti
       () => monotonic,
       () => time,
     )
-    scheduler.tick()
+    await scheduler.tick()
     time += 2000
     monotonic += 2000
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(
       personal.quizStore().find(retained.id),
       undefined,
@@ -195,7 +204,7 @@ test('scheduler reconstructs expiry, retention and shared deletions after downti
       () => monotonic,
       () => time,
     )
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(personal.quizStore().find(pending.id)!.status, 'completed')
     assert.equal(personal.quizStore().find(paused.id)!.status, 'paused')
     assert.deepEqual(personal.quizStore().find(pending.id)!.deletedBankNames, ['quiz-synthetic'])
@@ -207,7 +216,7 @@ test('scheduler reconstructs expiry, retention and shared deletions after downti
       const overdue = { ...structuredClone(paused), id: randomUUID(), status: 'active' as const }
       newcomer.quizStore().save(overdue)
       monotonic += 5000
-      scheduler.tick()
+      await scheduler.tick()
       assert.equal(newcomer.quizStore().find(overdue.id)!.status, 'completed')
       assert.equal(newcomer.sharedDeletionCursor(), 1)
     } finally {
@@ -220,7 +229,7 @@ test('scheduler reconstructs expiry, retention and shared deletions after downti
   }
 })
 
-test('failed discovery does not block a known due owner and retries on the next reconciliation', (t) => {
+test('failed discovery does not block a known due owner and retries on the next reconciliation', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-discovery-retry-'))
   const shared = new LibraryRepository(':memory:')
   const libraries = new PrivateLibraries(directory)
@@ -240,21 +249,21 @@ test('failed discovery does not block a known due owner and retries on the next 
     const study = shared.forAccount(id, personal)
     const quizzes = new QuizService(study, () => time)
     const quiz = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' })
-    scheduler.tick()
+    await scheduler.tick()
     const discover = t.mock.method(libraries, 'accounts', () => {
       throw new Error('Sensitive directory')
     })
     time += 30 * 60_000
     monotonic += 5000
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(personal.quizStore().find(quiz.id)!.status, 'completed')
     assert.equal(discover.mock.callCount(), 1)
     monotonic += 1000
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(discover.mock.callCount(), 1)
     discover.mock.restore()
     monotonic += 4000
-    assert.doesNotThrow(() => scheduler.tick())
+    await scheduler.tick()
   } finally {
     personal.close()
     shared.close()
@@ -262,7 +271,7 @@ test('failed discovery does not block a known due owner and retries on the next 
   }
 })
 
-test('foreground resume, deletion and restore refresh or cancel background deadlines', (t) => {
+test('foreground resume, deletion and restore refresh or cancel background deadlines', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-foreground-deadlines-'))
   const shared = new LibraryRepository(':memory:')
   const libraries = new PrivateLibraries(directory)
@@ -285,14 +294,14 @@ test('foreground resume, deletion and restore refresh or cancel background deadl
     stored.deadline = time + 1000
     personal.quizStore().save(stored)
     quizzes.pause(quiz.id)
-    scheduler.tick()
+    await scheduler.tick()
     time += 1000
     monotonic += 1000
     quizzes.resume(quiz.id)
     scheduler.observe(id, personal)
     time += 1000
     monotonic += 1000
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(personal.quizStore().find(quiz.id)!.status, 'completed')
     assert.equal(opened.mock.callCount(), 2)
     quizzes.deleteResult(quiz.id)
@@ -301,17 +310,227 @@ test('foreground resume, deletion and restore refresh or cancel background deadl
     scheduler.observe(id, personal)
     time += 48 * 60 * 60_000
     monotonic += 1000
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(personal.quizStore().find(quiz.id)!.status, 'completed')
     assert.equal(opened.mock.callCount(), 2, 'Restoring cancels the retained-deletion deadline')
     quizzes.deleteResult(quiz.id)
     scheduler.observe(id, personal)
     time += 48 * 60 * 60_000
     monotonic += 1000
-    scheduler.tick()
+    await scheduler.tick()
     assert.equal(personal.quizStore().find(quiz.id), undefined)
     assert.equal(opened.mock.callCount(), 3, 'Foreground deletion schedules its purge')
   } finally {
+    personal.close()
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('owner batches yield closed connections, prioritize new deadlines and coalesce ticks', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'study-batches-'))
+  const shared = new LibraryRepository(':memory:')
+  const libraries = new PrivateLibraries(directory)
+  const ids = Array.from({ length: 6 }, () => randomUUID())
+  for (const id of ids) {
+    libraries.open(id).close()
+  }
+  t.mock.method(libraries, 'accounts', () => ids)
+  let time = 1_000_000
+  const scheduler = new StudyHousekeeping(
+    shared,
+    libraries,
+    () => 0,
+    () => time,
+  )
+  const opened: string[] = []
+  let connections = 0
+  const open = libraries.open.bind(libraries)
+  t.mock.method(libraries, 'open', (id: string) => {
+    opened.push(id)
+    const personal = open(id)
+    connections++
+    const close = personal.close.bind(personal)
+    t.mock.method(personal, 'close', () => {
+      close()
+      connections--
+    })
+    return personal
+  })
+  try {
+    const pass = scheduler.tick()
+    assert.ok(opened.length < ids.length, 'A full sweep must not occupy one event-loop turn')
+    assert.equal(connections, 0, 'Close before yielding to foreground work')
+    const urgentId = ids.at(-1)!
+    const personal = open(urgentId)
+    let attemptId: string
+    try {
+      populate(personal)
+      const quiz = new QuizService(shared.forAccount(urgentId, personal), () => time)
+      attemptId = quiz.start({ sourceFilter: 'mixed', questionType: 'mixed' }).id
+      scheduler.observe(urgentId, personal)
+    } finally {
+      personal.close()
+    }
+    time += 30 * 60_000
+    assert.equal(scheduler.tick(), pass, 'Overlapping ticks share one drain promise')
+    assert.equal(scheduler.tick(), pass, 'Repeated ticks coalesce instead of queueing sweeps')
+    await yieldTurn()
+    assert.equal(opened[1], urgentId, 'A newly due owner jumps ahead of the idle sweep')
+    assert.equal(connections, 0)
+    await pass
+    assert.equal(opened.length, ids.length, 'Coalescing does not repeat the discovery sweep')
+    assert.equal(new Set(opened).size, ids.length)
+    const check = open(urgentId)
+    try {
+      assert.equal(check.quizStore().find(attemptId)!.status, 'completed')
+    } finally {
+      check.close()
+    }
+  } finally {
+    await scheduler.stop()
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('stop cancels a yielded sweep and drains before the root repository closes', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'study-stop-'))
+  const shared = new LibraryRepository(':memory:')
+  const libraries = new PrivateLibraries(directory)
+  for (let index = 0; index < 4; index++) {
+    libraries.open(randomUUID()).close()
+  }
+  const opened = t.mock.method(libraries, 'open')
+  const scheduler = new StudyHousekeeping(shared, libraries)
+  try {
+    const pass = scheduler.tick()
+    await scheduler.stop()
+    await pass
+    assert.equal(opened.mock.callCount(), 1, 'Cancellation must skip the remaining owners')
+    shared.close()
+    await scheduler.tick()
+    await yieldTurn()
+    assert.equal(opened.mock.callCount(), 1, 'Stopped ticks never access the closed root')
+  } finally {
+    await scheduler.stop()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('simultaneously due owners also yield and accept a newer deadline for a visited owner', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'study-due-batches-'))
+  const shared = new LibraryRepository(':memory:')
+  const libraries = new PrivateLibraries(directory)
+  const ids = Array.from({ length: 4 }, () => randomUUID())
+  let time = 1_000_000
+  const scheduler = new StudyHousekeeping(
+    shared,
+    libraries,
+    () => 0,
+    () => time,
+  )
+  const attempts = new Map<string, string>()
+  try {
+    for (const id of ids) {
+      const personal = libraries.open(id)
+      try {
+        populate(personal)
+        const quizzes = new QuizService(shared.forAccount(id, personal), () => time)
+        attempts.set(id, quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' }).id)
+      } finally {
+        personal.close()
+      }
+    }
+    await scheduler.tick()
+    const opened = t.mock.method(libraries, 'open')
+    time += 30 * 60_000
+    const pass = scheduler.tick()
+    assert.equal(opened.mock.callCount(), 1, 'Due cohorts must yield just like discovery sweeps')
+    const firstId = opened.mock.calls[0]!.arguments[0]
+    const personal = new PrivateLibraries(directory).open(firstId)
+    let newer: string
+    try {
+      const quizzes = new QuizService(shared.forAccount(firstId, personal), () => time)
+      newer = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' }).id
+      scheduler.observe(firstId, personal)
+    } finally {
+      personal.close()
+    }
+    time += 30 * 60_000
+    await pass
+    assert.equal(opened.mock.callCount(), ids.length + 1)
+    for (const id of ids) {
+      const check = libraries.open(id)
+      try {
+        assert.equal(check.quizStore().find(attempts.get(id)!)!.status, 'completed')
+        if (id === firstId) {
+          assert.equal(check.quizStore().find(newer)!.status, 'completed')
+        }
+      } finally {
+        check.close()
+      }
+    }
+  } finally {
+    await scheduler.stop()
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('request observation skips read metadata but refreshes attempted mutations and retries failed reads', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'study-request-observation-'))
+  const shared = new LibraryRepository(':memory:')
+  const libraries = new PrivateLibraries(directory)
+  const id = randomUUID()
+  const personal = libraries.open(id)
+  let time = 1_000_000
+  const scheduler = new StudyHousekeeping(
+    shared,
+    libraries,
+    () => 0,
+    () => time,
+  )
+  t.mock.method(console, 'error', () => {})
+  try {
+    await scheduler.tick()
+    populate(personal)
+    const quizzes = new QuizService(shared.forAccount(id, personal), () => time)
+    const attempt = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' })
+    const store = personal.quizStore()
+    t.mock.method(personal, 'quizStore', () => store)
+    const metadata = t.mock.method(store, 'nextHousekeepingAt')
+    for (const method of ['GET', 'HEAD']) {
+      scheduler.observeRequest(method, id, personal)
+    }
+    assert.equal(metadata.mock.callCount(), 0, 'Bank browsing must not scan deadline JSON')
+    scheduler.observeRequest('POST', id, personal)
+    assert.equal(metadata.mock.callCount(), 1)
+    const opened = t.mock.method(libraries, 'open')
+    quizzes.pause(attempt.id)
+    scheduler.observeRequest('POST', id, personal)
+    time += 30 * 60_000
+    await scheduler.tick()
+    assert.equal(opened.mock.callCount(), 0, 'Pause cancels the observed deadline')
+    quizzes.resume(attempt.id)
+    metadata.mock.mockImplementation(() => {
+      throw new Error('Synthetic private metadata')
+    })
+    assert.doesNotThrow(() => scheduler.observeRequest('POST', id, personal))
+    time += 30 * 60_000
+    await scheduler.tick()
+    assert.equal(personal.quizStore().find(attempt.id)!.status, 'completed')
+    assert.equal(opened.mock.callCount(), 1, 'Failed mutation metadata is retried on the next tick')
+    metadata.mock.restore()
+    const abandoned = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' })
+    scheduler.observeRequest('POST', id, personal)
+    quizzes.abandon(abandoned.id)
+    scheduler.observeRequest('POST', id, personal)
+    time += 30 * 60_000
+    await scheduler.tick()
+    assert.equal(opened.mock.callCount(), 1, 'Abandon cancels background work')
+  } finally {
+    await scheduler.stop()
     personal.close()
     shared.close()
     rmSync(directory, { recursive: true, force: true })

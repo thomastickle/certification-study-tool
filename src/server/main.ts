@@ -50,7 +50,7 @@ chmodSync(databasePath, 0o600)
 const housekeeping = new StudyHousekeeping(repository, privateLibraries)
 try {
   privateLibraries.migrateFrom(repository)
-  housekeeping.tick()
+  await housekeeping.tick()
 } catch (error) {
   repository.close()
   authentication.close()
@@ -78,7 +78,7 @@ async function serveStudy(user: SessionUser, request: IncomingMessage, response:
     const api = apiController(repository, user, origin, previews, privateLibrary)
     await api(request, response)
   } finally {
-    housekeeping.observe(user.id, privateLibrary)
+    housekeeping.observeRequest(request.method, user.id, privateLibrary)
     privateLibrary.close()
   }
 }
@@ -134,6 +134,7 @@ server.listen(port, host, () => console.log(`Certification Study Tool: ${origin.
 
 async function shutdown() {
   clearInterval(expiryTimer)
+  await housekeeping.stop()
   // Vite owns upgraded HMR sockets; close those before awaiting HTTP shutdown.
   await closeWeb()
   server.close(() => {

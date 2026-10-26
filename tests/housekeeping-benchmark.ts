@@ -74,10 +74,14 @@ for (const population of [10, 100]) {
     let connections = 0
     let peakConnections = 0
     let discoveries = 0
+    let ownerBlockingMs = 0
+    let discoveryBlockingMs = 0
+    let maxOwnerBlockingMs = 0
     const open = libraries.open.bind(libraries)
     const accounts = libraries.accounts.bind(libraries)
     libraries.open = (id) => {
       opens++
+      const started = performance.now()
       const personal = open(id)
       connections++
       peakConnections = Math.max(peakConnections, connections)
@@ -87,33 +91,75 @@ for (const population of [10, 100]) {
           close()
         } finally {
           connections--
+          const elapsed = performance.now() - started
+          ownerBlockingMs += elapsed
+          maxOwnerBlockingMs = Math.max(maxOwnerBlockingMs, elapsed)
         }
       }
       return personal
     }
     libraries.accounts = () => {
       discoveries++
-      return accounts()
+      const started = performance.now()
+      try {
+        return accounts()
+      } finally {
+        discoveryBlockingMs += performance.now() - started
+      }
     }
-    const blocking: number[] = []
-    const eventLoopDelay: number[] = []
+    const passes: {
+      elapsedMs: number
+      operationBlockingMs: number
+      maxOwnerBlockingMs: number
+      maxTimerDelayMs: number
+      timerSamples: number
+    }[] = []
     for (tick = 0; tick < 20; tick++) {
+      const priorBlockingMs = ownerBlockingMs + discoveryBlockingMs
+      maxOwnerBlockingMs = 0
+      let maxTimerDelayMs = 0
+      let timerSamples = 0
+      let previousTimer = performance.now()
+      // Keep probing THROUGH the final batch; one timer scheduled before tick misses later stalls.
+      const timer = setInterval(() => {
+        const now = performance.now()
+        maxTimerDelayMs = Math.max(maxTimerDelayMs, now - previousTimer)
+        previousTimer = now
+        timerSamples++
+      }, 1)
       const start = performance.now()
-      const pendingTimer = delay(0).then(() => performance.now() - start)
       const realNow = Date.now
+      let elapsedMs: number
       try {
         Date.now = () => epoch + tick * 1000
         if (mode === 'baseline') {
           baselinePass(shared, libraries)
         } else {
-          scheduler.tick()
+          await scheduler.tick()
         }
+        elapsedMs = performance.now() - start
+        // Include the last synchronous slice in timer latency, excluding this drain from pass elapsed.
+        await delay(0)
       } finally {
         Date.now = realNow
+        clearInterval(timer)
       }
-      blocking.push(performance.now() - start)
-      eventLoopDelay.push(await pendingTimer)
+      passes.push({
+        elapsedMs,
+        operationBlockingMs: ownerBlockingMs + discoveryBlockingMs - priorBlockingMs,
+        maxOwnerBlockingMs,
+        maxTimerDelayMs,
+        timerSamples,
+      })
     }
+    await scheduler.stop()
+    assert.equal(connections, 0)
+    assert.equal(peakConnections, 1)
+    assert.equal(
+      opens,
+      mode === 'baseline' ? population * 20 : population * 4 + (population / 5) * 2,
+    )
+    assert.equal(discoveries, mode === 'baseline' ? 20 : 4)
     // Validate equal useful work without counting these verification connections as upkeep.
     let completed = 0
     for (const id of accounts()) {
@@ -122,7 +168,11 @@ for (const population of [10, 100]) {
         assert.equal(personal.sharedDeletionCursor(), 1)
         assert.equal(personal.quizStore().active().length, 0)
         assert.equal(personal.quizStore().deleted().length, 0)
-        completed += personal.quizStore().completed().length
+        const histories = personal.quizStore().completed()
+        for (const history of histories) {
+          assert.deepEqual(history.deletedBankNames, ['quiz-synthetic'])
+        }
+        completed += histories.length
       } finally {
         personal.close()
       }
@@ -137,10 +187,18 @@ for (const population of [10, 100]) {
         ticks: 20,
         opens,
         discoveries,
-        startupBlockingMs: blocking[0],
-        recurringBlockingMs: blocking.slice(1).reduce((sum, ms) => sum + ms, 0),
-        maxTimerDelayMs: Math.max(...eventLoopDelay),
-        recurringMaxTimerDelayMs: Math.max(...eventLoopDelay.slice(1)),
+        startupElapsedMs: passes[0]!.elapsedMs,
+        startupOperationBlockingMs: passes[0]!.operationBlockingMs,
+        startupMaxTimerDelayMs: passes[0]!.maxTimerDelayMs,
+        recurringElapsedMs: passes.slice(1).reduce((sum, pass) => sum + pass.elapsedMs, 0),
+        recurringOperationBlockingMs: passes
+          .slice(1)
+          .reduce((sum, pass) => sum + pass.operationBlockingMs, 0),
+        recurringMaxOwnerBlockingMs: Math.max(
+          ...passes.slice(1).map((pass) => pass.maxOwnerBlockingMs),
+        ),
+        recurringMaxTimerDelayMs: Math.max(...passes.slice(1).map((pass) => pass.maxTimerDelayMs)),
+        timerSamples: passes.reduce((sum, pass) => sum + pass.timerSamples, 0),
       }),
     )
   } finally {
