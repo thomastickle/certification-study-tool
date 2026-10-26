@@ -76,11 +76,9 @@ The five-second cadence uses monotonic elapsed time, so wall-clock adjustments
 do not postpone reconciliation. Quiz and retention timestamps still follow the
 server wall clock, as foreground operations do. These are scheduling cadences,
 not hard latency bounds: synchronous SQLite work, busy timeouts and event-loop
-load can delay either pass. Full passes remain synchronous and proportional to
-owner count; this change reduces their frequency rather than removing their
-latency spikes. The synchronous timer cannot overlap itself. Shutdown clears the
-timer; each pass closes its owned connection before returning, and at most one
-background private connection is open at a time. No connection pool is retained.
+load can delay either pass. Total reconciliation work remains proportional to
+owner count, with a yield between owners. At most one background private
+connection is open at a time, and no connection pool is retained.
 
 History is private even when its questions came from shared banks. Private
 question snapshots never enter the shared database. Shared deletions append a
