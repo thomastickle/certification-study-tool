@@ -7,7 +7,7 @@ test('OIDC discovers the issuer, uses code with PKCE, and returns a verified sta
   const fixture = await oidcFixture()
   try {
     const login = new OidcLogin({
-      issuer: fixture.issuer,
+      issuer: fixture.issuerIdentifier,
       clientId: 'study-tool',
       origin: new URL('http://127.0.0.1:3000'),
     })
@@ -30,7 +30,7 @@ for (const error of ['signature', 'issuer', 'audience', 'nonce', 'expired'] as c
     try {
       fixture.invalidate(error)
       const login = new OidcLogin({
-        issuer: fixture.issuer,
+        issuer: fixture.issuerIdentifier,
         clientId: 'study-tool',
         origin: new URL('http://127.0.0.1:3000'),
       })
@@ -47,7 +47,7 @@ test('OIDC rejects a callback with another browser state or a wrong PKCE verifie
   const fixture = await oidcFixture()
   try {
     const login = new OidcLogin({
-      issuer: fixture.issuer,
+      issuer: fixture.issuerIdentifier,
       clientId: 'study-tool',
       origin: new URL('http://127.0.0.1:3000'),
     })
@@ -65,13 +65,13 @@ test('OIDC rejects a callback with another browser state or a wrong PKCE verifie
 
 test('HTTP OIDC and application origins are limited to loopback', () => {
   const valid = {
-    issuer: new URL('http://127.0.0.1:8080/realms/study'),
+    issuer: 'http://127.0.0.1:8080/realms/study',
     clientId: 'study-tool',
     origin: new URL('http://localhost:3000'),
   }
   assert.doesNotThrow(() => new OidcLogin(valid))
   assert.throws(
-    () => new OidcLogin({ ...valid, issuer: new URL('http://192.168.1.5:8080/realms/study') }),
+    () => new OidcLogin({ ...valid, issuer: 'http://192.168.1.5:8080/realms/study' }),
     /HTTPS/,
   )
   assert.throws(() => new OidcLogin({ ...valid, origin: new URL('http://study.example') }), /HTTPS/)

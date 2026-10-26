@@ -20,7 +20,7 @@ if (accountsPath === databasePath) {
 const origin = new URL(process.env.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
 const authenticationOptions = {
   origin,
-  issuer: new URL(process.env.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study'),
+  issuer: process.env.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study',
   clientId: process.env.STUDY_OIDC_CLIENT_ID ?? 'study-tool',
   clientSecret: process.env.STUDY_OIDC_CLIENT_SECRET || undefined,
   ownerSubject: process.env.STUDY_OWNER_SUBJECT ?? '',

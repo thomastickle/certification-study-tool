@@ -96,7 +96,7 @@ export class OwnerAuthentication {
     }
     const token = cookie(request, this.sessionName)
     const account = token ? this.accounts.session(token, this.now()) : undefined
-    const owner = this.accounts.findIdentity(this.options.issuer.href, this.options.ownerSubject)
+    const owner = this.accounts.findIdentity(this.options.issuer, this.options.ownerSubject)
     const user = account && account.id === owner?.id ? account : undefined
     if (url.pathname === '/api/session' && request.method === 'GET') {
       sendJson(response, 200, { user: user ?? null })
@@ -189,7 +189,7 @@ export class OwnerAuthentication {
     } catch {
       throw new ApplicationError('Sign-in could not be verified. Start sign-in again.', 400)
     }
-    const sameIssuer = identity.issuer === this.options.issuer.href
+    const sameIssuer = identity.issuer === this.options.issuer
     const sameSubject = identity.subject === this.options.ownerSubject
     if (!sameIssuer || !sameSubject) {
       const previous = cookie(request, this.sessionName)

@@ -3,7 +3,7 @@ import * as oidc from 'openid-client'
 
 export type LoginTransaction = { state: string; verifier: string; nonce: string }
 
-export type OidcSettings = { issuer: URL; clientId: string; clientSecret?: string; origin: URL }
+export type OidcSettings = { issuer: string; clientId: string; clientSecret?: string; origin: URL }
 
 /** Keep protocol details behind the standard OIDC client boundary. */
 export class OidcLogin {
@@ -11,7 +11,7 @@ export class OidcLogin {
   private configuration?: Promise<oidc.Configuration>
 
   constructor(settings: OidcSettings) {
-    requireSafeTransport(settings.issuer)
+    requireSafeTransport(new URL(settings.issuer))
     requireSafeTransport(settings.origin)
     if (settings.origin.pathname !== '/' || settings.origin.search || settings.origin.hash) {
       throw new Error('STUDY_ORIGIN must be an origin without a path, query, or fragment.')
@@ -89,7 +89,8 @@ export class OidcLogin {
   }
 
   private async discover(): Promise<oidc.Configuration> {
-    const { issuer, clientId, clientSecret } = this.settings
+    const { clientId, clientSecret } = this.settings
+    const issuer = new URL(this.settings.issuer)
     const execute = [oidc.enableNonRepudiationChecks]
     if (issuer.protocol === 'http:') {
       execute.unshift(oidc.allowInsecureRequests)

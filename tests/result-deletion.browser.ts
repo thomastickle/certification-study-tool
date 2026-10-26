@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Run only in a disposable populated app; exercises actual result and recovery controls. */
 export async function resultDeletionCheck(lostRestore = false, staleRead = false) {
   const originalFetch = window.fetch
@@ -58,7 +60,7 @@ export async function resultDeletionCheck(lostRestore = false, staleRead = false
       !document.body.innerText.includes('Recently deleted results'),
       'Separate deleted section remains',
     )
-    const deletedReport = await (await originalFetch('/api/reports')).json()
+    const deletedReport = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       !deletedReport.attempts.some((item: { id: string }) => item.id === attemptId),
       'Deleted attempt still counted',
@@ -99,7 +101,7 @@ export async function resultDeletionCheck(lostRestore = false, staleRead = false
       await new Promise((resolve) => setTimeout(resolve, 100))
       assert(!!row().querySelector('a'), 'Stale read reinserted pending state')
     }
-    const restoredReport = await (await originalFetch('/api/reports')).json()
+    const restoredReport = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       restoredReport.attempts.some((item: { id: string }) => item.id === attemptId),
       'Restored result missing from reports',

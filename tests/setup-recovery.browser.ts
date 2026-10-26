@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
 import type { QuizView } from '../src/shared/quiz-contracts.ts'
@@ -64,10 +66,14 @@ export async function setupRecoveryCheck(
 
   /** Use the unmodified transport to inspect real server state and prepare synthetic work. */
   async function request(path: string, body?: unknown, method = 'POST') {
-    const response = await originalFetch(`/api${path}`, {
-      ...(body === undefined ? {} : { method, body: JSON.stringify(body) }),
-      headers: { 'Content-Type': 'application/json' },
-    })
+    const response = await workspaceFetch(
+      `/api${path}`,
+      {
+        ...(body === undefined ? {} : { method, body: JSON.stringify(body) }),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      originalFetch,
+    )
     assert(response.ok, `Fixture request failed: ${path} (${response.status})`)
     return response.json()
   }

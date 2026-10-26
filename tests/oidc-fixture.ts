@@ -5,7 +5,7 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 type AuthorizationCode = { challenge: string; nonce: string; subject: string }
 
 /** A synthetic issuer exercises the real OIDC client, including its signature validation. */
-export async function oidcFixture() {
+export async function oidcFixture(issuerPath = '/realms/test') {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const otherKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey
   const codes = new Map<string, AuthorizationCode>()
@@ -128,9 +128,10 @@ export async function oidcFixture() {
   if (!address || typeof address === 'string') {
     throw new Error('Missing fixture port')
   }
-  const issuer = `http://127.0.0.1:${address.port}/realms/test`
+  const issuer = `http://127.0.0.1:${address.port}${issuerPath}`
   return {
     issuer: new URL(issuer),
+    issuerIdentifier: issuer,
     server,
     invalidate: (error: typeof tokenError) => {
       tokenError = error

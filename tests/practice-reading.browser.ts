@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only reading/layout regression; use a disposable populated database. */
@@ -62,7 +64,9 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
     )
     click(`Start ${total}-question ${mode}`)
     await until(() => !!document.querySelector('.question-navigation'), 'Question did not open')
-    const attempt = await (await originalFetch(`/api/quizzes/current?mode=${mode}`)).json()
+    const attempt = await (
+      await workspaceFetch(`/api/quizzes/current?mode=${mode}`, {}, originalFetch)
+    ).json()
     attemptId = attempt.id
     await until(
       () => !!document.querySelector('.choice input:enabled'),
@@ -323,7 +327,7 @@ export async function practiceReadingTest(mode: 'quiz' | 'exam'): Promise<string
         () => document.querySelector('.reports-page') !== null,
         'Cleanup navigation failed',
       )
-      await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
+      await workspaceFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' }, originalFetch)
     }
     window.confirm = originalConfirm
   }

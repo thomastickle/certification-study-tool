@@ -76,6 +76,9 @@ set `STUDY_PORT=3100` and `STUDY_ORIGIN=http://127.0.0.1:3100` together.
 Register `<STUDY_ORIGIN>/auth/callback` as an exact callback and `<STUDY_ORIGIN>/`
 as an allowed post-logout redirect. Local development uses a public client with
 required PKCE; a confidential client can supply a private server-side secret.
+Use the issuer identifier exactly as published in discovery metadata, including
+whether a trailing slash is present. It is retained unchanged for owner checks
+and account lookup.
 
 HTTP is accepted only on loopback. Remote application origins and issuers require
 HTTPS. Behind a TLS reverse proxy, preserve the configured Host and restrict direct

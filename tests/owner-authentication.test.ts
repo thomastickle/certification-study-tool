@@ -14,8 +14,8 @@ import { BrowserCookies } from './support/browser-cookies.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 
 /** Exercise authentication in front of the unchanged single-library API. */
-async function fixture(ownerSubject = 'alice') {
-  const provider = await oidcFixture()
+async function fixture(ownerSubject = 'alice', issuerPath = '/realms/test') {
+  const provider = await oidcFixture(issuerPath)
   const directory = mkdtempSync(join(tmpdir(), 'study-owner-login-'))
   const library = new LibraryRepository(join(directory, 'library.sqlite3'))
   const importer = new ImportService(library)
@@ -45,7 +45,7 @@ async function fixture(ownerSubject = 'alice') {
   assert.ok(address && typeof address !== 'string')
   const origin = new URL(`http://127.0.0.1:${address.port}`)
   const options = {
-    issuer: provider.issuer,
+    issuer: provider.issuerIdentifier,
     origin,
     clientId: 'study-tool',
     accountsPath: join(directory, 'accounts.sqlite3'),
@@ -125,6 +125,18 @@ test('a verified non-owner cannot establish an application session', async () =>
     assert.equal(denied.cookie, '')
     const session = await app.call('/api/session', denied.cookie)
     assert.deepEqual(await session.json(), { user: null })
+  } finally {
+    await app.close()
+  }
+})
+
+test('a root issuer without a trailing slash admits the owner and survives restart', async () => {
+  const app = await fixture('alice', '')
+  try {
+    const owner = await app.login('alice')
+    assert.equal(owner.response.status, 302)
+    app.restart()
+    assert.equal((await app.call('/api/questions', owner.cookie)).status, 200)
   } finally {
     await app.close()
   }
@@ -272,7 +284,7 @@ test('an explicit owner is required before authentication storage is created', (
   try {
     const accountsPath = join(directory, 'accounts.sqlite3')
     const options = {
-      issuer: new URL('http://127.0.0.1:8080/realms/study'),
+      issuer: 'http://127.0.0.1:8080/realms/study',
       origin: new URL('http://127.0.0.1:3000'),
       clientId: 'study-tool',
       ownerSubject: '',

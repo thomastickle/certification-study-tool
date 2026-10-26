@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
@@ -54,7 +56,7 @@ export async function navigationCheck(
   }
 
   async function attempt() {
-    return (await originalFetch(`/api/quizzes/${attemptId}`)).json()
+    return (await workspaceFetch(`/api/quizzes/${attemptId}`, {}, originalFetch)).json()
   }
 
   window.confirm = () => {
@@ -315,7 +317,7 @@ export async function navigationCheck(
         assert(saved.questions[0].flagged, 'Review mark was lost')
       }
     }
-    const report = await (await originalFetch('/api/reports')).json()
+    const report = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       !report.attempts.some((item: { id: string }) => item.id === attemptId),
       'Paused attempt entered report',
@@ -346,7 +348,7 @@ export async function navigationCheck(
       'Submission failed',
     )
     const completed = await attempt()
-    const finalReport = await (await originalFetch('/api/reports')).json()
+    const finalReport = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       finalReport.attempts.filter((item: { id: string }) => item.id === attemptId).length === 1,
       'Completed attempt not counted once',

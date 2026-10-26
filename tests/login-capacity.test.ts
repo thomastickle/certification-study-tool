@@ -24,7 +24,7 @@ test('pending sign-ins reserve capacity across asynchronous provider work', asyn
   const app = new OwnerAuthentication({
     accountsPath: join(directory, 'accounts.sqlite3'),
     ownerSubject: 'alice',
-    issuer: new URL('https://identity.example'),
+    issuer: 'https://identity.example',
     clientId: 'study-tool',
     origin: new URL('http://127.0.0.1:3000'),
   })

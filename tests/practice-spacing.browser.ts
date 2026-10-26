@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only fixture checks for answer spacing and scored-report contrast. */
@@ -153,19 +155,25 @@ export async function practiceSpacingTest(
       'Review label is incorrect',
     )
     // Score the real disposable attempt; the layout fixture only changed the browser view.
-    const active = await (await originalFetch(`/api/quizzes/${attemptId}`)).json()
-    await originalFetch(`/api/quizzes/${attemptId}/submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        answers: active.questions.map((question: { questionId: number }) => ({
-          questionId: question.questionId,
-          selected: [],
-          confidence: null,
-          flagged: false,
-        })),
-      }),
-    })
+    const active = await (
+      await workspaceFetch(`/api/quizzes/${attemptId}`, {}, originalFetch)
+    ).json()
+    await workspaceFetch(
+      `/api/quizzes/${attemptId}/submit`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          answers: active.questions.map((question: { questionId: number }) => ({
+            questionId: question.questionId,
+            selected: [],
+            confidence: null,
+            flagged: false,
+          })),
+        }),
+      },
+      originalFetch,
+    )
     window.fetch = originalFetch
     click('Reports')
     await until(
@@ -191,7 +199,8 @@ export async function practiceSpacingTest(
     window.fetch = originalFetch
     click('Reports')
     await until(() => document.querySelector('.reports-page') !== null, 'Cleanup navigation failed')
-    if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
+    if (attemptId)
+      await workspaceFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' }, originalFetch)
     window.confirm = originalConfirm
   }
 }

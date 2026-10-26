@@ -23,6 +23,8 @@ const app = new URL(values['app-url'])
 const issuer = new URL(values.issuer)
 assert.equal(app.hostname, '127.0.0.1')
 assert.equal(issuer.hostname, '127.0.0.1')
+assert.ok(app.port && issuer.port, 'Both URLs must specify explicit isolated ports.')
+assert.notEqual(app.port, issuer.port, 'Application and provider ports must differ.')
 assert.ok(!['3000', '3100', '3200'].includes(app.port), 'Use an isolated integration-test port.')
 
 /** Run only the disposable test stack; capture failures without exposing credential-bearing inputs. */
@@ -59,6 +61,12 @@ realm.users = [owner, other].map((user) => ({
   credentials: [{ type: 'password', value: user.password, temporary: false }],
 }))
 writeFileSync(join(directory, 'study-realm.json'), JSON.stringify(realm), { mode: 0o600 })
+// Match the host file owner while retaining group 0 access to the image's writable directories.
+// CI runners and local desktops need not use the same UID; fixture files stay private.
+const overridePath = join(directory, 'compose-smoke.yaml')
+const keycloakUser = `${process.getuid?.() ?? 1000}:0`
+const override = { services: { keycloak: { user: keycloakUser } } }
+writeFileSync(overridePath, JSON.stringify(override), { mode: 0o600 })
 const environment = {
   ...process.env,
   STUDY_WEB_PORT: app.port,
@@ -72,7 +80,10 @@ const environment = {
 
 /** Preserve the same environment and explicit project through setup, recreation and cleanup. */
 function compose(...args: string[]): string {
-  return docker(['compose', '-p', project!, ...args], environment)
+  return docker(
+    ['compose', '-f', 'compose.yaml', '-f', overridePath, '-p', project!, ...args],
+    environment,
+  )
 }
 
 /** A test-only browser follows forms; application OAuth remains entirely in openid-client. */
@@ -144,9 +155,20 @@ function seedLibrary(): void {
     const preview = importer.preview(input)
     importer.confirm(input, preview.token, false)
     const service = new QuizService(repo)
-    const quiz = service.start({provider:'Example',certification:'DEMO-1',sourceFilter:'mixed',questionType:'mixed'})
-    const answers = quiz.questions.map(q => ({questionId:q.questionId,selected:[],confidence:'Unsure',flagged:false}))
-    service.submit(quiz.id, {answers})
+    const options = {
+      provider: 'Example',
+      certification: 'DEMO-1',
+      sourceFilter: 'mixed',
+      questionType: 'mixed',
+    }
+    const quiz = service.start(options)
+    const answers = quiz.questions.map(question => ({
+      questionId: question.questionId,
+      selected: [],
+      confidence: 'Unsure',
+      flagged: false,
+    }))
+    service.submit(quiz.id, { answers })
     repo.close()
   `
   compose('run', '--rm', '--no-deps', '-T', 'study', 'node', '--input-type=module', '-e', script)
