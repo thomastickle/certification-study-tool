@@ -6,6 +6,8 @@ import { apiController } from './http-controller.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import { ApplicationAuthentication } from './auth/application-authentication.ts'
 import { ImportPreviews } from './importer/import-previews.ts'
+import { applicationRequestHandler } from './request-handler.ts'
+import type { ApplicationHandlers } from './request-handler.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
@@ -53,27 +55,13 @@ let webHandler: (
   request: import('node:http').IncomingMessage,
   response: import('node:http').ServerResponse,
 ) => void
-const server = createServer((request, response) => {
-  void handleRequest(request, response)
-})
-
-/** Bind the authenticated actor before selecting shared content and private study stores. */
-async function handleRequest(
-  request: import('node:http').IncomingMessage,
-  response: import('node:http').ServerResponse,
-) {
-  const handled = await authentication.handle(request, response)
-  if (handled) {
-    return
-  }
-  if (request.url?.startsWith('/api/')) {
-    const actor = authentication.userFor(request)
-    const api = apiController(repository, actor, origin, previews)
-    void api(request, response)
-    return
-  }
-  webHandler(request, response)
+const handlers: ApplicationHandlers = {
+  authentication,
+  study: (user) => apiController(repository, user, origin, previews),
+  web: (request, response) => webHandler(request, response),
 }
+
+const server = createServer(applicationRequestHandler(handlers))
 
 /** Score overdue attempts and purge expired deleted results without mixing account histories. */
 function expireStudyWork(): void {

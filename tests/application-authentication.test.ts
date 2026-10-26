@@ -13,6 +13,8 @@ import { closeServer, oidcFixture } from './oidc-fixture.ts'
 import { BrowserCookies } from './support/browser-cookies.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { ImportPreviews } from '../src/server/importer/import-previews.ts'
+import { applicationRequestHandler } from '../src/server/request-handler.ts'
+import type { ApplicationHandlers } from '../src/server/request-handler.ts'
 
 /** Exercise verified identities and role checks in front of the shared-content/private-study API. */
 async function fixture(issuerPath = '/realms/test') {
@@ -33,19 +35,15 @@ async function fixture(issuerPath = '/realms/test') {
   let authentication: ApplicationAuthentication
   let now = Date.now()
   const previews = new ImportPreviews(() => now)
-  const server = createServer((request, response) => {
-    void authentication.handle(request, response).then((handled) => {
-      if (!handled) {
-        if (request.url?.startsWith('/api/')) {
-          const user = authentication.userFor(request)
-          void apiController(library, user, origin, previews)(request, response)
-        } else {
-          response.writeHead(200, { 'Content-Type': 'text/html' })
-          response.end('<!doctype html><title>Study workspace</title>')
-        }
-      }
-    })
-  })
+  const handlers: ApplicationHandlers = {
+    authentication: { handle: (request, response) => authentication.handle(request, response) },
+    study: (user) => apiController(library, user, origin, previews),
+    web: (_request, response) => {
+      response.writeHead(200, { 'Content-Type': 'text/html' })
+      response.end('<!doctype html><title>Study workspace</title>')
+    },
+  }
+  const server = createServer(applicationRequestHandler(handlers))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

@@ -67,6 +67,17 @@ test('server permits its configured Host but requires login for study data', asy
     assert.equal(await status(`localhost:${port}`), 200)
     assert.equal(await status(`localhost:${port}`, '/api/questions'), 401)
     assert.equal(await status(`untrusted.example:${port}`), 403)
+    for (const path of [
+      '/api/../index.html',
+      '/api/%2e%2e/index.html',
+      '/api/./../index.html',
+      `http://localhost:${port}/api/../index.html`,
+    ]) {
+      assert.equal(await status(`localhost:${port}`, path), 200, path)
+      assert.equal(await status(`localhost:${port}`), 200, 'The server must remain alive')
+    }
+    assert.equal(await status(`localhost:${port}`, '/public/../api/questions'), 401)
+    assert.equal(await status(`localhost:${port}`, '/api/../auth/logout'), 404)
   } finally {
     child.kill('SIGTERM')
     await exit

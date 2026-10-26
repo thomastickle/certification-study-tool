@@ -15,6 +15,9 @@ export type AuthenticationOptions = OidcSettings & {
   now?: () => number
 }
 
+export type AuthenticationResult =
+  { route: 'handled' } | { route: 'public' } | { route: 'study'; user: SessionUser }
+
 /** Establish verified identities and bind each admitted request to its own account and session role. */
 export class ApplicationAuthentication {
   private accounts: AccountRepository
@@ -25,7 +28,6 @@ export class ApplicationAuthentication {
   private startingLogins = 0
   private sessionName: string
   private loginName: string
-  private users = new WeakMap<IncomingMessage, SessionUser>()
 
   constructor(options: AuthenticationOptions) {
     this.login = new OidcLogin(options)
@@ -46,18 +48,17 @@ export class ApplicationAuthentication {
   }
 
   /** Validate the request before routing authentication, public assets, or private study APIs. */
-  async handle(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
-    this.users.delete(request)
+  async handle(request: IncomingMessage, response: ServerResponse): Promise<AuthenticationResult> {
     try {
       const url = this.validateRequest(request)
       response.setHeader('Referrer-Policy', 'same-origin')
       if (url.pathname.startsWith('/auth/')) {
         response.setHeader('Referrer-Policy', 'no-referrer')
         await this.authRoute(request, response, url)
-        return true
+        return { route: 'handled' }
       }
       if (!url.pathname.startsWith('/api/')) {
-        return false
+        return { route: 'public' }
       }
       return this.authorizeStudyRequest(request, response, url)
     } catch (error) {
@@ -65,17 +66,8 @@ export class ApplicationAuthentication {
       const status = expected ? error.status : 500
       const message = expected ? error.message : 'The request could not be completed. Please retry.'
       sendJson(response, status, { error: message })
-      return true
+      return { route: 'handled' }
     }
-  }
-
-  /** Read server-established request context; callers never accept account IDs from the browser. */
-  userFor(request: IncomingMessage): SessionUser {
-    const user = this.users.get(request)
-    if (!user) {
-      throw new ApplicationError('An authenticated study request is required.', 401)
-    }
-    return user
   }
 
   /** Map an operator-selected legacy owner without issuing a login or granting any role. */
@@ -107,16 +99,16 @@ export class ApplicationAuthentication {
     request: IncomingMessage,
     response: ServerResponse,
     url: URL,
-  ): boolean {
+  ): AuthenticationResult {
     if (url.pathname === '/api/health' && request.method === 'GET') {
       sendJson(response, 200, { status: 'ok' })
-      return true
+      return { route: 'handled' }
     }
     const token = cookie(request, this.sessionName)
     const user = token ? this.accounts.session(token, this.now(), this.options.issuer) : undefined
     if (url.pathname === '/api/session' && request.method === 'GET') {
       sendJson(response, 200, { user: user ?? null })
-      return true
+      return { route: 'handled' }
     }
     if (!user) {
       throw new ApplicationError('Sign in to access study data.', 401)
@@ -126,10 +118,9 @@ export class ApplicationAuthentication {
         code: 'workspace_changed',
         error: 'Your sign-in changed. Reopen the workspace before continuing.',
       })
-      return true
+      return { route: 'handled' }
     }
-    this.users.set(request, user)
-    return false
+    return { route: 'study', user }
   }
 
   /** Map each authentication route to its workflow; each flow owns its cookies and failure rules. */
