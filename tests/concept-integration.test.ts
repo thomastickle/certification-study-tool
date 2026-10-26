@@ -113,7 +113,7 @@ test('Due Review keeps actual due identity and never substitutes its unseen grou
 
 test('concept HTTP routes preserve local mutation gates and reject stale saves atomically', async () => {
   const { repository, group } = setup()
-  const server = createServer(apiController(repository))
+  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

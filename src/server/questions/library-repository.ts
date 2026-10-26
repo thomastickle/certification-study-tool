@@ -1,20 +1,34 @@
 import { DatabaseSync } from 'node:sqlite'
 import { ConceptRepository, migrateConcepts } from '../concepts/concept-repository.ts'
 import { migrateQuizzes, QuizRepository } from '../quizzes/quiz-repository.ts'
+import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 import { CertificationRepository, migrateCertifications } from '../home/certification-repository.ts'
 import type { JsonObject, QuestionPage, Source, StoredQuestion } from '../../shared/contracts.ts'
+import { migrateStudyOwnership } from './study-schema.ts'
 
 export type SourceRecord = Omit<Source, 'questionCount'> & { metadata: JsonObject }
 
 export type QuestionRecord = StoredQuestion & { fingerprint: string; answerKey: string }
 
+type LibraryConnection = { db: DatabaseSync; transactionDepth: number }
+
 /** SQLite access only. Application services own transactions. */
 export class LibraryRepository {
   private db: DatabaseSync
-  private transactionDepth = 0
+  private connection: LibraryConnection
+  private ownsConnection: boolean
+  private accountId: string
 
-  constructor(path: string) {
+  constructor(path: string | LibraryConnection, accountId = 'local', legacyOwnerId?: string) {
+    this.accountId = accountId
+    this.ownsConnection = typeof path === 'string'
+    if (typeof path !== 'string') {
+      this.connection = path
+      this.db = path.db
+      return
+    }
     this.db = new DatabaseSync(path, { timeout: 5000 })
+    this.connection = { db: this.db, transactionDepth: 0 }
     this.db.exec('PRAGMA foreign_keys = ON')
     const version = this.db.prepare('PRAGMA user_version').get()?.user_version
     const appId = this.db.prepare('PRAGMA application_id').get()?.application_id
@@ -30,7 +44,7 @@ export class LibraryRepository {
       this.db.close()
       throw new Error('Unrecognized database. Use a separate application database.')
     }
-    if (version !== 0 && version !== 1 && version !== 2) {
+    if (version !== 0 && version !== 1 && version !== 2 && version !== 3) {
       this.db.close()
       throw new Error('Unsupported database version. Use a separate application database.')
     }
@@ -57,13 +71,55 @@ export class LibraryRepository {
       PRAGMA user_version = 1;
       COMMIT;
     `)
-    migrateQuizzes(this.db)
-    migrateConcepts(this.db)
-    migrateCertifications(this.db)
+    try {
+      migrateQuizzes(this.db)
+      migrateConcepts(this.db)
+      migrateCertifications(this.db)
+      migrateStudyOwnership(this.db, legacyOwnerId)
+    } catch (error) {
+      this.db.close()
+      throw error
+    }
+  }
+
+  /** Bind personal study stores to an authenticated account while sharing the content connection. */
+  forAccount(accountId: string): LibraryRepository {
+    if (!accountId.trim()) {
+      throw new Error('A study account ID is required.')
+    }
+    return new LibraryRepository(this.connection, accountId)
+  }
+
+  /** Expiry and retention jobs visit only accounts with unfinished timer or deletion work. */
+  pendingStudyAccounts(): string[] {
+    return this.db
+      .prepare(
+        `
+      SELECT DISTINCT account_id
+      FROM quiz_sessions
+      WHERE status IN ('active', 'deleted')
+    `,
+      )
+      .all()
+      .map((row) => String(row.account_id))
+  }
+
+  /** Annotate shared-bank provenance across accounts without returning personal snapshots to callers. */
+  annotateSnapshots(annotate: (quiz: StoredQuiz) => boolean): void {
+    const records = this.db.prepare('SELECT account_id, id, data FROM quiz_sessions').all()
+    const update = this.db.prepare(
+      'UPDATE quiz_sessions SET data = ? WHERE account_id = ? AND id = ?',
+    )
+    for (const record of records) {
+      const quiz: StoredQuiz = JSON.parse(String(record.data))
+      if (annotate(quiz)) {
+        update.run(JSON.stringify(quiz), record.account_id!, record.id!)
+      }
+    }
   }
 
   certificationStore(): CertificationRepository {
-    return new CertificationRepository(this.db)
+    return new CertificationRepository(this.db, this.accountId)
   }
 
   conceptStore(): ConceptRepository {
@@ -71,11 +127,13 @@ export class LibraryRepository {
   }
 
   quizStore(): QuizRepository {
-    return new QuizRepository(this.db)
+    return new QuizRepository(this.db, this.accountId)
   }
 
   close(): void {
-    this.db.close()
+    if (this.ownsConnection) {
+      this.db.close()
+    }
   }
 
   revision(): number {
@@ -83,7 +141,7 @@ export class LibraryRepository {
   }
 
   transaction<T>(work: () => T): T {
-    const depth = this.transactionDepth++
+    const depth = this.connection.transactionDepth++
     const savepoint = `library_${depth}`
     try {
       this.db.exec(depth === 0 ? 'BEGIN IMMEDIATE' : `SAVEPOINT ${savepoint}`)
@@ -97,7 +155,7 @@ export class LibraryRepository {
         throw error
       }
     } finally {
-      this.transactionDepth--
+      this.connection.transactionDepth--
     }
   }
 

@@ -1,11 +1,14 @@
-/** Exercise the mounted session gate with a deferred old request and a synthetic replacement login.
+/** Exercise deferred responses across account or role changes in the mounted session gate.
  * Uses a disposable signed-in library; reload afterward to restore the real account's UI.
  */
-export async function workspaceRaceBrowserTest() {
+export async function workspaceRaceBrowserTest(change: 'account' | 'role' = 'account') {
   const original = window.fetch
   const account = document.querySelector<HTMLElement>('[data-study-account]')?.dataset.studyAccount
   if (!account) throw new Error('Sign in to a disposable workspace before running this check.')
-  const replacement = 'synthetic-browser-replacement'
+  const replacement = change === 'account' ? 'synthetic-browser-replacement' : account
+  const role =
+    document.querySelector<HTMLElement>('[data-study-role]')?.dataset.studyRole ?? 'student'
+  const replacementRole = role === 'admin' ? 'student' : 'admin'
   let switched = false
   let finishOld: ((response: Response) => void) | undefined
   let settled = false
@@ -25,11 +28,13 @@ export async function workspaceRaceBrowserTest() {
     if (path === '/api/session') {
       sessionChecks++
       if (switched) {
-        return Response.json({ user: { id: replacement, name: 'Synthetic Replacement' } })
+        return Response.json({
+          user: { id: replacement, name: 'Synthetic Replacement', role: replacementRole },
+        })
       }
-      return Response.json({ user: { id: account, name: 'Original Workspace' } })
+      return Response.json({ user: { id: account, name: 'Original Workspace', role } })
     }
-    if (requestAccount === replacement) {
+    if (switched && requestAccount === replacement) {
       if (path === '/api/sources') return Response.json([])
       if (path === '/api/home') return Response.json({ generatedAt: Date.now(), providers: [] })
       throw new Error('Unexpected replacement-account request during the browser check.')
@@ -62,7 +67,10 @@ export async function workspaceRaceBrowserTest() {
     await until(
       () =>
         document.querySelector<HTMLElement>('[data-study-account]')?.dataset.studyAccount ===
-        replacement,
+          replacement &&
+        document.querySelector<HTMLElement>('[data-study-role]')?.dataset.studyRole ===
+          replacementRole &&
+        !!document.querySelector('.home-page'),
       'The replacement workspace did not mount.',
     )
     finishOld!(
@@ -70,13 +78,14 @@ export async function workspaceRaceBrowserTest() {
     )
     await until(() => settled, 'The old response did not settle.')
     await new Promise((resolve) => setTimeout(resolve, 50))
+    const current = document.querySelector<HTMLElement>('[data-study-account]')
     if (
-      document.querySelector<HTMLElement>('[data-study-account]')?.dataset.studyAccount !==
-      replacement
+      current?.dataset.studyAccount !== replacement ||
+      current.dataset.studyRole !== replacementRole
     ) {
       throw new Error('The late old-account failure invalidated the replacement workspace.')
     }
-    return { sameAccountFocusPreserved: true, obsoleteFailureIgnored: true }
+    return { sameAccountFocusPreserved: true, obsoleteFailureIgnored: true, transition: change }
   } finally {
     window.fetch = original
     finishOld?.(Response.json({ items: [], total: 0, page: 1, pageSize: 25 }))

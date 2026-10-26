@@ -39,7 +39,7 @@ export function SessionGate() {
       if (!user) {
         previous?.client.invalidate()
         current.current = null
-      } else if (previous?.user.id === user.id) {
+      } else if (previous?.user.id === user.id && previous.user.role === user.role) {
         current.current = { ...previous, user }
       } else {
         previous?.client.invalidate()

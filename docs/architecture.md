@@ -1,19 +1,24 @@
-# Initial architecture
+# Application architecture
 
-The application runs locally. A single loopback HTTP server serves the React
-frontend and the API. SQLite is a local file. Only the GUI is implemented.
+One Node HTTP server serves React and the API. The default deployment is local;
+remote origins require HTTPS. SQLite holds shared bank content and account-scoped
+study records; a second database holds identities and hashed application sessions.
 
 ```mermaid
 flowchart LR
-  GUI[React GUI] --> HTTP[HTTP controller]
-  HTTP --> Import[Import service]
-  HTTP --> Library[Library service]
+  GUI[React GUI] --> Auth[Session and workspace checks]
+  Auth <--> Provider[OIDC provider]
+  Auth --> Accounts[(Accounts and sessions)]
+  Auth --> HTTP[HTTP controller]
+  HTTP --> Admin[Admin role check]
+  Admin --> Import[Import service]
+  Admin --> Library[Library service]
   HTTP --> Queries[Library queries]
   Import --> Validation[Bank validation]
   Import --> Repo[SQLite repository]
   Library --> Repo
   Queries --> Repo
-  Repo --> DB[(Local SQLite)]
+  Repo --> DB[(Shared content and private study rows)]
   CLI[Future prompt-driven CLI] -.-> Import
   CLI -.-> Library
   TUI[Future full-screen TUI] -.-> Import
@@ -24,13 +29,16 @@ flowchart LR
   and duplicate comparisons. The service receives parsed content, not paths.
 - `src/server/questions/` owns library queries, deletion, and persistence. SQL
   and initial schema creation live in the repository; services own transactions.
-- `src/server/http-controller.ts` translates HTTP requests into service calls.
-  It enforces local host/origin access and request limits.
+- `src/server/auth/` verifies OIDC identity and role claims, manages opaque
+  sessions, and binds admitted requests to an application account.
+- `src/server/http-controller.ts` translates authenticated requests into service
+  calls. It enforces origin, request-size, and shared-content role checks.
 - `src/server/main.ts` owns startup, the database connection, and frontend serving.
 - `src/web/` owns React presentation, file selection, and confirmation dialogs.
 - `src/shared/` contains TypeScript request/result types used across boundaries.
 
-Previewing does not write to SQLite. Confirmation validates again inside a
+Previewing does not write to SQLite. Its short-lived, single-use HTTP review
+ticket belongs to one account. Confirmation validates again inside a
 transaction and rejects a stale preview if the database or input changed.
 Database revisions also change after deletion, invalidating outstanding previews.
 Imports never remove questions absent from the incoming file.
@@ -50,9 +58,28 @@ search and pagination can follow if measured size or latency requires them.
 cases, and quiz persistence. The library repository owns the shared SQLite
 connection and exposes a quiz store; quiz writes use separate transactions
 without invalidating library import revisions. Schema version 2 adds quiz and
-mastery tables transactionally. Snapshots preserve completed results across
+mastery tables transactionally; version 3 adds explicit study ownership. Snapshots preserve completed results across
 source edits/deletions. React and HTTP use public DTOs without answer keys until
 completion. See [quiz rules](quizzes.md).
+
+## Account and role boundaries
+
+The server derives account ID and role from a verified application session, then
+creates an account-bound study view over the shared SQLite connection. Every
+attempt, mastery, and earned-certification query includes that account ID.
+Composite keys also isolate deliberately colliding record IDs. Admins receive
+shared-content mutation permissions, not another user's study history.
+
+Sources, questions, reviewed concept groups, and concept-suggestion moderation
+are shared. Shared-bank deletion annotates saved provenance across accounts in
+the same content transaction; it never returns those private snapshots to the
+administrator. Expiry and retention jobs visit account-scoped stores.
+
+The browser's account binding detects stale tabs; it does not select the server's
+account. React replaces the workspace client when account or role changes, and
+obsolete clients cannot dispatch through their replacements. Existing history is
+attributed only through an explicit upgrade mapping. See
+[authentication and rollout](authentication.md) for claims and revocation limits.
 
 ## Terms
 
@@ -66,8 +93,8 @@ completion. See [quiz rules](quizzes.md).
 - **Preview:** proposed import changes, with a token binding the input to the
   current database revision. A preview is not a saved import.
 
-No external hosting or runtime integrations are configured. No independent
-review has been performed for this bootstrap.
+OIDC is the configured external runtime integration. Question content and study
+history remain in the application database and are not sent to the provider.
 
 ## Reporting
 

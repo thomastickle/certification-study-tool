@@ -18,7 +18,41 @@ test('OIDC discovers the issuer, uses code with PKCE, and returns a verified sta
     assert.equal(url.searchParams.get('scope'), 'openid profile')
     const response = await fetch(url, { redirect: 'manual' })
     const identity = await login.complete(new URL(response.headers.get('location')!), transaction)
-    assert.deepEqual(identity, { issuer: fixture.issuer.href, subject: 'alice', name: 'alice' })
+    assert.deepEqual(identity, {
+      issuer: fixture.issuer.href,
+      subject: 'alice',
+      name: 'alice',
+      role: 'student',
+    })
+  } finally {
+    await closeServer(fixture.server)
+  }
+})
+
+test('admin access comes only from a well-formed application role claim in the verified ID token', async () => {
+  let roles: unknown = ['admin']
+  const fixture = await oidcFixture('/realms/test', () => ({ study_roles: roles }))
+  try {
+    const login = new OidcLogin({
+      issuer: fixture.issuerIdentifier,
+      clientId: 'study-tool',
+      origin: new URL('http://127.0.0.1:3000'),
+    })
+    for (const [claim, expected] of [
+      [['admin'], 'admin'],
+      [undefined, 'student'],
+      [['student'], 'student'],
+      ['admin', 'student'],
+      [['admin', 1], 'student'],
+      [['administrator'], 'student'],
+    ] as const) {
+      roles = claim
+      const { url, transaction } = await login.begin()
+      const authorization = await fetch(url, { redirect: 'manual' })
+      const callback = new URL(authorization.headers.get('location')!)
+      const identity = await login.complete(callback, transaction)
+      assert.equal(identity.role, expected)
+    }
   } finally {
     await closeServer(fixture.server)
   }

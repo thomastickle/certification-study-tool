@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 // Exercise the actual entry point through a container-like, non-loopback connection.
-test('server permits its configured Host but requires owner login for study data', async (t) => {
+test('server permits its configured Host but requires login for study data', async (t) => {
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === 'IPv4' && !entry.internal)?.address
@@ -31,7 +31,6 @@ test('server permits its configured Host but requires owner login for study data
       STUDY_PORT: String(port),
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
       STUDY_ACCOUNTS_PATH: join(directory, 'accounts.sqlite3'),
-      STUDY_OWNER_SUBJECT: 'synthetic-owner',
       STUDY_ORIGIN: `http://localhost:${port}`,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -68,6 +67,17 @@ test('server permits its configured Host but requires owner login for study data
     assert.equal(await status(`localhost:${port}`), 200)
     assert.equal(await status(`localhost:${port}`, '/api/questions'), 401)
     assert.equal(await status(`untrusted.example:${port}`), 403)
+    for (const path of [
+      '/api/../index.html',
+      '/api/%2e%2e/index.html',
+      '/api/./../index.html',
+      `http://localhost:${port}/api/../index.html`,
+    ]) {
+      assert.equal(await status(`localhost:${port}`, path), 200, path)
+      assert.equal(await status(`localhost:${port}`), 200, 'The server must remain alive')
+    }
+    assert.equal(await status(`localhost:${port}`, '/public/../api/questions'), 401)
+    assert.equal(await status(`localhost:${port}`, '/api/../auth/logout'), 404)
   } finally {
     child.kill('SIGTERM')
     await exit

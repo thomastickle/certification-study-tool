@@ -8,29 +8,29 @@ import type { LoginTransaction } from './oidc-login.ts'
 import { AccountRepository } from './account-repository.ts'
 import { checkLocalRequest } from '../http-controller.ts'
 import { ApplicationError } from '../errors.ts'
+import type { SessionUser } from '../../shared/auth-contracts.ts'
 
-export type OwnerAuthenticationOptions = OidcSettings & {
+export type AuthenticationOptions = OidcSettings & {
   accountsPath: string
-  ownerSubject: string
   now?: () => number
 }
 
-/** Admit one configured identity while leaving study storage with the existing application. */
-export class OwnerAuthentication {
+export type AuthenticationResult =
+  { route: 'handled' } | { route: 'public' } | { route: 'study'; user: SessionUser }
+
+/** Establish verified identities and bind each admitted request to its own account and session role. */
+export class ApplicationAuthentication {
   private accounts: AccountRepository
   private login: OidcLogin
-  private options: OwnerAuthenticationOptions
+  private options: AuthenticationOptions
   private now: () => number
   private pending = new Map<string, { transaction: LoginTransaction; expiresAt: number }>()
   private startingLogins = 0
   private sessionName: string
   private loginName: string
 
-  constructor(options: OwnerAuthenticationOptions) {
+  constructor(options: AuthenticationOptions) {
     this.login = new OidcLogin(options)
-    if (!options.ownerSubject.trim()) {
-      throw new Error('STUDY_OWNER_SUBJECT must identify the one allowed OIDC subject.')
-    }
     this.options = options
     this.now = options.now ?? Date.now
     mkdirSync(dirname(options.accountsPath), { recursive: true, mode: 0o700 })
@@ -48,17 +48,17 @@ export class OwnerAuthentication {
   }
 
   /** Validate the request before routing authentication, public assets, or private study APIs. */
-  async handle(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
+  async handle(request: IncomingMessage, response: ServerResponse): Promise<AuthenticationResult> {
     try {
       const url = this.validateRequest(request)
       response.setHeader('Referrer-Policy', 'same-origin')
       if (url.pathname.startsWith('/auth/')) {
         response.setHeader('Referrer-Policy', 'no-referrer')
         await this.authRoute(request, response, url)
-        return true
+        return { route: 'handled' }
       }
       if (!url.pathname.startsWith('/api/')) {
-        return false
+        return { route: 'public' }
       }
       return this.authorizeStudyRequest(request, response, url)
     } catch (error) {
@@ -66,8 +66,18 @@ export class OwnerAuthentication {
       const status = expected ? error.status : 500
       const message = expected ? error.message : 'The request could not be completed. Please retry.'
       sendJson(response, status, { error: message })
-      return true
+      return { route: 'handled' }
     }
+  }
+
+  /** Map an operator-selected legacy owner without issuing a login or granting any role. */
+  legacyOwnerId(subject: string): string {
+    if (!subject.trim()) {
+      throw new Error('STUDY_LEGACY_OWNER_SUBJECT must identify the previous study owner.')
+    }
+    const issuer = this.options.issuer
+    const existing = this.accounts.findIdentity(issuer, subject)
+    return existing?.id ?? this.accounts.identify({ issuer, subject, name: subject }).id
   }
 
   /** Permit provider return documents while retaining origin checks on auth and study operations. */
@@ -84,35 +94,33 @@ export class OwnerAuthentication {
     return url
   }
 
-  /** Check each session against the current configured owner before forwarding study requests. */
+  /** Reject expired/foreign-issuer sessions and stale workspaces before selecting personal storage. */
   private authorizeStudyRequest(
     request: IncomingMessage,
     response: ServerResponse,
     url: URL,
-  ): boolean {
+  ): AuthenticationResult {
     if (url.pathname === '/api/health' && request.method === 'GET') {
       sendJson(response, 200, { status: 'ok' })
-      return true
+      return { route: 'handled' }
     }
     const token = cookie(request, this.sessionName)
-    const account = token ? this.accounts.session(token, this.now()) : undefined
-    const owner = this.accounts.findIdentity(this.options.issuer, this.options.ownerSubject)
-    const user = account && account.id === owner?.id ? account : undefined
+    const user = token ? this.accounts.session(token, this.now(), this.options.issuer) : undefined
     if (url.pathname === '/api/session' && request.method === 'GET') {
       sendJson(response, 200, { user: user ?? null })
-      return true
+      return { route: 'handled' }
     }
     if (!user) {
-      throw new ApplicationError('Sign in as the configured owner to access study data.', 401)
+      throw new ApplicationError('Sign in to access study data.', 401)
     }
     if (request.headers['x-study-account'] !== user.id) {
       sendJson(response, 409, {
         code: 'workspace_changed',
         error: 'Your sign-in changed. Reopen the workspace before continuing.',
       })
-      return true
+      return { route: 'handled' }
     }
-    return false
+    return { route: 'study', user }
   }
 
   /** Map each authentication route to its workflow; each flow owns its cookies and failure rules. */
@@ -190,8 +198,7 @@ export class OwnerAuthentication {
       throw new ApplicationError('Sign-in could not be verified. Start sign-in again.', 400)
     }
     const sameIssuer = identity.issuer === this.options.issuer
-    const sameSubject = identity.subject === this.options.ownerSubject
-    if (!sameIssuer || !sameSubject) {
+    if (!sameIssuer) {
       const previous = cookie(request, this.sessionName)
       if (previous) {
         this.accounts.revokeSession(previous)
@@ -200,7 +207,10 @@ export class OwnerAuthentication {
         ...this.makeLoginCookies('', 0),
         this.makeCookie(this.sessionName, '', 0, '/'),
       ])
-      throw new ApplicationError('This account is not the configured application owner.', 403)
+      throw new ApplicationError(
+        'This account does not belong to the configured sign-in provider.',
+        403,
+      )
     }
     const account = this.accounts.identify(identity)
     const previous = cookie(request, this.sessionName)
@@ -210,7 +220,7 @@ export class OwnerAuthentication {
     const token = randomBytes(32).toString('base64url')
     const now = this.now()
     this.accounts.pruneExpiredSessions(now)
-    this.accounts.saveSession(token, account.id, now + 8 * 60 * 60_000)
+    this.accounts.saveSession(token, account.id, now + 8 * 60 * 60_000, identity.role ?? 'student')
     response.setHeader('Set-Cookie', [
       ...this.makeLoginCookies('', 0),
       this.makeCookie(this.sessionName, token, 8 * 60 * 60, '/'),

@@ -227,7 +227,7 @@ export function App({ account }: { account: SessionUser }) {
   }
 
   return (
-    <div className="app-shell" data-study-account={account.id}>
+    <div className="app-shell" data-study-account={account.id} data-study-role={account.role}>
       <header className="workspace-header">
         <button
           className="brand-button"
@@ -326,7 +326,12 @@ export function App({ account }: { account: SessionUser }) {
               )}
             </main>
           )}
-        {page === 'importer' && <LibraryPage onLibraryChange={refreshCertifications} />}
+        {page === 'importer' && (
+          <LibraryPage
+            canManage={account.role === 'admin'}
+            onLibraryChange={refreshCertifications}
+          />
+        )}
       </div>
     </div>
   )

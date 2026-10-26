@@ -14,7 +14,13 @@ type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?
 
 const emptyPage: QuestionPage = { items: [], total: 0, page: 1, pageSize: 25 }
 
-export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promise<void> }) {
+export function LibraryPage({
+  onLibraryChange,
+  canManage = false,
+}: {
+  onLibraryChange?: () => Promise<void>
+  canManage?: boolean
+}) {
   const api = useApi()
   const [sources, setSources] = useState<Source[]>([])
   const [questions, setQuestions] = useState<QuestionPage>(emptyPage)
@@ -147,15 +153,19 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
         <div className="page-heading">
           <div>
             <h1>Question library</h1>
-            <p className="intro">Browse sources and import question banks.</p>
+            <p className="intro">
+              Browse shared question banks. Administrators manage this library.
+            </p>
           </div>
-          <button
-            className="primary"
-            onClick={() => setImportOpen((open) => !open)}
-            aria-expanded={importOpen}
-          >
-            {importOpen ? 'Close import' : '+ Import a bank'}
-          </button>
+          {canManage && (
+            <button
+              className="primary"
+              onClick={() => setImportOpen((open) => !open)}
+              aria-expanded={importOpen}
+            >
+              {importOpen ? 'Close import' : '+ Import a bank'}
+            </button>
+          )}
         </div>
         {error && (
           <div className="message error" role="alert">
@@ -169,16 +179,19 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
             {notice}
           </div>
         )}
-        {importOpen && (
+        {canManage && importOpen && (
           <section className="import-panel" aria-label="Import question bank">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">ADD TO YOUR LIBRARY</p>
+                <p className="eyebrow">ADD TO THE SHARED LIBRARY</p>
                 <h2>Import a question bank</h2>
               </div>
               <span className="step-label">Preview before saving</span>
             </div>
-            <p>Choose a version 2 JSON bank. It is sent only to this computer’s local server.</p>
+            <p>
+              Choose a version 2 JSON bank. Imported questions are shared with this application’s
+              users.
+            </p>
             <div className="file-row">
               <label className={`file-button ${busy ? 'disabled' : ''}`}>
                 Choose JSON file
@@ -301,7 +314,7 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
             )}
           </section>
         )}
-        <ConceptPanel refreshKey={refresh} />
+        <ConceptPanel refreshKey={refresh} canManage={canManage} />
         <div className="library-layout">
           <aside className="source-panel" aria-label="Question sources">
             <div className="source-heading">
@@ -338,10 +351,10 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
               </button>
             ))}
             <div className="privacy-note">
-              <strong>Your library stays here.</strong>
+              <strong>Shared questions, private progress.</strong>
               <p>
-                The database lives on this computer. Importing doesn’t send your questions to an
-                external service.
+                Everyone can study these banks. Your attempts, results, and earned certifications
+                belong to your account.
               </p>
             </div>
           </aside>
@@ -351,7 +364,7 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
                 <p className="eyebrow">{selectedSource?.certification ?? 'LIBRARY'}</p>
                 <h2>{selectedSource?.name ?? 'All questions'}</h2>
               </div>
-              {selectedSource && (
+              {canManage && selectedSource && (
                 <button
                   className="danger subtle"
                   disabled={busy || loading}
@@ -407,10 +420,10 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
                 </h3>
                 <p>
                   {total === 0
-                    ? 'Import your first bank to see its questions and sources here.'
+                    ? 'An administrator can import question banks for everyone to study.'
                     : 'Try another search or choose a different source.'}
                 </p>
-                {total === 0 && (
+                {canManage && total === 0 && (
                   <button onClick={() => setImportOpen(true)}>Import your first bank</button>
                 )}
               </div>
@@ -421,6 +434,7 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
                     key={question.id}
                     question={question}
                     disabled={busy}
+                    canManage={canManage}
                     onDelete={() =>
                       setRemoval({
                         kind: 'questions',
@@ -454,49 +468,51 @@ export function LibraryPage({ onLibraryChange }: { onLibraryChange?: () => Promi
           Certification Study Tool <span>Start small. Learn deliberately.</span>
         </footer>
       </main>
-      <dialog
-        ref={dialog}
-        onCancel={(event) => {
-          if (busy) event.preventDefault()
-          else setRemoval(undefined)
-        }}
-        onClose={() => {
-          if (!busy) setRemoval(undefined)
-        }}
-        aria-labelledby="delete-title"
-      >
-        <h2 id="delete-title">
-          {removal?.kind === 'sources' ? 'Delete this source?' : 'Delete this question?'}
-        </h2>
-        <p className="delete-name">{removal?.name}</p>
-        <p>
-          {removal?.kind === 'sources'
-            ? `This removes the source and its ${removal.count} questions from this database.`
-            : 'This removes only this source’s copy of the question.'}{' '}
-          Your original JSON files stay untouched. This cannot be undone here.
-        </p>
-        {removal?.kind === 'sources' && (
+      {canManage && (
+        <dialog
+          ref={dialog}
+          onCancel={(event) => {
+            if (busy) event.preventDefault()
+            else setRemoval(undefined)
+          }}
+          onClose={() => {
+            if (!busy) setRemoval(undefined)
+          }}
+          aria-labelledby="delete-title"
+        >
+          <h2 id="delete-title">
+            {removal?.kind === 'sources' ? 'Delete this source?' : 'Delete this question?'}
+          </h2>
+          <p className="delete-name">{removal?.name}</p>
           <p>
-            Saved quizzes, exams, and reports stay available. Attempts that used this bank will show
-            a “Contains obsolete / deleted questions” indicator, even after reimport. Their scores
-            still count.
+            {removal?.kind === 'sources'
+              ? `This removes the source and its ${removal.count} questions from this database.`
+              : 'This removes only this source’s copy of the question.'}{' '}
+            Your original JSON files stay untouched. This cannot be undone here.
           </p>
-        )}
-        <div className="dialog-actions">
-          <button disabled={busy} onClick={() => setRemoval(undefined)} autoFocus>
-            Cancel
-          </button>
-          <button
-            className="danger"
-            disabled={busy}
-            onClick={() => {
-              void confirmRemoval()
-            }}
-          >
-            Delete {removal?.kind === 'sources' ? 'source' : 'question'}
-          </button>
-        </div>
-      </dialog>
+          {removal?.kind === 'sources' && (
+            <p>
+              Saved quizzes, exams, and reports stay available. Attempts that used this bank will
+              show a “Contains obsolete / deleted questions” indicator, even after reimport. Their
+              scores still count.
+            </p>
+          )}
+          <div className="dialog-actions">
+            <button disabled={busy} onClick={() => setRemoval(undefined)} autoFocus>
+              Cancel
+            </button>
+            <button
+              className="danger"
+              disabled={busy}
+              onClick={() => {
+                void confirmRemoval()
+              }}
+            >
+              Delete {removal?.kind === 'sources' ? 'source' : 'question'}
+            </button>
+          </div>
+        </dialog>
+      )}
     </>
   )
 }
@@ -520,10 +536,12 @@ function QuestionCard({
   question,
   disabled,
   onDelete,
+  canManage,
 }: {
   question: StoredQuestion
   disabled: boolean
   onDelete: () => void
+  canManage: boolean
 }) {
   const q: Question = question.data
   return (
@@ -564,9 +582,11 @@ function QuestionCard({
       </details>
       <div className="question-bottom">
         <span>{question.sourceName}</span>
-        <button className="danger subtle" disabled={disabled} onClick={onDelete}>
-          Delete question
-        </button>
+        {canManage && (
+          <button className="danger subtle" disabled={disabled} onClick={onDelete}>
+            Delete question
+          </button>
+        )}
       </div>
     </article>
   )

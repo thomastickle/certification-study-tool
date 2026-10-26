@@ -5,7 +5,10 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 type AuthorizationCode = { challenge: string; nonce: string; subject: string }
 
 /** A synthetic issuer exercises the real OIDC client, including its signature validation. */
-export async function oidcFixture(issuerPath = '/realms/test') {
+export async function oidcFixture(
+  issuerPath = '/realms/test',
+  additionalClaims: (subject: string) => Record<string, unknown> = () => ({}),
+) {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const otherKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey
   const codes = new Map<string, AuthorizationCode>()
@@ -59,6 +62,7 @@ export async function oidcFixture(issuerPath = '/realms/test') {
   function createIdToken(grant: AuthorizationCode): string {
     const now = Math.floor(Date.now() / 1000)
     const claims = {
+      ...additionalClaims(grant.subject),
       iss: tokenError === 'issuer' ? 'https://wrong.example' : issuer,
       aud: tokenError === 'audience' ? 'wrong' : 'study-tool',
       sub: grant.subject,

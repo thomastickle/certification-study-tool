@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 
-test('owner smoke rejects unsafe or omitted ports before attempting Docker', () => {
+test('shared-user smoke rejects unsafe or omitted ports before attempting Docker', () => {
   const cases = [
     ['http://127.0.0.1', 'http://127.0.0.1:8340/realms/study', /explicit isolated ports/],
     ['http://127.0.0.1:3340', 'http://127.0.0.1/realms/study', /explicit isolated ports/],
@@ -17,7 +17,7 @@ test('owner smoke rejects unsafe or omitted ports before attempting Docker', () 
     const result = spawnSync(
       process.execPath,
       [
-        'tests/owner-login-smoke.ts',
+        'tests/shared-users-smoke.ts',
         '--project',
         'study-login-refusal-test',
         '--app-url',

@@ -7,7 +7,7 @@ import { bank } from './fixtures.ts'
 
 test('HTTP supports preview, confirm, browse and scoped deletion while denying cross-site writes', async () => {
   const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiController(repository))
+  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
@@ -79,7 +79,7 @@ for (const mode of ['quiz', 'exam'] as const) {
     const { populate } = await import('./quiz-fixtures.ts')
     const repository = new LibraryRepository(':memory:')
     populate(repository, 24)
-    const server = createServer(apiController(repository))
+    const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const address = server.address()
     assert.ok(address && typeof address !== 'string')

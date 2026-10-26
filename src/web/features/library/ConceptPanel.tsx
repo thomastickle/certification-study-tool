@@ -18,7 +18,13 @@ type ReviewData = {
 type Editor = ConceptScope & { id?: string; name: string; members: ConceptMember[] }
 
 /** Keep suggestions inactive until the user reviews content and explicitly saves membership. */
-export function ConceptPanel({ refreshKey }: { refreshKey: number }) {
+export function ConceptPanel({
+  refreshKey,
+  canManage = false,
+}: {
+  refreshKey: number
+  canManage?: boolean
+}) {
   const api = useApi()
   const [data, setData] = useState<ReviewData>({ groups: [], suggestions: [], library: [] })
   const [editor, setEditor] = useState<Editor>()
@@ -80,8 +86,8 @@ export function ConceptPanel({ refreshKey }: { refreshKey: number }) {
       <summary>Reviewed concept groups</summary>
       <p>
         Suggestions use the same study area and topic. Matching labels do not prove that questions
-        test the same concept. Only groups you explicitly activate affect normal quiz and exam
-        variations.
+        test the same concept. Administrators review and activate shared groups before they affect
+        normal quiz and exam variations.
       </p>
       <p>
         Each question keeps its own results and retention checks. Overlapping groups do not join
@@ -97,20 +103,22 @@ export function ConceptPanel({ refreshKey }: { refreshKey: number }) {
           {notice}
         </p>
       )}
-      <button
-        disabled={busy || data.library.length === 0}
-        onClick={() => {
-          const first = data.library[0]!
-          review({
-            provider: first.provider,
-            certification: first.certification,
-            name: '',
-            members: [],
-          })
-        }}
-      >
-        Create concept group
-      </button>
+      {canManage && (
+        <button
+          disabled={busy || data.library.length === 0}
+          onClick={() => {
+            const first = data.library[0]!
+            review({
+              provider: first.provider,
+              certification: first.certification,
+              name: '',
+              members: [],
+            })
+          }}
+        >
+          Create concept group
+        </button>
+      )}
       <h3>Active reviewed groups ({data.groups.length})</h3>
       {data.groups.length === 0 && <p>No reviewed groups yet. Suggestions are inactive.</p>}
       {data.groups.map((group) => (
@@ -125,74 +133,80 @@ export function ConceptPanel({ refreshKey }: { refreshKey: number }) {
               members replaces this group’s membership with your current selection.
             </p>
           )}
-          <div className="concept-actions">
-            <button disabled={busy} onClick={() => review(group)}>
-              Edit group
-            </button>
-            <button disabled={busy} onClick={() => setRemoving(group.id)}>
-              Delete group
-            </button>
-            {removing === group.id && (
-              <>
-                <span>Remove this reviewed mapping? Saved results stay intact.</span>
+          {canManage && (
+            <div className="concept-actions">
+              <button disabled={busy} onClick={() => review(group)}>
+                Edit group
+              </button>
+              <button disabled={busy} onClick={() => setRemoving(group.id)}>
+                Delete group
+              </button>
+              {removing === group.id && (
+                <>
+                  <span>Remove this reviewed mapping? Saved results stay intact.</span>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      void run(async () => {
+                        await api(`/concepts/${group.id}`, { method: 'DELETE' })
+                        setRemoving(undefined)
+                        if (editor?.id === group.id) {
+                          setEditor(undefined)
+                        }
+                        setNotice('Concept group deleted.')
+                      })
+                    }}
+                  >
+                    Confirm delete group
+                  </button>
+                  <button onClick={() => setRemoving(undefined)}>Cancel deletion</button>
+                </>
+              )}
+            </div>
+          )}
+        </article>
+      ))}
+      {canManage && (
+        <>
+          <h3>Inactive suggestions ({data.suggestions.length})</h3>
+          {data.suggestions.map((suggestion) => (
+            <article className="concept-group" key={suggestion.id}>
+              <strong>{suggestion.topic}</strong>
+              <p>
+                {suggestion.provider} · {suggestion.certification} · Same area: {suggestion.area} ·
+                Same topic: {suggestion.topic} · {suggestion.members.length} variations
+              </p>
+              <div className="concept-actions">
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    review({
+                      provider: suggestion.provider,
+                      certification: suggestion.certification,
+                      name: suggestion.name,
+                      members: suggestion.members,
+                    })
+                  }
+                >
+                  Review suggestion
+                </button>
                 <button
                   disabled={busy}
                   onClick={() => {
                     void run(async () => {
-                      await api(`/concepts/${group.id}`, { method: 'DELETE' })
-                      setRemoving(undefined)
-                      if (editor?.id === group.id) {
-                        setEditor(undefined)
-                      }
-                      setNotice('Concept group deleted.')
+                      await api(`/concept-suggestions/${suggestion.id}/dismiss`, { method: 'POST' })
+                      setNotice('Suggestion dismissed. No group was activated.')
                     })
                   }}
                 >
-                  Confirm delete group
+                  Dismiss suggestion
                 </button>
-                <button onClick={() => setRemoving(undefined)}>Cancel deletion</button>
-              </>
-            )}
-          </div>
-        </article>
-      ))}
-      <h3>Inactive suggestions ({data.suggestions.length})</h3>
-      {data.suggestions.map((suggestion) => (
-        <article className="concept-group" key={suggestion.id}>
-          <strong>{suggestion.topic}</strong>
-          <p>
-            {suggestion.provider} · {suggestion.certification} · Same area: {suggestion.area} · Same
-            topic: {suggestion.topic} · {suggestion.members.length} variations
-          </p>
-          <div className="concept-actions">
-            <button
-              disabled={busy}
-              onClick={() =>
-                review({
-                  provider: suggestion.provider,
-                  certification: suggestion.certification,
-                  name: suggestion.name,
-                  members: suggestion.members,
-                })
-              }
-            >
-              Review suggestion
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                void run(async () => {
-                  await api(`/concept-suggestions/${suggestion.id}/dismiss`, { method: 'POST' })
-                  setNotice('Suggestion dismissed. No group was activated.')
-                })
-              }}
-            >
-              Dismiss suggestion
-            </button>
-          </div>
-        </article>
-      ))}
-      {editor && (
+              </div>
+            </article>
+          ))}
+        </>
+      )}
+      {canManage && editor && (
         <form
           className="concept-editor"
           onSubmit={(event) => {

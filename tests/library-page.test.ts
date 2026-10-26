@@ -21,13 +21,16 @@ test('library renders page content without duplicating the application header', 
   })
   try {
     const { LibraryPage } = await import('../src/web/features/library/LibraryPage.tsx')
-    const html = renderToStaticMarkup(createElement(LibraryPage))
+    const html = renderToStaticMarkup(createElement(LibraryPage, { canManage: true }))
     assert.equal((html.match(/<header\b/g) ?? []).length, 0, 'the app shell owns the shared header')
     assert.equal((html.match(/<main\b/g) ?? []).length, 1)
     assert.match(html, /<h1>Question library<\/h1>/)
     assert.match(html, /Import a bank/)
     assert.match(html, /Search questions/)
     assert.doesNotMatch(html, /A place to build your knowledge/)
+    const student = renderToStaticMarkup(createElement(LibraryPage, { canManage: false }))
+    assert.match(student, /Question library/)
+    assert.doesNotMatch(student, /Import a bank|Create concept group|Delete source|Delete question/)
   } finally {
     hooks.deregister()
   }

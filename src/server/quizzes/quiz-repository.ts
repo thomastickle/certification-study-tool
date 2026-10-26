@@ -21,9 +21,11 @@ export function migrateQuizzes(db: DatabaseSync): void {
 /** Snapshot storage has no cascading source/question FKs: old results survive library deletion. */
 export class QuizRepository {
   private db: DatabaseSync
+  private accountId: string
 
-  constructor(db: DatabaseSync) {
+  constructor(db: DatabaseSync, accountId = 'local') {
     this.db = db
+    this.accountId = accountId
   }
 
   transaction<T>(work: () => T): T {
@@ -39,38 +41,52 @@ export class QuizRepository {
   }
 
   find(id: string): StoredQuiz | undefined {
-    const row = this.db.prepare('SELECT data FROM quiz_sessions WHERE id = ?').get(id)
+    const row = this.db
+      .prepare(
+        `
+      SELECT data FROM quiz_sessions
+      WHERE account_id = ? AND id = ?
+    `,
+      )
+      .get(this.accountId, id)
     return row ? JSON.parse(String(row.data)) : undefined
   }
 
   save(quiz: StoredQuiz): void {
     this.db
       .prepare(
-        `INSERT INTO quiz_sessions(id, status, started_at, data)
-         VALUES (?, ?, ?, ?) ON CONFLICT(id) DO
+        `INSERT INTO quiz_sessions(account_id, id, status, started_at, data)
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT(account_id, id) DO
         UPDATE SET status=excluded.status, data =excluded.data`,
       )
-      .run(quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
+      .run(this.accountId, quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
   }
 
   /** Include unfinished and recoverable results when recording library provenance changes. */
   snapshots(): StoredQuiz[] {
     return this.db
-      .prepare('SELECT data FROM quiz_sessions')
-      .all()
+      .prepare('SELECT data FROM quiz_sessions WHERE account_id = ?')
+      .all(this.accountId)
       .map((row) => JSON.parse(String(row.data)))
   }
 
   /** Discard an unfinished snapshot without recording a result or changing mastery. */
   remove(id: string): void {
-    this.db.prepare('DELETE FROM quiz_sessions WHERE id = ?').run(id)
+    this.db
+      .prepare(
+        `
+      DELETE FROM quiz_sessions
+      WHERE account_id = ? AND id = ?
+    `,
+      )
+      .run(this.accountId, id)
   }
 
   /** Recoverable snapshots never participate in completed history queries. */
   deleted(): StoredQuiz[] {
     return this.db
-      .prepare("SELECT data FROM quiz_sessions WHERE status = 'deleted'")
-      .all()
+      .prepare("SELECT data FROM quiz_sessions WHERE account_id = ? AND status = 'deleted'")
+      .all(this.accountId)
       .map((row) => JSON.parse(String(row.data)))
   }
 
@@ -78,9 +94,11 @@ export class QuizRepository {
   purgeDeleted(now: number): void {
     this.db
       .prepare(
-        "DELETE FROM quiz_sessions WHERE status = 'deleted' AND json_extract(data, '$.purgeAt') <= ?",
+        `DELETE FROM quiz_sessions
+         WHERE account_id = ? AND status = 'deleted'
+           AND json_extract(data, '$.purgeAt') <= ?`,
       )
-      .run(now)
+      .run(this.accountId, now)
   }
 
   recent(): QuizSummary[] {
@@ -95,26 +113,28 @@ export class QuizRepository {
                 json_extract(data, '$.correctCount')                   AS correctCount,
                 json_extract(data, '$.total')                          AS total
          FROM quiz_sessions
-         WHERE status = 'completed'
+         WHERE account_id = ? AND status = 'completed'
          ORDER BY started_at DESC, id DESC`,
       )
-      .all() as unknown as QuizSummary[]
+      .all(this.accountId) as unknown as QuizSummary[]
   }
 
   /** Completed snapshots alone are eligible for aggregate reporting. */
   completed(): StoredQuiz[] {
     return this.db
       .prepare(
-        "SELECT data FROM quiz_sessions WHERE status='completed' ORDER BY started_at DESC, id DESC",
+        `SELECT data FROM quiz_sessions
+         WHERE account_id = ? AND status = 'completed'
+         ORDER BY started_at DESC, id DESC`,
       )
-      .all()
+      .all(this.accountId)
       .map((row) => JSON.parse(String(row.data)))
   }
 
   active(): StoredQuiz[] {
     return this.db
-      .prepare("SELECT data FROM quiz_sessions WHERE status='active'")
-      .all()
+      .prepare("SELECT data FROM quiz_sessions WHERE account_id = ? AND status='active'")
+      .all(this.accountId)
       .map((row) => JSON.parse(String(row.data)))
   }
 
@@ -122,9 +142,11 @@ export class QuizRepository {
   unfinished(): StoredQuiz[] {
     return this.db
       .prepare(
-        "SELECT data FROM quiz_sessions WHERE status IN ('active', 'paused') ORDER BY started_at DESC, id DESC",
+        `SELECT data FROM quiz_sessions
+         WHERE account_id = ? AND status IN ('active', 'paused')
+         ORDER BY started_at DESC, id DESC`,
       )
-      .all()
+      .all(this.accountId)
       .map((row) => JSON.parse(String(row.data)))
   }
 
@@ -146,16 +168,21 @@ export class QuizRepository {
   /** Legacy table writer retained for compatibility; new scheduling never reads it. */
   record(fingerprint: string, correct: boolean): void {
     const previous = this.db
-      .prepare('SELECT boosted, correct_streak FROM quiz_mastery WHERE fingerprint = ?')
-      .get(fingerprint)
+      .prepare(
+        `
+        SELECT boosted, correct_streak FROM quiz_mastery
+        WHERE account_id = ? AND fingerprint = ?
+      `,
+      )
+      .get(this.accountId, fingerprint)
     const streak = correct ? Number(previous?.correct_streak ?? 0) + 1 : 0
     const boosted = correct ? (previous?.boosted === 1 && streak < 3 ? 1 : 0) : 1
     this.db
       .prepare(
-        `INSERT INTO quiz_mastery(fingerprint, boosted, correct_streak)
-         VALUES (?, ?, ?) ON CONFLICT(fingerprint) DO
+        `INSERT INTO quiz_mastery(account_id, fingerprint, boosted, correct_streak)
+         VALUES (?, ?, ?, ?) ON CONFLICT(account_id, fingerprint) DO
         UPDATE SET boosted=excluded.boosted, correct_streak=excluded.correct_streak`,
       )
-      .run(fingerprint, boosted, streak)
+      .run(this.accountId, fingerprint, boosted, streak)
   }
 }

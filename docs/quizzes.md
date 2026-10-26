@@ -167,7 +167,10 @@ Schema version 2 adds quiz snapshots and fingerprint mastery alongside the
 existing library. The version-1 upgrade is additive and transactional; it does
 not delete or replace library rows. Quiz snapshots have no cascading foreign
 keys to sources, so later deletion/import changes cannot rewrite past results.
-Only completed attempts update shared mastery across quizzes and exams. Repeated submission is idempotent.
+Schema version 3 assigns study records to an explicitly selected legacy owner
+during upgrade. New attempts, history, and mastery are scoped to the signed-in
+account; shared banks do not share study evidence. Only completed attempts update
+that account's mastery across quizzes and exams. Repeated submission is idempotent.
 
 **Pause** saves current answers first, then freezes the server-owned remaining
 time. A failed save or pause shows an error and leaves the attempt running. A

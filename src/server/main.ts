@@ -4,7 +4,10 @@ import { resolve, dirname, extname, sep } from 'node:path'
 import { QuizService } from './quizzes/quiz-service.ts'
 import { apiController } from './http-controller.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
-import { OwnerAuthentication } from './auth/owner-authentication.ts'
+import { ApplicationAuthentication } from './auth/application-authentication.ts'
+import { ImportPreviews } from './importer/import-previews.ts'
+import { applicationRequestHandler } from './request-handler.ts'
+import type { ApplicationHandlers } from './request-handler.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
@@ -23,19 +26,25 @@ const authenticationOptions = {
   issuer: process.env.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study',
   clientId: process.env.STUDY_OIDC_CLIENT_ID ?? 'study-tool',
   clientSecret: process.env.STUDY_OIDC_CLIENT_SECRET || undefined,
-  ownerSubject: process.env.STUDY_OWNER_SUBJECT ?? '',
   accountsPath,
 }
-const authentication = new OwnerAuthentication(authenticationOptions)
+const authentication = new ApplicationAuthentication(authenticationOptions)
+const previews = new ImportPreviews()
 mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
-const repository = new LibraryRepository(databasePath)
+const legacySubject = process.env.STUDY_LEGACY_OWNER_SUBJECT
+const legacyOwner = legacySubject ? authentication.legacyOwnerId(legacySubject) : undefined
+let repository: LibraryRepository
+try {
+  repository = new LibraryRepository(databasePath, 'local', legacyOwner)
+} catch (error) {
+  authentication.close()
+  throw error
+}
 chmodSync(databasePath, 0o600)
-const api = apiController(repository, origin)
-const quizzes = new QuizService(repository)
-quizzes.expireDue()
+expireStudyWork()
 const expiryTimer = setInterval(() => {
   try {
-    quizzes.expireDue()
+    expireStudyWork()
   } catch {
     console.error('Could not score an expired quiz; it will be retried.')
   }
@@ -46,24 +55,19 @@ let webHandler: (
   request: import('node:http').IncomingMessage,
   response: import('node:http').ServerResponse,
 ) => void
-const server = createServer((request, response) => {
-  void handleRequest(request, response)
-})
+const handlers: ApplicationHandlers = {
+  authentication,
+  study: (user) => apiController(repository, user, origin, previews),
+  web: (request, response) => webHandler(request, response),
+}
 
-/** Admit the configured owner before forwarding requests to the unchanged study API. */
-async function handleRequest(
-  request: import('node:http').IncomingMessage,
-  response: import('node:http').ServerResponse,
-) {
-  const handled = await authentication.handle(request, response)
-  if (handled) {
-    return
+const server = createServer(applicationRequestHandler(handlers))
+
+/** Score overdue attempts and purge expired deleted results without mixing account histories. */
+function expireStudyWork(): void {
+  for (const accountId of repository.pendingStudyAccounts()) {
+    new QuizService(repository.forAccount(accountId)).expireDue()
   }
-  if (request.url?.startsWith('/api/')) {
-    void api(request, response)
-    return
-  }
-  webHandler(request, response)
 }
 
 let closeWeb = async () => {}

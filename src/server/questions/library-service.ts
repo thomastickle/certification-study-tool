@@ -46,10 +46,9 @@ export class LibraryService {
           references.set(question.reference, ids)
         }
       }
-      const store = this.repository.quizStore()
-      for (const quiz of store.snapshots()) {
+      this.repository.annotateSnapshots((quiz) => {
         if (!sameCertification(quiz.options, scope)) {
-          continue
+          return false
         }
         let resolvedLegacy = false
         for (const question of quiz.questions) {
@@ -72,10 +71,8 @@ export class LibraryService {
         if (affected) {
           quiz.deletedBankNames = [...new Set([...(quiz.deletedBankNames ?? []), source.name])]
         }
-        if (affected || resolvedLegacy) {
-          store.save(quiz)
-        }
-      }
+        return affected || resolvedLegacy
+      })
       if (!this.repository.deleteSource(id)) throw new ApplicationError('Source not found.', 404)
     })
   }

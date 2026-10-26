@@ -8,6 +8,8 @@ import { ImportService } from './importer/import-service.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import { LibraryService } from './questions/library-service.ts'
 import { HomeService } from './home/home-service.ts'
+import type { SessionUser } from '../shared/auth-contracts.ts'
+import { ImportPreviews } from './importer/import-previews.ts'
 
 /** Prevent other websites from driving a local library through this server. */
 export function checkLocalRequest(
@@ -78,17 +80,30 @@ function positiveInteger(text: string | null, fallback?: number): number {
   return Number(text)
 }
 
-export function apiController(repository: LibraryRepository, origin?: URL) {
-  const concepts = new ConceptService(repository)
-  const quizzes = new QuizService(repository)
-  const reports = new ReportService(repository)
+/** Bind personal queries to the authenticated actor and protect shared-content mutations. */
+export function apiController(
+  repository: LibraryRepository,
+  actor: Pick<SessionUser, 'id' | 'role'>,
+  origin?: URL,
+  previews = new ImportPreviews(),
+) {
+  const personal = repository.forAccount(actor.id)
+  const concepts = new ConceptService(personal)
+  const quizzes = new QuizService(personal)
+  const reports = new ReportService(personal)
   const importer = new ImportService(repository)
   const library = new LibraryService(repository)
-  const home = new HomeService(repository)
+  const home = new HomeService(personal)
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
       checkLocalRequest(request, origin)
       const url = new URL(request.url ?? '/', 'http://localhost')
+      const changesContent =
+        !['GET', 'HEAD'].includes(request.method ?? '') &&
+        /^\/api\/(imports|questions|sources|concepts|concept-suggestions)(\/|$)/.test(url.pathname)
+      if (changesContent && actor.role !== 'admin') {
+        throw new ApplicationError('Only an administrator can change shared question banks.', 403)
+      }
       const scope = {
         provider: url.searchParams.get('provider') ?? undefined,
         certification: url.searchParams.get('certification') ?? undefined,
@@ -187,13 +202,17 @@ export function apiController(repository: LibraryRepository, origin?: URL) {
       }
       if (request.method === 'POST' && url.pathname === '/api/imports/preview') {
         const input = await body(request)
-        return send(response, 200, importer.preview(input.bank))
+        const preview = importer.preview(input.bank)
+        const token = previews.issue(actor.id, preview.token)
+        return send(response, 200, { ...preview, token })
       }
       if (request.method === 'POST' && url.pathname === '/api/imports/confirm') {
         const input = await body(request)
         if (typeof input.token !== 'string' || typeof input.reviewed !== 'boolean')
           throw new ApplicationError('Preview token and review confirmation are required.')
-        return send(response, 201, importer.confirm(input.bank, input.token, input.reviewed))
+        const contentToken = previews.consume(actor.id, input.token)
+        const imported = importer.confirm(input.bank, contentToken, input.reviewed)
+        return send(response, 201, { ...imported, token: input.token })
       }
       const match = url.pathname.match(/^\/api\/(questions|sources)\/(\d+)$/)
       if (request.method === 'DELETE' && match) {

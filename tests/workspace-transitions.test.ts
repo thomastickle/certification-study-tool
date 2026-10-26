@@ -11,7 +11,7 @@ import { createWorkspaceApi } from '../src/web/shared/lib/api.ts'
 
 type Element = ReactElement<Record<string, unknown>>
 
-const account = { id: 'synthetic-owner', name: 'Owner' }
+const account = { id: 'synthetic-owner', name: 'Owner', role: 'admin' as const }
 const source = {
   id: 1,
   name: 'Synthetic questions',

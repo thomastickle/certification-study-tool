@@ -6,6 +6,11 @@
   "registrationAllowed": false,
   "registrationEmailAsUsername": false,
   "resetPasswordAllowed": false,
+  "roles": {
+    "client": {
+      "study-tool": [{ "name": "admin", "description": "Manage shared study question banks" }]
+    }
+  },
   "clients": [
     {
       "clientId": "study-tool",
@@ -25,7 +30,23 @@
         "pkce.code.challenge.method": "S256",
         "post.logout.redirect.uris": "${STUDY_WEB_ORIGIN}/##${STUDY_PREVIEW_ORIGIN}/"
       },
-      "defaultClientScopes": ["profile"]
+      "defaultClientScopes": ["profile"],
+      "protocolMappers": [
+        {
+          "name": "study-application-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "study-tool",
+            "claim.name": "study_roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     }
   ]
 }
