@@ -8,6 +8,8 @@ import { parseArgs } from 'node:util'
 import { bank } from './fixtures.ts'
 import { BrowserCookies } from './support/browser-cookies.ts'
 import { waitForApplication } from './support/application-readiness.ts'
+import { legacyAccountSchema, legacyStudySchema } from './legacy-study-schema.ts'
+import type { Session } from '../src/shared/auth-contracts.ts'
 
 const { values } = parseArgs({
   options: {
@@ -47,11 +49,17 @@ assert.equal(
   '',
   'Test volumes already exist.',
 )
-const directory = mkdtempSync(join(tmpdir(), 'study-owner-smoke-'))
+const directory = mkdtempSync(join(tmpdir(), 'study-shared-smoke-'))
 const owner = { id: randomUUID(), username: 'synthetic-owner', password: randomUUID() + '!aA1' }
 const other = { id: randomUUID(), username: 'synthetic-other', password: randomUUID() + '!aA1' }
+const previousOwnerAccount = randomUUID()
+const administrator = {
+  id: randomUUID(),
+  username: 'synthetic-second-admin',
+  password: randomUUID() + '!aA1',
+}
 const realm = JSON.parse(readFileSync('dev/keycloak/study-realm.json', 'utf8'))
-realm.users = [owner, other].map((user) => ({
+realm.users = [owner, other, administrator].map((user) => ({
   id: user.id,
   username: user.username,
   enabled: true,
@@ -59,6 +67,7 @@ realm.users = [owner, other].map((user) => ({
   lastName: 'User',
   email: user.username + '@example.test',
   credentials: [{ type: 'password', value: user.password, temporary: false }],
+  clientRoles: { 'study-tool': user.id === other.id ? [] : ['admin'] },
 }))
 writeFileSync(join(directory, 'study-realm.json'), JSON.stringify(realm), { mode: 0o600 })
 // Match the host file owner while retaining group 0 access to the image's writable directories.
@@ -73,7 +82,7 @@ const environment = {
   STUDY_KEYCLOAK_PORT: issuer.port,
   STUDY_ORIGIN: app.origin,
   STUDY_OIDC_ISSUER: issuer.href,
-  STUDY_OWNER_SUBJECT: owner.id,
+  STUDY_LEGACY_OWNER_SUBJECT: owner.id,
   STUDY_KEYCLOAK_IMPORT_DIR: directory,
   KC_BOOTSTRAP_ADMIN_PASSWORD: randomUUID(),
 }
@@ -137,7 +146,7 @@ async function login(credentials: typeof owner): Promise<{ browser: Browser; sta
   return { browser, status: landing.status }
 }
 
-/** Seed existing single-library data before the application starts; no migration is involved. */
+/** Seed the deployed single-owner schema so startup must map history to the explicit owner. */
 function seedLibrary(): void {
   const input = bank()
   input.questions = Array.from({ length: 20 }, (_, index) => ({
@@ -149,6 +158,7 @@ function seedLibrary(): void {
     import { LibraryRepository } from './src/server/questions/library-repository.ts'
     import { ImportService } from './src/server/importer/import-service.ts'
     import { QuizService } from './src/server/quizzes/quiz-service.ts'
+    import { DatabaseSync } from 'node:sqlite'
     const repo = new LibraryRepository('/data/library.sqlite3')
     const input = ${JSON.stringify(input)}
     const importer = new ImportService(repo)
@@ -169,9 +179,51 @@ function seedLibrary(): void {
       flagged: false,
     }))
     service.submit(quiz.id, { answers })
+    repo.certificationStore().setEarned({ provider: 'Example', code: 'DEMO-1', name: 'Example' }, true)
     repo.close()
+    const legacy = new DatabaseSync('/data/library.sqlite3')
+    legacy.exec(${JSON.stringify(legacyStudySchema)})
+    legacy.close()
+    const accounts = new DatabaseSync('/data/accounts.sqlite3')
+    accounts.exec(${JSON.stringify(legacyAccountSchema)})
+    const identity = accounts.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)')
+    identity.run(${JSON.stringify(previousOwnerAccount)}, ${JSON.stringify(issuer.href)}, ${JSON.stringify(owner.id)}, 'Legacy owner')
+    accounts.close()
   `
   compose('run', '--rm', '--no-deps', '-T', 'study', 'node', '--input-type=module', '-e', script)
+}
+
+/** Bind every test API operation to the account returned by that browser's own session. */
+async function study(browser: Browser, path: string, options: RequestInit = {}): Promise<Response> {
+  const user = await currentUser(browser)
+  const headers = new Headers(options.headers)
+  headers.set('X-Study-Account', user.id)
+  headers.set('Origin', app.origin)
+  headers.set('Content-Type', 'application/json')
+  return browser.request(new URL(path, app), { ...options, headers })
+}
+
+/** Resolve one browser's verified identity and role without reusing another browser's binding. */
+async function currentUser(browser: Browser) {
+  const response = await browser.request(new URL('/api/session', app))
+  assert.equal(response.status, 200)
+  const session: Session = await response.json()
+  assert.ok(session.user)
+  return session.user
+}
+
+/** Keep response validation separate from JSON inspection in integration assertions. */
+async function studyJson(browser: Browser, path: string, options: RequestInit = {}) {
+  const response = await study(browser, path, options)
+  assert.equal(response.status, 200)
+  return response.json()
+}
+
+/** Inspect one user's own completed history without relying on another account's identifiers. */
+async function history(browser: Browser) {
+  const response = await study(browser, '/api/quizzes?provider=Example&certification=DEMO-1')
+  assert.equal(response.status, 200)
+  return response.json() as Promise<Array<{ id: string }>>
 }
 
 try {
@@ -180,16 +232,88 @@ try {
   compose('up', '--no-build', '-d', '--wait', '--wait-timeout', '180')
   await waitForApplication(app)
   assert.equal((await fetch(new URL('/api/questions', app))).status, 401)
+
   const signedIn = await login(owner)
+  const student = await login(other)
+  const secondAdmin = await login(administrator)
   assert.equal(signedIn.status, 200)
-  const session = await signedIn.browser.request(new URL('/api/session', app))
-  const account = (await session.json()).user
-  assert.ok(account?.id)
-  const headers = { 'X-Study-Account': account.id }
-  const questions = await signedIn.browser.request(new URL('/api/questions', app), { headers })
-  assert.equal((await questions.json()).total, 20)
-  const denied = await login(other)
-  assert.equal(denied.status, 403)
+  assert.equal(student.status, 200)
+  assert.equal(secondAdmin.status, 200)
+  const ownerSession = await currentUser(signedIn.browser)
+  const studentSession = await currentUser(student.browser)
+  assert.equal(ownerSession.role, 'admin')
+  assert.equal(ownerSession.id, previousOwnerAccount)
+  assert.equal(studentSession.role, 'student')
+  assert.notEqual(ownerSession.id, studentSession.id)
+  const questions = await studyJson(student.browser, '/api/questions')
+  assert.equal(questions.total, 20)
+  const originalHistory = await history(signedIn.browser)
+  assert.equal(originalHistory.length, 1)
+  assert.deepEqual(await history(student.browser), [])
+  const ownerHome = await studyJson(signedIn.browser, '/api/home')
+  const studentHome = await studyJson(student.browser, '/api/home')
+  assert.equal(ownerHome.providers[0].certifications[0].earned, true)
+  assert.equal(studentHome.providers[0].certifications[0].earned, false)
+
+  const deleteDenied = await study(student.browser, '/api/questions/' + questions.items[0].id, {
+    method: 'DELETE',
+  })
+  assert.equal(deleteDenied.status, 403)
+  const started = await study(student.browser, '/api/quizzes', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider: 'Example',
+      certification: 'DEMO-1',
+      sourceFilter: 'mixed',
+      questionType: 'mixed',
+    }),
+  })
+  assert.equal(started.status, 201)
+  const quiz = await started.json()
+  assert.equal((await study(signedIn.browser, '/api/quizzes/' + quiz.id)).status, 404)
+  const answers = quiz.questions.map((question: { questionId: number }) => ({
+    questionId: question.questionId,
+    selected: [],
+    confidence: 'Unsure',
+    flagged: false,
+  }))
+  assert.equal(
+    (
+      await study(student.browser, '/api/quizzes/' + quiz.id + '/submit', {
+        method: 'POST',
+        body: JSON.stringify({ answers }),
+      })
+    ).status,
+    200,
+  )
+  assert.deepEqual(await history(signedIn.browser), originalHistory)
+  assert.deepEqual(
+    (await history(student.browser)).map((item) => item.id),
+    [quiz.id],
+  )
+
+  const input = bank('new-shared-bank')
+  const previewRequest = { method: 'POST', body: JSON.stringify({ bank: input }) }
+  assert.equal((await study(student.browser, '/api/imports/preview', previewRequest)).status, 403)
+  const preview = await studyJson(signedIn.browser, '/api/imports/preview', previewRequest)
+  const confirmation = {
+    method: 'POST',
+    body: JSON.stringify({ bank: input, token: preview.token, reviewed: true }),
+  }
+  assert.equal((await study(secondAdmin.browser, '/api/imports/confirm', confirmation)).status, 409)
+  assert.equal((await study(signedIn.browser, '/api/imports/confirm', confirmation)).status, 201)
+  assert.equal((await study(signedIn.browser, '/api/imports/confirm', confirmation)).status, 409)
+  const updatedQuestions = await studyJson(student.browser, '/api/questions')
+  assert.equal(updatedQuestions.total, 21)
+  const stale = await student.browser.request(
+    new URL('/api/questions/' + questions.items[0].id, app),
+    {
+      method: 'DELETE',
+      headers: { Origin: app.origin, 'X-Study-Account': ownerSession.id },
+    },
+  )
+  assert.equal(stale.status, 409)
+
   compose(
     'up',
     '--no-build',
@@ -202,20 +326,29 @@ try {
     'study',
   )
   await waitForApplication(app)
-  const history = await signedIn.browser.request(
-    new URL('/api/quizzes?provider=Example&certification=DEMO-1', app),
-    { headers },
+  assert.deepEqual(await history(signedIn.browser), originalHistory)
+  assert.deepEqual(
+    (await history(student.browser)).map((item) => item.id),
+    [quiz.id],
   )
-  assert.equal(history.status, 200)
-  assert.equal((await history.json()).length, 1)
-  const summary = {
-    ownerLogin: true,
-    nonOwnerDenied: true,
-    existingQuestions: 20,
-    existingHistory: 1,
-    sessionSurvivesRecreation: true,
-  }
-  console.log(JSON.stringify(summary))
+  const restartedQuestions = await studyJson(student.browser, '/api/questions')
+  const restartedOwner = await currentUser(signedIn.browser)
+  const restartedStudent = await currentUser(student.browser)
+  assert.equal(restartedQuestions.total, 21)
+  assert.equal(restartedOwner.role, 'admin')
+  assert.equal(restartedStudent.role, 'student')
+  console.log(
+    JSON.stringify({
+      adminAndStudentLogin: true,
+      legacyOwnerHistory: 1,
+      privateStudentHistory: 1,
+      sharedQuestions: 21,
+      studentMutationDenied: true,
+      crossAccountPreviewDenied: true,
+      staleWorkspaceDenied: true,
+      sessionsSurviveRecreation: true,
+    }),
+  )
 } finally {
   try {
     compose('down', '--volumes', '--remove-orphans')

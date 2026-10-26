@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
 import { AccountRepository } from '../src/server/auth/account-repository.ts'
+import { createHash, randomUUID } from 'node:crypto'
+import { legacyAccountSchema } from './legacy-study-schema.ts'
 
 test('account identity survives restart, ignores display name changes, and separates issuers', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-accounts-'))
@@ -30,6 +32,53 @@ test('account identity survives restart, ignores display name changes, and separ
   }
 })
 
+test('sessions retain their verified role and only resolve under the configured issuer', () => {
+  const accounts = new AccountRepository(':memory:')
+  const issuer = 'https://identity.example/realm'
+  try {
+    const account = accounts.identify({ issuer, subject: 'alice', name: 'Alice' })
+    accounts.saveSession('admin-session', account.id, 2000, 'admin')
+    accounts.saveSession('student-session', account.id, 2000, 'student')
+    assert.equal(accounts.session('admin-session', 1000, issuer)?.role, 'admin')
+    assert.equal(accounts.session('student-session', 1000, issuer)?.role, 'student')
+    assert.equal(accounts.session('admin-session', 1000, 'https://other.example/realm'), undefined)
+    accounts.revokeAccountSessions(account.id)
+    assert.equal(accounts.session('admin-session', 1000, issuer), undefined)
+    assert.equal(accounts.session('student-session', 1000, issuer), undefined)
+  } finally {
+    accounts.close()
+  }
+})
+
+test('upgrading existing account sessions preserves identity and grants no implicit admin role', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'study-session-upgrade-'))
+  const path = join(directory, 'accounts.sqlite3')
+  const id = randomUUID()
+  const issuer = 'https://identity.example/realm'
+  const token = 'synthetic-pre-upgrade-session'
+  const original = new DatabaseSync(path)
+  try {
+    original.exec(legacyAccountSchema)
+    original.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)').run(id, issuer, 'alice', 'Alice')
+    const hash = createHash('sha256').update(token).digest('hex')
+    original.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run(hash, id, 2000)
+  } finally {
+    original.close()
+  }
+  const accounts = new AccountRepository(path)
+  try {
+    assert.equal(accounts.findIdentity(issuer, 'alice')?.id, id)
+    assert.equal(accounts.session(token, 1000, issuer)?.id, id)
+    assert.equal(accounts.session(token, 1000, issuer)?.role, 'student')
+    accounts.saveSession('new-admin-session', id, 2000, 'admin')
+    assert.equal(accounts.session('new-admin-session', 1000, issuer)?.role, 'admin')
+    assert.equal(accounts.session(token, 1000, issuer)?.role, 'student')
+  } finally {
+    accounts.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('sessions persist as hashes, expire at their deadline, and can be revoked', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-sessions-'))
   const path = join(directory, 'accounts.sqlite3')
@@ -42,12 +91,18 @@ test('sessions persist as hashes, expire at their deadline, and can be revoked',
     })
     const token = 'synthetic-browser-session-credential'
     accounts.saveSession(token, account.id, 2000)
-    assert.deepEqual(accounts.session(token, 1000), account)
+    assert.deepEqual(
+      { ...accounts.session(token, 1000, 'https://id.example') },
+      { ...account, role: 'student' },
+    )
     accounts.close()
     accounts = new AccountRepository(path)
-    assert.deepEqual(accounts.session(token, 1999), account)
-    assert.equal(accounts.session('unknown', 1000), undefined)
-    assert.equal(accounts.session(token, 2000), undefined)
+    assert.deepEqual(
+      { ...accounts.session(token, 1999, 'https://id.example') },
+      { ...account, role: 'student' },
+    )
+    assert.equal(accounts.session('unknown', 1000, 'https://id.example'), undefined)
+    assert.equal(accounts.session(token, 2000, 'https://id.example'), undefined)
     // Expiration rejects the token immediately; explicit housekeeping reclaims its stored record.
     const expired = new DatabaseSync(path, { readOnly: true })
     try {
@@ -59,7 +114,7 @@ test('sessions persist as hashes, expire at their deadline, and can be revoked',
     }
     accounts.saveSession(token, account.id, 3000)
     accounts.revokeSession(token)
-    assert.equal(accounts.session(token, 2001), undefined)
+    assert.equal(accounts.session(token, 2001, 'https://id.example'), undefined)
     const db = new DatabaseSync(path)
     try {
       accounts.saveSession(token, account.id, 4000)
@@ -90,8 +145,11 @@ test('session lookup remains available while another connection holds the write 
     accounts.saveSession('valid-session', account.id, 2000)
     accounts.saveSession('expired-session', account.id, 1000)
     writer.exec('BEGIN IMMEDIATE')
-    assert.deepEqual(accounts.session('valid-session', 1500), account)
-    assert.equal(accounts.session('expired-session', 1500), undefined)
+    assert.deepEqual(
+      { ...accounts.session('valid-session', 1500, 'https://id.example') },
+      { ...account, role: 'student' },
+    )
+    assert.equal(accounts.session('expired-session', 1500, 'https://id.example'), undefined)
   } finally {
     writer.close()
     accounts.close()

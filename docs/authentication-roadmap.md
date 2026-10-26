@@ -7,6 +7,8 @@ reference; its combined rollout is superseded by this plan.
 
 ## Epic 1: OIDC login for the existing application ([#57](https://github.com/thomastickle/certification-study-tool/issues/57))
 
+Delivered in [PR #60](https://github.com/thomastickle/certification-study-tool/pull/60).
+
 Add a complete login/logout flow with local Keycloak using `openid-client`.
 Keep the existing library database, question banks, and study history in place.
 The first-stage admission policy is one explicitly configured owner.

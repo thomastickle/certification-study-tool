@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
+import type { SessionUser, StudyRole } from '../../shared/auth-contracts.ts'
 
-export type Identity = { issuer: string; subject: string; name: string }
+export type Identity = { issuer: string; subject: string; name: string; role?: StudyRole }
 
 export type Account = { id: string; name: string }
 
@@ -20,12 +21,13 @@ export class AccountRepository {
     `)
     const occupied = Number(existingTables.get()?.total) > 0
     const unrecognizedSchema = version === 0 && occupied
-    const incompatibleVersion = version !== 0 && (appId !== 1096242005 || version !== 1)
+    const incompatibleVersion = version !== 0 && (appId !== 1096242005 || ![1, 2].includes(version))
     if (unrecognizedSchema || incompatibleVersion) {
       this.db.close()
       throw new Error('Unrecognized account database. Use a separate application data directory.')
     }
-    this.db.exec(`
+    try {
+      this.db.exec(`
       PRAGMA foreign_keys = ON;
       BEGIN IMMEDIATE;
       CREATE TABLE IF NOT EXISTS accounts (
@@ -38,13 +40,21 @@ export class AccountRepository {
       CREATE TABLE IF NOT EXISTS sessions (
         token_hash TEXT PRIMARY KEY,
         account_id TEXT NOT NULL REFERENCES accounts(id),
-        expires_at INTEGER NOT NULL
+        expires_at INTEGER NOT NULL,
+        role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'student'))
       );
       CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
-      PRAGMA application_id = 1096242005;
-      PRAGMA user_version = 1;
-      COMMIT;
     `)
+      if (version === 1) {
+        this.db.exec(
+          "ALTER TABLE sessions ADD COLUMN role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'student'))",
+        )
+      }
+      this.db.exec('PRAGMA application_id = 1096242005; PRAGMA user_version = 2; COMMIT;')
+    } catch (error) {
+      this.db.close()
+      throw error
+    }
   }
 
   /** Names are presentation only; an issuer and subject pair owns the account. */
@@ -58,7 +68,7 @@ export class AccountRepository {
     return this.findIdentity(identity.issuer, identity.subject)!
   }
 
-  /** Resolve the configured owner without creating an account or changing its display name. */
+  /** Resolve an exact issuer/subject identity without creating an account or changing its name. */
   findIdentity(issuer: string, subject: string): Account | undefined {
     const findAccount = this.db.prepare(`
       SELECT id, name
@@ -68,20 +78,25 @@ export class AccountRepository {
     return findAccount.get(issuer, subject) as Account | undefined
   }
 
-  saveSession(token: string, accountId: string, expiresAt: number): void {
+  saveSession(
+    token: string,
+    accountId: string,
+    expiresAt: number,
+    role: StudyRole = 'student',
+  ): void {
     this.db
-      .prepare('INSERT INTO sessions VALUES (?, ?, ?)')
-      .run(tokenHash(token), accountId, expiresAt)
+      .prepare('INSERT INTO sessions(token_hash, account_id, expires_at, role) VALUES (?, ?, ?, ?)')
+      .run(tokenHash(token), accountId, expiresAt, role)
   }
 
-  session(token: string, now: number): Account | undefined {
+  session(token: string, now: number, issuer: string): SessionUser | undefined {
     const findSession = this.db.prepare(`
-      SELECT a.id, a.name
+      SELECT a.id, a.name, s.role
       FROM sessions s
       JOIN accounts a ON a.id = s.account_id
-      WHERE s.token_hash = ? AND s.expires_at > ?
+      WHERE s.token_hash = ? AND s.expires_at > ? AND a.issuer = ?
     `)
-    return findSession.get(tokenHash(token), now) as Account | undefined
+    return findSession.get(tokenHash(token), now, issuer) as SessionUser | undefined
   }
 
   /** Reclaim expired records during explicit session housekeeping, never during lookup. */
@@ -91,6 +106,11 @@ export class AccountRepository {
 
   revokeSession(token: string): void {
     this.db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash(token))
+  }
+
+  /** Operator revocation invalidates every browser session for an explicitly selected identity. */
+  revokeAccountSessions(accountId: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE account_id = ?').run(accountId)
   }
 
   close(): void {

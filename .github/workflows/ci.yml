@@ -49,7 +49,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=study-tool
       - name: Verify container health and web app
         run: |
-          docker run --detach --name study-tool --env STUDY_OWNER_SUBJECT=synthetic-ci-owner --publish 127.0.0.1:3000:3000 study-tool:ci
+          docker run --detach --name study-tool --publish 127.0.0.1:3000:3000 study-tool:ci
           for attempt in {1..30}; do
             status=$(docker inspect --format '{{.State.Health.Status}}' study-tool)
             if [ "$status" = healthy ]; then
@@ -70,7 +70,7 @@ jobs:
         with:
           node-version-file: package.json
           check-latest: true
-      - name: Verify owner-only login against local Keycloak
+      - name: Verify shared banks and private progress against Keycloak
         env:
           STUDY_IMAGE: study-tool:ci
-        run: node tests/owner-login-smoke.ts --project study-login-ci --app-url http://127.0.0.1:13000 --issuer http://127.0.0.1:18080/realms/study
+        run: node tests/shared-users-smoke.ts --project study-login-ci --app-url http://127.0.0.1:13000 --issuer http://127.0.0.1:18080/realms/study

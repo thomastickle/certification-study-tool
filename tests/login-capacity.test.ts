@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { OwnerAuthentication } from '../src/server/auth/owner-authentication.ts'
+import { ApplicationAuthentication } from '../src/server/auth/application-authentication.ts'
 import { OidcLogin } from '../src/server/auth/oidc-login.ts'
 
 test('pending sign-ins reserve capacity across asynchronous provider work', async (t) => {
@@ -21,9 +21,8 @@ test('pending sign-ins reserve capacity across asynchronous provider work', asyn
     }
   })
   const directory = mkdtempSync(join(tmpdir(), 'study-login-capacity-'))
-  const app = new OwnerAuthentication({
+  const app = new ApplicationAuthentication({
     accountsPath: join(directory, 'accounts.sqlite3'),
-    ownerSubject: 'alice',
     issuer: 'https://identity.example',
     clientId: 'study-tool',
     origin: new URL('http://127.0.0.1:3000'),

@@ -18,8 +18,8 @@ filters, saved answer review, and local Markdown exports. See
 ## Run
 
 Use Node **24.14 or later in the 24.x line** and npm.
-First complete [Keycloak enrollment and owner configuration](docs/authentication.md).
-Only that verified owner can sign in; the existing study database stays in place.
+First complete [Keycloak enrollment and application-role setup](docs/authentication.md).
+Users study shared banks with private progress; administrators manage shared content.
 
 ```sh
 npm ci
@@ -39,13 +39,14 @@ NODE_ENV=production npm start
 The database defaults to `private/app/library.sqlite3`. `STUDY_DB_PATH` selects a
 separate database path and `STUDY_PORT` selects a port. Do not point this app at
 the original Python app's database; existing unrelated databases are refused.
-The current schema is version 2 and uses an application identifier to recognize
-its own databases. No legacy database migration is implemented.
+The current study schema is version 3 and uses an application identifier to recognize
+its own databases. Upgrading owner-only study history requires an explicit
+[legacy-owner mapping](docs/authentication.md#upgrade-from-the-owner-only-release).
 
 ## Run with Docker
 
 With Docker Engine/Desktop and Docker Compose running, follow the
-[owner setup and upgrade instructions](docs/authentication.md) before starting:
+[role setup and upgrade instructions](docs/authentication.md) before starting:
 
 ```sh
 docker compose up --build -d
@@ -85,9 +86,10 @@ active in either mode.
    duplicate answer keys must be corrected in the input before importing.
 
 The prepared banks live in the Git-ignored `private/question-banks/` folder.
-Banks and databases must remain local. File contents are sent only to the
-loopback server; this app has no external API or upload destination, analytics,
-remote fonts, or cloud database. Imported data is persisted in SQLite; the app
+Keep bank files and databases out of Git. Imported banks are sent to your study
+server and shared with its users. Banks and progress are not sent to the identity
+provider; the app has no analytics, remote fonts, or cloud database. Imported data
+is persisted in SQLite; the app
 does not save a separate copy of the selected input file. Original files are
 never edited or deleted by the app.
 

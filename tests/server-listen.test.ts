@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 // Exercise the actual entry point through a container-like, non-loopback connection.
-test('server permits its configured Host but requires owner login for study data', async (t) => {
+test('server permits its configured Host but requires login for study data', async (t) => {
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === 'IPv4' && !entry.internal)?.address
@@ -31,7 +31,6 @@ test('server permits its configured Host but requires owner login for study data
       STUDY_PORT: String(port),
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
       STUDY_ACCOUNTS_PATH: join(directory, 'accounts.sqlite3'),
-      STUDY_OWNER_SUBJECT: 'synthetic-owner',
       STUDY_ORIGIN: `http://localhost:${port}`,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

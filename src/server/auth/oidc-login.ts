@@ -56,10 +56,14 @@ export class OidcLogin {
     }
     const tokens = await oidc.authorizationCodeGrant(config, url, checks)
     const claims = tokens.claims()!
+    const roles = claims.study_roles
+    const hasRoleList = Array.isArray(roles) && roles.every((role) => typeof role === 'string')
+    const admin = hasRoleList && roles.includes('admin')
     return {
       issuer: claims.iss,
       subject: claims.sub,
       name: typeof claims.name === 'string' ? claims.name : claims.sub,
+      role: admin ? 'admin' : 'student',
     }
   }
 

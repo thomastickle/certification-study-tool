@@ -21,7 +21,9 @@ test('migration preserves v1 library IDs/content; saved results survive reopen a
     repository.close()
     // Recreate the previous version's schema around genuine synthetic library rows.
     const old = new DatabaseSync(path)
-    old.exec('DROP TABLE quiz_sessions; DROP TABLE quiz_mastery; PRAGMA user_version=1;')
+    old.exec(
+      'DROP TABLE quiz_sessions; DROP TABLE quiz_mastery; DROP TABLE earned_certifications; PRAGMA user_version=1;',
+    )
     old.close()
     repository = new LibraryRepository(path)
     assert.deepEqual(repository.allQuestions(), original)

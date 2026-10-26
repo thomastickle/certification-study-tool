@@ -1,126 +1,157 @@
-# Owner-only OIDC login
+# Login and shared study libraries
 
-This first authentication epic admits one explicitly configured owner. The
-existing `STUDY_DB_PATH` library, question banks, and study history remain in place.
-Multiple users, admin-managed shared banks, and private banks are later
-[epics](authentication-roadmap.md).
+Users sign in through the configured OIDC provider. Everyone can study shared
+question banks. The application `admin` role permits importing, changing, and
+deleting shared banks and reviewed concept mappings. Attempts, mastery, results,
+and earned certifications belong to the signed-in account, including for admins.
+Private question banks remain a [later epic](authentication-roadmap.md).
 
-The Node backend uses `openid-client` for discovery, Authorization Code with S256
-PKCE, state/nonce, and ID-token validation including signatures. Passwords stay
-at the provider. The browser receives an opaque HttpOnly, SameSite=Lax application
-cookie; only its hash is stored in the separate account/session database.
+The backend uses `openid-client` for discovery, Authorization Code with S256 PKCE,
+state, nonce, and signed ID-token validation. Passwords stay at the provider.
+The browser receives an opaque HttpOnly, SameSite=Lax cookie; the separate account
+database stores its hash. Provider tokens are discarded.
 
-## Local Keycloak and owner enrollment
+## Local Keycloak setup
 
-Use a private, Git-ignored `.env` file for these local settings. Choose a strong
-local bootstrap password; never commit that file or a realm export with passwords.
+Keep credentials in a private, Git-ignored `.env` file:
 
 ```dotenv
 KC_BOOTSTRAP_ADMIN_USERNAME=local-admin
 KC_BOOTSTRAP_ADMIN_PASSWORD=<your-private-local-bootstrap-password>
 ```
 
-Start the identity provider first:
+Start the identity provider:
 
 ```sh
 docker compose -f compose.keycloak.yaml up -d --wait
 ```
 
-Open http://127.0.0.1:8080/admin and sign in with those bootstrap credentials.
-Select the imported **study** realm. Under **Users**, create the owner's user,
-enable it, and set its password under **Credentials**. Copy its **ID** from the
-user details into `.env`:
+Open http://127.0.0.1:8080/admin and select the **study** realm. Create your users
+under **Users**, enable them, and set passwords under **Credentials**. Registration
+is disabled in the supplied development realm.
 
-```dotenv
-STUDY_OWNER_SUBJECT=<the-owner-user-ID-from-the-study-realm>
-```
+For an application administrator, open the user's **Role mapping**, filter by
+client roles, and assign **study-tool → admin**. Students need no role. Keycloak
+bootstrap administrators do not automatically receive application admin rights.
 
-This must be the verified OIDC `sub`, paired with `STUDY_OIDC_ISSUER`; a username,
-email, or display name does not establish ownership. There is no automatic
-first-login claim. Registration is disabled in the development realm. A valid
-login by another identity is denied and clears any previous local browser session.
-
-Start the application:
+Start the application and open http://127.0.0.1:3000:
 
 ```sh
 docker compose up --build -d --wait
 ```
 
-Open http://127.0.0.1:3000 and choose **Sign in**. The image contains no seeded
-users or passwords. Realm imports happen only when the realm does not exist;
-editing the JSON does not change an existing realm. Keep the Keycloak volume:
-recreating users can change their subjects and requires explicit reconfiguration.
+The image contains no seeded users or passwords. Keep the Keycloak volume:
+recreating users can change their subjects. Native development can use
+`node --env-file=.env --watch src/server/main.ts` with Keycloak running.
+The development client permits exact callbacks at ports 3000 and 3100; a native
+server on port 3100 needs matching `STUDY_PORT` and `STUDY_ORIGIN` settings.
 
-For a native development server, leave Keycloak running and use:
+## Verified roles and existing realms
 
-```sh
-node --env-file=.env --watch src/server/main.ts
-```
+The app reads only the `study_roles` array in the **verified ID token**. An exact
+`admin` entry grants shared-library management. Missing, malformed, or unrelated
+roles grant student access. Browser headers, usernames, email addresses, realm
+administrator roles, and unsigned token contents do not grant application roles.
 
-`npm run dev` also works when the configuration is exported in the environment.
-The local client permits exact callbacks at ports 3000 and 3100. For port 3100,
-set `STUDY_PORT=3100` and `STUDY_ORIGIN=http://127.0.0.1:3100` together.
+The supplied realm declares the `study-tool` client role and a dedicated mapper.
+For an **existing realm**, apply these changes in its admin console; startup
+import does not update an existing realm:
+
+1. Under **Clients → study-tool → Roles**, create `admin`.
+2. In the client's dedicated scope, add a **User Client Role** mapper named
+   `study-application-roles`.
+3. Set **Client ID** to `study-tool`, **Token Claim Name** to `study_roles`,
+   **Claim JSON Type** to `String`, and **Multivalued** to on.
+4. Turn **Add to ID token** on. Access-token and userinfo inclusion are not needed.
+   See the exact [realm configuration](../dev/keycloak/study-realm.json) and
+   [Keycloak mapper fields](https://www.keycloak.org/admin-api/protocol-mappers#oidc-usermodel-client-role-mapper).
+5. Assign the client role to intended users and sign in again. Confirm an admin
+   sees import/delete controls and a student can browse and study.
+
+Any user who authenticates with the configured issuer/client can use student
+features. Control enrollment at that provider. Providers that do not issue the
+application role claim grant student access.
 
 ## Configuration
 
-| Variable                   | Default                                                             | Purpose                                                    |
-| -------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `STUDY_DB_PATH`            | `private/app/library.sqlite3`; `/data/library.sqlite3` in the image | Existing study database; unchanged by authentication.      |
-| `STUDY_ACCOUNTS_PATH`      | `accounts.sqlite3` beside the study database                        | Durable account/session metadata; must be a separate file. |
-| `STUDY_OWNER_SUBJECT`      | Required                                                            | The sole admitted subject from the configured issuer.      |
-| `STUDY_OIDC_ISSUER`        | `http://127.0.0.1:8080/realms/study`                                | Trusted issuer.                                            |
-| `STUDY_OIDC_CLIENT_ID`     | `study-tool`                                                        | Registered client.                                         |
-| `STUDY_OIDC_CLIENT_SECRET` | Unset                                                               | Optional server-side confidential-client secret.           |
-| `STUDY_ORIGIN`             | `http://127.0.0.1:<STUDY_PORT>`                                     | Exact browser-facing origin and Host allowlist.            |
+| Variable                     | Default                                                          | Purpose                                                             |
+| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `STUDY_DB_PATH`              | `private/app/library.sqlite3`; `/data/library.sqlite3` in Docker | Shared content and account-scoped study state.                      |
+| `STUDY_ACCOUNTS_PATH`        | `accounts.sqlite3` beside the study database                     | Identity and hashed sessions; a separate file.                      |
+| `STUDY_LEGACY_OWNER_SUBJECT` | Unset                                                            | Explicit ownership mapping for existing single-owner study history. |
+| `STUDY_OIDC_ISSUER`          | `http://127.0.0.1:8080/realms/study`                             | Trusted issuer identifier, retained exactly.                        |
+| `STUDY_OIDC_CLIENT_ID`       | `study-tool`                                                     | Registered client.                                                  |
+| `STUDY_OIDC_CLIENT_SECRET`   | Unset                                                            | Optional private server-side client secret.                         |
+| `STUDY_ORIGIN`               | `http://127.0.0.1:<STUDY_PORT>`                                  | Exact browser origin and Host allowlist.                            |
 
-Register `<STUDY_ORIGIN>/auth/callback` as an exact callback and `<STUDY_ORIGIN>/`
-as an allowed post-logout redirect. Local development uses a public client with
-required PKCE; a confidential client can supply a private server-side secret.
-Use the issuer identifier exactly as published in discovery metadata, including
-whether a trailing slash is present. It is retained unchanged for owner checks
-and account lookup.
+`STUDY_OWNER_SUBJECT` no longer controls admission. The legacy-owner setting is
+for data attribution and never grants admin rights. Its value must be the previous
+owner's verified `sub` from the same issuer, not a username, email, or display
+name. There is no automatic first-login claim.
 
-HTTP is accepted only on loopback. Remote application origins and issuers require
-HTTPS. Behind a TLS reverse proxy, preserve the configured Host and restrict direct
-backend access; forwarded host/protocol headers are not trusted. HTTPS produces
-Secure cookies. The local Compose services share a loopback namespace so both
-browser and server can use the same issuer URL. Keycloak `start-dev` is a local
-development setup, not a production identity-provider deployment.
+Register `<STUDY_ORIGIN>/auth/callback` and `<STUDY_ORIGIN>/` as exact callback and
+logout destinations. Keep the issuer exactly as published, including whether it
+ends in `/`. HTTP is accepted only on loopback; remote origins and issuers require
+HTTPS. A TLS reverse proxy must preserve the configured Host and restrict direct
+backend access. Forwarded origin headers are not trusted. HTTPS uses Secure
+cookies. Keycloak `start-dev` and the loopback Compose setup are for development.
 
-## Sessions and failure behavior
+## Sessions, role changes, and revocation
 
-- Application sessions survive app restarts, expire after eight hours, and are
-  checked against the current configured owner on every study request. Changing
-  the configured owner requires a restart and rejects the former owner's sessions.
-- Provider tokens are discarded. There is no refresh token or refresh loop,
-  back-channel logout, or immediate provider-disable revocation. A local session
-  remains valid until local logout or its eight-hour expiry.
-- Pending login attempts are browser-bound, single-use, bounded, and expire after
-  ten minutes. Restarting the app or overlapping sign-ins can require starting
-  again. New attempts replace the browser's previous attempt.
-- Logout is a same-origin POST, following the practice save/pause guard. Local
-  revocation succeeds during provider outages. The provider may request logout
-  confirmation because the app does not retain an ID token.
-- The API requires the immutable account binding displayed by the mounted UI.
-  An obsolete client cannot adopt a replacement login or invalidate its UI with
-  a late failure. Focus rechecks the session while preserving a same-owner mount.
+- Each application session lasts eight hours without sliding expiry or a refresh
+  loop. Its verified role is fixed for that session and survives app restarts.
+  New sign-in establishes the latest role and replaces that browser's old session.
+- Changing a provider role, disabling a user, or ending a provider session does
+  **not** immediately revoke application sessions in other browsers. They remain
+  valid until local logout, expiry, or operator revocation.
+- For urgent revocation, first remove the provider role or disable the user, then
+  revoke that account's application sessions. With the standard volume:
 
-## Upgrade and rollback
+  ```sh
+  docker compose exec study node src/server/auth/revoke-sessions.ts --accounts /data/accounts.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
+  ```
 
-Before upgrading, retain the previous image tag and stop the study application.
-Back up its entire data volume while stopped, and use the same Compose project
-name and volume as before. Keep `STUDY_DB_PATH=/data/library.sqlite3` for the
-standard image; do not create a fresh study volume as part of adding login.
+  Native runs can use `npm run auth:revoke --` with the same arguments. Issuer and
+  subject must both match; other accounts remain signed in. Sign in again to
+  acquire updated permissions. Back-channel logout is not implemented.
 
-Enroll the owner in Keycloak and set the verified subject before starting the new
-image. Check `/api/health`, sign in, and verify existing questions and completed
-history. No study schema or ownership migration is introduced by this epic.
-The only added application file is the account/session database beside the library.
+- Login transactions are browser-bound, single-use, bounded, and expire after ten
+  minutes. Import review tickets have the same lifetime, belong to one account,
+  and can be confirmed once. App restart requires a fresh import preview.
+- Logout is a same-origin POST after the practice save/pause guard. Failures keep
+  the workspace open with feedback. Provider outages do not prevent local logout.
+  Keycloak may request confirmation because the app does not retain an ID token.
+- APIs use the authenticated account and the UI's fixed account binding. Old
+  workspaces cannot adopt a replacement login or its API client. Focus checks
+  preserve the mount only when account and role match.
 
-Back up the application volume and Keycloak volume, plus private configuration.
-To roll back, stop the new app and start the retained old image with its original
-library volume and environment. The old image does not provide this login boundary;
-retain its previous network restrictions. Restore a stopped-volume backup only
-when required and with a separately preserved copy of newer data.
+## Upgrade from the owner-only release
 
-`docker compose down` retains the volumes. `down --volumes` deletes their data.
+1. Retain the old image tag, stop **all** study application instances, and back up
+   the entire stopped application volume plus Keycloak and private settings.
+   Keep the same Compose project, volume, and `/data/library.sqlite3` path.
+2. Configure the Keycloak role and mapper above without replacing the existing
+   realm or users. Assign `study-tool → admin` to intended library managers.
+3. Copy the old `STUDY_OWNER_SUBJECT` value into `.env` as
+   `STUDY_LEGACY_OWNER_SUBJECT`. Keep the same issuer. Confirm this identifies the
+   person whose existing study history belongs to them.
+4. Start the new image. An atomic study-schema upgrade attributes attempts, legacy
+   mastery, and earned certifications to that identity. Shared questions, source
+   IDs, concept mappings, and import revisions stay intact. Startup refuses an
+   occupied legacy study database without the explicit mapping.
+5. Sign in as the previous owner and verify history and earned certifications.
+   A second user should see shared questions and empty personal history. Confirm
+   that a student cannot import or delete. After success, remove the old owner-only
+   setting and the one-time legacy-owner setting from `.env`.
+
+Empty databases need no legacy mapping. Upgraded databases are not reassigned by
+later changes to the setting. The study schema is version 3; account/session
+storage is version 2. Account IDs remain stable. A new user does not receive a
+library copy. Theme and sidebar layout remain browser-local preferences; study
+evidence and tracked-certification selection are account-specific.
+
+For rollback, stop all new instances and preserve their newer data separately.
+Restore **both** application databases from the stopped pre-upgrade volume backup,
+then start the retained old image with its former environment. The old image
+cannot open upgraded schemas. Provider role/mapper additions can remain.
+`docker compose down` retains volumes; `down --volumes` deletes their data.

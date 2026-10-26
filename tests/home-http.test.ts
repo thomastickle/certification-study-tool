@@ -19,7 +19,7 @@ test('HTTP home and earned settings preserve readiness, enforce scope and surviv
   input.certification = { provider: 'AWS', code: 'CLF-C02', name: 'Cloud Practitioner' }
   importer.confirm(input, importer.preview(input).token, false)
   const revision = repository.revision()
-  const server = createServer(apiController(repository))
+  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

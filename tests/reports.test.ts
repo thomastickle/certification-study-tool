@@ -9,7 +9,7 @@ import { LibraryRepository } from '../src/server/questions/library-repository.ts
 /** Exercises the report through the same local HTTP boundary as the dashboard. */
 async function withReports(work: (base: string, repository: LibraryRepository) => Promise<void>) {
   const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiController(repository))
+  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
