@@ -47,7 +47,7 @@ export function App({ account }: { account: SessionUser }) {
   const [selected, setSelected] = useState<Certification | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
-  const [selectionError, setSelectionError] = useState('')
+  const [transitionError, setTransitionError] = useState('')
   const selectedRef = useRef<Certification | null>(null)
   const [focusPreset, setFocusPreset] = useState(false)
   const destination = page === 'quiz' || page === 'exam' ? 'practice' : page
@@ -128,7 +128,7 @@ export function App({ account }: { account: SessionUser }) {
     setPage(next)
   }
 
-  /** Serialize every exit, save/pause practice, and reject continuations from an old workspace. */
+  /** Serialize exits, retain failed work with feedback, and ignore obsolete workspace continuations. */
   async function transitionWorkspace(transition: WorkspaceTransition) {
     const inPractice = page === 'quiz' || page === 'exam' || page === 'review'
     if (navigating.current) {
@@ -145,9 +145,7 @@ export function App({ account }: { account: SessionUser }) {
       }
     }
     navigating.current = true
-    if (transition.kind === 'certification') {
-      setSelectionError('')
-    }
+    setTransitionError('')
     try {
       if (inPractice) {
         const canLeave = await leaveQuiz.current()
@@ -170,14 +168,19 @@ export function App({ account }: { account: SessionUser }) {
           break
       }
     } catch (reason) {
-      if (transition.kind !== 'certification') {
-        throw reason
+      if (!workspace.isActive()) {
+        return
       }
       const message =
-        reason instanceof Error ? reason.message : 'Could not suspend the previous attempt.'
-      setSelectionError(
-        `${message} Your certification has not changed. Retry the selection to pause saved work safely.`,
-      )
+        reason instanceof Error ? reason.message : 'Could not save and pause the current attempt.'
+      let recovery = 'Your page has not changed. Retry navigation to pause saved work safely.'
+      if (transition.kind === 'certification') {
+        recovery =
+          'Your certification has not changed. Retry the selection to pause saved work safely.'
+      } else if (transition.kind === 'logout') {
+        recovery = 'You are still signed in. Retry Sign out to pause saved work safely.'
+      }
+      setTransitionError(`${message} ${recovery}`)
     } finally {
       navigating.current = false
     }
@@ -198,7 +201,7 @@ export function App({ account }: { account: SessionUser }) {
       (certification) => certificationKey(certification) === certificationKey(track),
     )
     if (!target) {
-      setSelectionError(
+      setTransitionError(
         'Import eligible question banks for this certification before starting practice or review.',
       )
       return
@@ -262,9 +265,9 @@ export function App({ account }: { account: SessionUser }) {
         }}
       />
       <div className="workspace-content">
-        {selectionError && (
+        {transitionError && (
           <div className="message error" role="alert">
-            {selectionError}
+            {transitionError}
           </div>
         )}
         {catalogError && (
