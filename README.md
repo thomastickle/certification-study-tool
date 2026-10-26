@@ -18,10 +18,12 @@ filters, saved answer review, and local Markdown exports. See
 ## Run
 
 Use Node **24.14 or later in the 24.x line** and npm.
+First complete [Keycloak enrollment and owner configuration](docs/authentication.md).
+Only that verified owner can sign in; the existing study database stays in place.
 
 ```sh
 npm ci
-npm run dev
+node --env-file=.env --watch src/server/main.ts
 ```
 
 Open **http://127.0.0.1:3000**. Frontend changes reload through Vite; changes to
@@ -42,17 +44,17 @@ its own databases. No legacy database migration is implemented.
 
 ## Run with Docker
 
-With Docker Engine/Desktop and Docker Compose running:
+With Docker Engine/Desktop and Docker Compose running, follow the
+[owner setup and upgrade instructions](docs/authentication.md) before starting:
 
 ```sh
 docker compose up --build -d
 ```
 
 Open **http://127.0.0.1:3000**. The image builds the frontend and runs the
-production server as a non-root user. Only the host loopback interface is
-published; keep this binding because the app has no user authentication.
-Port 3000 must be free. Keep host and container ports the same because the
-local Host/Origin checks use the server port.
+production server as a non-root user. The stack includes local Keycloak and
+publishes only loopback ports. Set `STUDY_WEB_PORT` and `STUDY_KEYCLOAK_PORT`
+together with the documented origin/issuer configuration when using other ports.
 
 ```sh
 docker compose logs -f study  # View logs
@@ -62,6 +64,7 @@ docker compose up -d          # Start again
 
 The `study-data` Docker volume stores SQLite data across container rebuilds and
 recreation. `docker compose down --volumes` **permanently deletes that library**.
+The `keycloak-data` volume separately preserves provider identities.
 Back up the volume while the service is stopped before removing volumes or
 moving machines. This starts a new, empty library; your existing
 `private/app/library.sqlite3` is not copied. Import banks through the browser as

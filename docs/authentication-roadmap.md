@@ -5,12 +5,11 @@ verified, and reviewed before the next changes its feature boundary. The earlier
 authentication/private-database stack is retained as implementation and test
 reference; its combined rollout is superseded by this plan.
 
-## Epic 1: OIDC login for the existing application
+## Epic 1: OIDC login for the existing application ([#57](https://github.com/thomastickle/certification-study-tool/issues/57))
 
 Add a complete login/logout flow with local Keycloak using `openid-client`.
 Keep the existing library database, question banks, and study history in place.
-The proposed first-stage admission policy is one explicitly configured owner;
-confirm that policy before connecting authentication to the live API.
+The first-stage admission policy is one explicitly configured owner.
 
 Acceptance criteria:
 
@@ -33,7 +32,7 @@ This epic does not introduce multi-user study ownership, bank roles, or private
 banks. Its PR contains the working authentication feature, rather than dormant
 primitives that require a later storage feature to become usable.
 
-## Epic 2: Multiple users with admin-managed shared banks
+## Epic 2: Multiple users with admin-managed shared banks ([#58](https://github.com/thomastickle/certification-study-tool/issues/58))
 
 Admit multiple users. Everyone can study the shared question banks; only users
 with the admin role can create, import, modify, or delete shared bank content.
@@ -54,7 +53,7 @@ Choose the storage design within this epic after reviewing its access patterns.
 The earlier separate-user-database implementation is useful evidence, not a
 requirement to copy a complete shared library into every user's database.
 
-## Epic 3: Shared banks plus user-owned private banks
+## Epic 3: Shared banks plus user-owned private banks ([#59](https://github.com/thomastickle/certification-study-tool/issues/59))
 
 Let users keep private banks alongside the shared banks. Preserve admin control
 over shared content and keep study progress private.

@@ -55,12 +55,17 @@ export class AccountRepository {
         SET name = excluded.name
     `)
     upsertAccount.run(randomUUID(), identity.issuer, identity.subject, identity.name)
+    return this.findIdentity(identity.issuer, identity.subject)!
+  }
+
+  /** Resolve the configured owner without creating an account or changing its display name. */
+  findIdentity(issuer: string, subject: string): Account | undefined {
     const findAccount = this.db.prepare(`
       SELECT id, name
       FROM accounts
       WHERE issuer = ? AND subject = ?
     `)
-    return findAccount.get(identity.issuer, identity.subject) as Account
+    return findAccount.get(issuer, subject) as Account | undefined
   }
 
   saveSession(token: string, accountId: string, expiresAt: number): void {

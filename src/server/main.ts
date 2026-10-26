@@ -2,18 +2,35 @@ import { createServer } from 'node:http'
 import { mkdirSync, chmodSync, existsSync, statSync, createReadStream } from 'node:fs'
 import { resolve, dirname, extname, sep } from 'node:path'
 import { QuizService } from './quizzes/quiz-service.ts'
-import { apiController, checkLocalRequest } from './http-controller.ts'
+import { apiController } from './http-controller.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
+import { OwnerAuthentication } from './auth/owner-authentication.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error('STUDY_PORT must be a valid port.')
 const databasePath = resolve(process.env.STUDY_DB_PATH ?? 'private/app/library.sqlite3')
+const accountsPath = resolve(
+  process.env.STUDY_ACCOUNTS_PATH ?? resolve(dirname(databasePath), 'accounts.sqlite3'),
+)
+if (accountsPath === databasePath) {
+  throw new Error('STUDY_ACCOUNTS_PATH must be separate from STUDY_DB_PATH.')
+}
+const origin = new URL(process.env.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
+const authenticationOptions = {
+  origin,
+  issuer: new URL(process.env.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study'),
+  clientId: process.env.STUDY_OIDC_CLIENT_ID ?? 'study-tool',
+  clientSecret: process.env.STUDY_OIDC_CLIENT_SECRET || undefined,
+  ownerSubject: process.env.STUDY_OWNER_SUBJECT ?? '',
+  accountsPath,
+}
+const authentication = new OwnerAuthentication(authenticationOptions)
 mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
 const repository = new LibraryRepository(databasePath)
 chmodSync(databasePath, 0o600)
-const api = apiController(repository)
+const api = apiController(repository, origin)
 const quizzes = new QuizService(repository)
 quizzes.expireDue()
 const expiryTimer = setInterval(() => {
@@ -30,11 +47,16 @@ let webHandler: (
   response: import('node:http').ServerResponse,
 ) => void
 const server = createServer((request, response) => {
-  try {
-    checkLocalRequest(request)
-  } catch {
-    response.writeHead(403)
-    response.end('Local access only.')
+  void handleRequest(request, response)
+})
+
+/** Admit the configured owner before forwarding requests to the unchanged study API. */
+async function handleRequest(
+  request: import('node:http').IncomingMessage,
+  response: import('node:http').ServerResponse,
+) {
+  const handled = await authentication.handle(request, response)
+  if (handled) {
     return
   }
   if (request.url?.startsWith('/api/')) {
@@ -42,7 +64,7 @@ const server = createServer((request, response) => {
     return
   }
   webHandler(request, response)
-})
+}
 
 let closeWeb = async () => {}
 
@@ -91,7 +113,7 @@ if (!production) {
     }
   }
 }
-server.listen(port, host, () => console.log(`Certification Study Tool: http://127.0.0.1:${port}`))
+server.listen(port, host, () => console.log(`Certification Study Tool: ${origin.origin}`))
 
 async function shutdown() {
   clearInterval(expiryTimer)
@@ -99,6 +121,7 @@ async function shutdown() {
   await closeWeb()
   server.close(() => {
     repository.close()
+    authentication.close()
     process.exit(0)
   })
   server.closeAllConnections()
