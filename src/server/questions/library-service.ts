@@ -1,15 +1,15 @@
 import { ApplicationError } from '../errors.ts'
-import { LibraryRepository } from './library-repository.ts'
+import type { LibraryView } from './library-repository.ts'
 import { pinLegacySources } from './bank-provenance.ts'
 import { privateItemId } from '../../shared/library-identity.ts'
 import type { LibraryVisibility } from '../../shared/contracts.ts'
 import { sameCertification } from '../quizzes/certification-scope.ts'
 
 export class LibraryService {
-  private repository: LibraryRepository
+  private repository: LibraryView
   private visibility: LibraryVisibility
 
-  constructor(repository: LibraryRepository, visibility: LibraryVisibility = 'shared') {
+  constructor(repository: LibraryView, visibility: LibraryVisibility = 'shared') {
     this.repository = repository
     this.visibility = visibility
   }

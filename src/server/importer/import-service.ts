@@ -1,14 +1,14 @@
 import type { JsonObject, Preview } from '../../shared/contracts.ts'
-import { LibraryRepository } from '../questions/library-repository.ts'
+import type { LibraryView } from '../questions/library-repository.ts'
 import { ApplicationError } from '../errors.ts'
 import { validateBank } from './validate-bank.ts'
 import { answerKey, canonical, digest, fingerprint, reference } from './bank-tools.ts'
 
 /** File import use cases; no HTTP, UI or filesystem ownership. */
 export class ImportService {
-  private repository: LibraryRepository
+  private repository: LibraryView
 
-  constructor(repository: LibraryRepository) {
+  constructor(repository: LibraryView) {
     this.repository = repository
   }
 

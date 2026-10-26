@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { digest } from '../importer/bank-tools.ts'
 import { ApplicationError } from '../errors.ts'
 import { currentQuestionIdentity } from '../quizzes/question-identity.ts'
-import type { LibraryRepository } from '../questions/library-repository.ts'
+import type { LibraryView } from '../questions/library-repository.ts'
 import type {
   ConceptGroup,
   ConceptMember,
@@ -11,9 +11,9 @@ import type {
 
 /** Review local label candidates independently of bank content. */
 export class ConceptService {
-  private repository: LibraryRepository
+  private repository: LibraryView
 
-  constructor(repository: LibraryRepository) {
+  constructor(repository: LibraryView) {
     this.repository = repository
   }
 
