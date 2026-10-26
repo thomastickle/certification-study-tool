@@ -90,6 +90,21 @@ export class QuizRepository {
       .map((row) => JSON.parse(String(row.data)))
   }
 
+  /** Read only timer metadata; paused and completed attempts have no background deadline. */
+  nextHousekeepingAt(): number | null {
+    const row = this.db
+      .prepare(
+        `SELECT MIN(CASE status
+                     WHEN 'active' THEN json_extract(data, '$.deadline')
+                     WHEN 'deleted' THEN json_extract(data, '$.purgeAt')
+                   END) AS deadline
+         FROM quiz_sessions
+         WHERE account_id = ? AND status IN ('active', 'deleted')`,
+      )
+      .get(this.accountId)
+    return row?.deadline == null ? null : Number(row.deadline)
+  }
+
   /** Remove expired snapshots, including after the application has been offline. */
   purgeDeleted(now: number): void {
     this.db
