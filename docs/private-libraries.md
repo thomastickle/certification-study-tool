@@ -42,6 +42,29 @@ accounts remain available, and later housekeeping passes retry the failed accoun
 discovery failures are also logged and retried. Schema/data migration and physical
 cleanup still fail startup rather than serving a partially separated layout.
 
+The first upkeep pass reconstructs timers from persisted files before HTTP starts.
+Thereafter, a one-second tick opens only owners whose known active-attempt or
+48-hour retention deadline is due. Every five seconds, a full discovery and
+reconciliation pass also opens idle owners, discovers new files, retries damaged
+files and applies shared-deletion outbox events. Idle owners are not opened on
+intervening ticks. Each completed request refreshes timer metadata from its own
+connection, covering create/resume/pause/abandon and result delete/restore without
+retaining that connection. Paused attempts have no expiry deadline.
+
+Known deadlines run on the first available one-second tick after their persisted
+wall-clock deadline; unattended changes made by another process and shared
+provenance events are recovered on the first available five-second pass. Startup
+also recovers missed scoring, retention purges and deletion events after downtime.
+The five-second cadence uses monotonic elapsed time, so wall-clock adjustments
+do not postpone reconciliation. Quiz and retention timestamps still follow the
+server wall clock, as foreground operations do. These are scheduling cadences,
+not hard latency bounds: synchronous SQLite work, busy timeouts and event-loop
+load can delay either pass. Full passes remain synchronous and proportional to
+owner count; this change reduces their frequency rather than removing their
+latency spikes. The synchronous timer cannot overlap itself. Shutdown clears the
+timer; each pass closes its owned connection before returning, and at most one
+background private connection is open at a time. No connection pool is retained.
+
 History is private even when its questions came from shared banks. Private
 question snapshots never enter the shared database. Shared deletions append a
 public bank-provenance event atomically with deletion. Each private database
@@ -106,3 +129,34 @@ Prefer the individual file for library/study settings, central storage for
 identity/session security and application defaults, and browser storage for
 device-specific presentation. Server-side preference synchronization is separate
 future work.
+
+## Synthetic housekeeping measurements
+
+Run with the supported Node 24 executable and existing dependencies:
+
+```sh
+umask 077
+node tests/housekeeping-benchmark.ts baseline > /restricted/path/housekeeping-baseline.log 2>&1
+node tests/housekeeping-benchmark.ts scheduled > /restricted/path/housekeeping-after.log 2>&1
+```
+
+Use an existing mode-0700 output directory outside Git; logs must be mode 0600.
+The baseline reproduces the successful per-second path at `0ee670f` without the
+new metadata query. The harness creates disposable synthetic SQLite files and
+removes them on exit. Each owner has ten completed 20-question snapshots; 20% also
+have an active attempt due at simulated second three and another 20% have a
+retained deletion due at second four. A shared deletion event exercises the
+current outbox-to-private-annotation path, including idle-owner histories.
+Assertions verify scoring, purging and every owner's deletion cursor in both modes.
+
+Twenty ticks advance injected wall/monotonic time by one second each, while actual
+work runs synchronously without sleeping a second between ticks. JSON reports
+startup blocking time, total recurring blocking time, maximum zero-delay timer
+latency (including a recurring-only maximum), discovery/open counts and peak/live
+owned background connections. Timer latency includes the timer resolution floor.
+Setup and result verification are excluded. Run modes sequentially on the same
+machine; timing is machine/load/cache dependent and is not a test threshold.
+For 10/100 owners the deterministic open counts are 200/2000 before and 44/440
+after, with 20 versus four discoveries and a peak of one owned connection.
+This measures housekeeping only. It does not resolve broader import/query work
+in #67, and the former cross-account central-snapshot model no longer applies.

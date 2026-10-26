@@ -10,7 +10,7 @@ import { applicationRequestHandler } from './request-handler.ts'
 import type { ApplicationHandlers } from './request-handler.ts'
 import type { SessionUser } from '../shared/auth-contracts.ts'
 import { PrivateLibraries } from './questions/private-libraries.ts'
-import { expireStudyWork } from './questions/study-housekeeping.ts'
+import { StudyHousekeeping } from './questions/study-housekeeping.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
@@ -47,15 +47,16 @@ try {
   throw error
 }
 chmodSync(databasePath, 0o600)
+const housekeeping = new StudyHousekeeping(repository, privateLibraries)
 try {
   privateLibraries.migrateFrom(repository)
-  expireStudyWork(repository, privateLibraries)
+  housekeeping.tick()
 } catch (error) {
   repository.close()
   authentication.close()
   throw error
 }
-const expiryTimer = setInterval(() => expireStudyWork(repository, privateLibraries), 1000)
+const expiryTimer = setInterval(() => housekeeping.tick(), 1000)
 expiryTimer.unref()
 const production = process.env.NODE_ENV === 'production'
 let webHandler: (
@@ -77,6 +78,7 @@ async function serveStudy(user: SessionUser, request: IncomingMessage, response:
     const api = apiController(repository, user, origin, previews, privateLibrary)
     await api(request, response)
   } finally {
+    housekeeping.observe(user.id, privateLibrary)
     privateLibrary.close()
   }
 }
