@@ -12,7 +12,8 @@ import type {
   QuizView,
 } from '../../shared/quiz-contracts.ts'
 import { ApplicationError } from '../errors.ts'
-import type { LibraryRepository } from '../questions/library-repository.ts'
+import type { StudyRepository } from '../questions/study-library.ts'
+import { isLibraryItemId } from '../../shared/library-identity.ts'
 import type { StoredQuiz } from './quiz-repository.ts'
 import { eligibleQuestions, selectQuestions, shuffled } from './quiz-selection.ts'
 import { masteryHistory } from './mastery-history.ts'
@@ -21,11 +22,11 @@ import { completedRecency } from '../concepts/concept-variations.ts'
 import { studyDay } from './mastery.ts'
 
 export class QuizService {
-  private repository: LibraryRepository
+  private repository: StudyRepository
   private now: () => number
   private random: () => number
 
-  constructor(repository: LibraryRepository, now = Date.now, random = Math.random) {
+  constructor(repository: StudyRepository, now = Date.now, random = Math.random) {
     this.repository = repository
     this.now = now
     this.random = random
@@ -63,7 +64,7 @@ export class QuizService {
       }
       const completed = store.completed().filter((quiz) => sameCertification(quiz.options, options))
       const states = masteryHistory(completed).states
-      const concepts = this.repository.conceptStore().all()
+      const concepts = this.repository.reviewedConcepts()
       const sources = this.repository.sources()
       const boosted = new Set(
         this.repository.allQuestions().flatMap((record) => {
@@ -544,10 +545,10 @@ export class QuizService {
         !Array.isArray(o.sourceIds) ||
         !o.sourceIds.length ||
         new Set(o.sourceIds).size !== o.sourceIds.length ||
-        o.sourceIds.some((id) => !Number.isSafeInteger(id) || id < 1 || !eligible.has(id))
+        o.sourceIds.some((id) => !isLibraryItemId(id) || !eligible.has(id))
       ) {
         throw new ApplicationError(
-          'Select at least one available source for this certification; source IDs must be unique positive integers.',
+          'Select at least one available source for this certification; source IDs must be unique and belong to your workspace.',
         )
       }
     }

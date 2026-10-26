@@ -1,3 +1,5 @@
+import type { LibraryItemId } from './contracts.ts'
+
 export type ReadinessStatus = 'insufficient' | 'unsupported' | 'red' | 'yellow' | 'green'
 
 export const readinessThresholds = { marginal: 80, ready: 90 } as const
@@ -19,7 +21,7 @@ export type CertificationProgress = {
   provider: string
   code: string
   name: string
-  sourceIds: number[]
+  sourceIds: LibraryItemId[]
   earned: boolean
   dueCount: number
   readiness: Readiness

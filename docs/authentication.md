@@ -1,10 +1,11 @@
-# Login and shared study libraries
+# Login, shared banks and private libraries
 
 Users sign in through the configured OIDC provider. Everyone can study shared
 question banks. The application `admin` role permits importing, changing, and
 deleting shared banks and reviewed concept mappings. Attempts, mastery, results,
-and earned certifications belong to the signed-in account, including for admins.
-Private question banks remain a [later epic](authentication-roadmap.md).
+and earned certifications live with private banks in that account's own database.
+Administrators cannot browse another account's private library or study history.
+See [private libraries](private-libraries.md) for storage, upgrade and backup details.
 
 The backend uses `openid-client` for discovery, Authorization Code with S256 PKCE,
 state, nonce, and signed ID-token validation. Passwords stay at the provider.
@@ -74,15 +75,16 @@ application role claim grant student access.
 
 ## Configuration
 
-| Variable                     | Default                                                          | Purpose                                                             |
-| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `STUDY_DB_PATH`              | `private/app/library.sqlite3`; `/data/library.sqlite3` in Docker | Shared content and account-scoped study state.                      |
-| `STUDY_ACCOUNTS_PATH`        | `accounts.sqlite3` beside the study database                     | Identity and hashed sessions; a separate file.                      |
-| `STUDY_LEGACY_OWNER_SUBJECT` | Unset                                                            | Explicit ownership mapping for existing single-owner study history. |
-| `STUDY_OIDC_ISSUER`          | `http://127.0.0.1:8080/realms/study`                             | Trusted issuer identifier, retained exactly.                        |
-| `STUDY_OIDC_CLIENT_ID`       | `study-tool`                                                     | Registered client.                                                  |
-| `STUDY_OIDC_CLIENT_SECRET`   | Unset                                                            | Optional private server-side client secret.                         |
-| `STUDY_ORIGIN`               | `http://127.0.0.1:<STUDY_PORT>`                                  | Exact browser origin and Host allowlist.                            |
+| Variable                      | Default                                                          | Purpose                                                             |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `STUDY_DB_PATH`               | `private/app/library.sqlite3`; `/data/library.sqlite3` in Docker | Shared banks and shared-bank deletion records.                      |
+| `STUDY_PRIVATE_LIBRARIES_DIR` | `users` beside the shared database                               | One private library and study database per internal account ID.     |
+| `STUDY_ACCOUNTS_PATH`         | `accounts.sqlite3` beside the study database                     | Identity and hashed sessions; a separate file.                      |
+| `STUDY_LEGACY_OWNER_SUBJECT`  | Unset                                                            | Explicit ownership mapping for existing single-owner study history. |
+| `STUDY_OIDC_ISSUER`           | `http://127.0.0.1:8080/realms/study`                             | Trusted issuer identifier, retained exactly.                        |
+| `STUDY_OIDC_CLIENT_ID`        | `study-tool`                                                     | Registered client.                                                  |
+| `STUDY_OIDC_CLIENT_SECRET`    | Unset                                                            | Optional private server-side client secret.                         |
+| `STUDY_ORIGIN`                | `http://127.0.0.1:<STUDY_PORT>`                                  | Exact browser origin and Host allowlist.                            |
 
 `STUDY_OWNER_SUBJECT` no longer controls admission. The legacy-owner setting is
 for data attribution and never grants admin rights. Its value must be the previous
@@ -145,13 +147,15 @@ cookies. Keycloak `start-dev` and the loopback Compose setup are for development
    setting and the one-time legacy-owner setting from `.env`.
 
 Empty databases need no legacy mapping. Upgraded databases are not reassigned by
-later changes to the setting. The study schema is version 3; account/session
-storage is version 2. Account IDs remain stable. A new user does not receive a
-library copy. Theme and sidebar layout remain browser-local preferences; study
+later changes to the setting. The library schema is version 4; account/session
+storage is version 2. Startup moves attributed study evidence into each owner's
+private file before serving requests. Account IDs remain stable. A new user
+starts with an empty private library and can study shared banks without a copy.
+Theme and sidebar layout remain browser-local preferences; study
 evidence and tracked-certification selection are account-specific.
 
 For rollback, stop all new instances and preserve their newer data separately.
-Restore **both** application databases from the stopped pre-upgrade volume backup,
+Restore the **entire** application volume, including account, shared and user databases, from the stopped pre-upgrade backup,
 then start the retained old image with its former environment. The old image
 cannot open upgraded schemas. Provider role/mapper additions can remain.
 `docker compose down` retains volumes; `down --volumes` deletes their data.

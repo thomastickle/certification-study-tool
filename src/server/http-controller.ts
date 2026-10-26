@@ -10,6 +10,7 @@ import { LibraryService } from './questions/library-service.ts'
 import { HomeService } from './home/home-service.ts'
 import type { SessionUser } from '../shared/auth-contracts.ts'
 import { ImportPreviews } from './importer/import-previews.ts'
+import { parseLibraryItemId } from '../shared/library-identity.ts'
 
 /** Prevent other websites from driving a local library through this server. */
 export function checkLocalRequest(
@@ -86,22 +87,41 @@ export function apiController(
   actor: Pick<SessionUser, 'id' | 'role'>,
   origin?: URL,
   previews = new ImportPreviews(),
+  privateLibrary?: LibraryRepository,
 ) {
-  const personal = repository.forAccount(actor.id)
-  const concepts = new ConceptService(personal)
+  const combined = privateLibrary ? repository.forAccount(actor.id, privateLibrary) : undefined
+  const personal = combined ?? repository.forAccount(actor.id)
   const quizzes = new QuizService(personal)
   const reports = new ReportService(personal)
-  const importer = new ImportService(repository)
-  const library = new LibraryService(repository)
   const home = new HomeService(personal)
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
       checkLocalRequest(request, origin)
+      combined?.synchronizeDeletions()
       const url = new URL(request.url ?? '/', 'http://localhost')
+      const prefix = url.pathname.match(/^\/api\/(shared|private)\//)
+      const visibility = prefix?.[1] === 'private' ? 'private' : 'shared'
+      if (prefix) {
+        url.pathname = '/api/' + url.pathname.slice(prefix[0].length)
+        if (
+          !/^\/api\/(imports|questions|sources|concepts|concept-suggestions)(\/|$)/.test(
+            url.pathname,
+          )
+        ) {
+          throw new ApplicationError('Not found.', 404)
+        }
+      }
+      const content = visibility === 'private' ? privateLibrary : repository
+      if (!content) {
+        throw new ApplicationError('Private library is unavailable.', 404)
+      }
+      const concepts = new ConceptService(content.forAccount(actor.id))
+      const importer = new ImportService(content)
+      const library = new LibraryService(content, visibility)
       const changesContent =
         !['GET', 'HEAD'].includes(request.method ?? '') &&
         /^\/api\/(imports|questions|sources|concepts|concept-suggestions)(\/|$)/.test(url.pathname)
-      if (changesContent && actor.role !== 'admin') {
+      if (changesContent && visibility === 'shared' && actor.role !== 'admin') {
         throw new ApplicationError('Only an administrator can change shared question banks.', 403)
       }
       const scope = {
@@ -141,7 +161,7 @@ export function apiController(
             ...scope,
             sourceFilter: url.searchParams.get('sourceFilter') ?? 'mixed',
             questionType: url.searchParams.get('questionType') ?? 'mixed',
-            ...(ids === null ? {} : { sourceIds: ids.split(',').map(Number) }),
+            ...(ids === null ? {} : { sourceIds: ids.split(',').map(parseLibraryItemId) }),
           }),
         )
       }
@@ -187,13 +207,13 @@ export function apiController(
           return send(response, 200, quizzes.abandon(id))
       }
       if (request.method === 'GET' && url.pathname === '/api/sources')
-        return send(response, 200, repository.sources())
+        return send(response, 200, prefix ? content.sources() : personal.sources())
       if (request.method === 'GET' && url.pathname === '/api/questions') {
         const source = url.searchParams.get('sourceId')
         return send(
           response,
           200,
-          repository.questions(
+          content.questions(
             source === null ? undefined : positiveInteger(source),
             url.searchParams.get('search') ?? '',
             positiveInteger(url.searchParams.get('page'), 1),
@@ -203,14 +223,14 @@ export function apiController(
       if (request.method === 'POST' && url.pathname === '/api/imports/preview') {
         const input = await body(request)
         const preview = importer.preview(input.bank)
-        const token = previews.issue(actor.id, preview.token)
+        const token = previews.issue(actor.id, preview.token, visibility)
         return send(response, 200, { ...preview, token })
       }
       if (request.method === 'POST' && url.pathname === '/api/imports/confirm') {
         const input = await body(request)
         if (typeof input.token !== 'string' || typeof input.reviewed !== 'boolean')
           throw new ApplicationError('Preview token and review confirmation are required.')
-        const contentToken = previews.consume(actor.id, input.token)
+        const contentToken = previews.consume(actor.id, input.token, visibility)
         const imported = importer.confirm(input.bank, contentToken, input.reviewed)
         return send(response, 201, { ...imported, token: input.token })
       }

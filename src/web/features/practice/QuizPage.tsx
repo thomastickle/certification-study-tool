@@ -13,7 +13,7 @@ import type {
   QuizQuestion,
   QuizView,
 } from '../../../shared/quiz-contracts.ts'
-import type { Source } from '../../../shared/contracts.ts'
+import type { LibraryItemId, Source } from '../../../shared/contracts.ts'
 import { DueReviewStatus } from './DueReviewStatus.tsx'
 import { PracticeActions } from './PracticeActions.tsx'
 import { PracticePresets } from './PracticePresets.tsx'
@@ -40,8 +40,8 @@ type Props = {
   mode?: PracticeMode
   onRegisterLeave: (leave: () => Promise<boolean>) => void
   onPresetChange?: (mode: 'quiz' | 'exam') => void
-  initialSourceIds?: number[]
-  onSourceIdsChange?: (sourceIds: number[]) => void
+  initialSourceIds?: LibraryItemId[]
+  onSourceIdsChange?: (sourceIds: LibraryItemId[]) => void
   focusPreset?: boolean
 }
 

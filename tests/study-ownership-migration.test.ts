@@ -47,7 +47,7 @@ test('legacy history stays unclaimed until an explicit nonempty owner is supplie
     const original = legacyStudyDatabase(path)
     for (const owner of [undefined, ' ']) {
       assert.throws(() => {
-        const unexpected = new LibraryRepository(path, 'bob', owner)
+        const unexpected = new LibraryRepository(path, 'bob', { legacyOwnerId: owner })
         unexpected.close()
       }, /explicit legacy owner/)
       const unchanged = new DatabaseSync(path, { readOnly: true })
@@ -61,7 +61,7 @@ test('legacy history stays unclaimed until an explicit nonempty owner is supplie
         unchanged.close()
       }
     }
-    const upgraded = new LibraryRepository(path, 'alice', 'alice')
+    const upgraded = new LibraryRepository(path, 'alice', { legacyOwnerId: 'alice' })
     try {
       assert.deepEqual(upgraded.quizStore().find(original.saved.id), original.saved)
       assert.deepEqual(upgraded.allQuestions(), original.questions)
@@ -73,7 +73,7 @@ test('legacy history stays unclaimed until an explicit nonempty owner is supplie
     } finally {
       upgraded.close()
     }
-    const reopened = new LibraryRepository(path, 'bob', 'bob')
+    const reopened = new LibraryRepository(path, 'bob', { legacyOwnerId: 'bob' })
     try {
       assert.equal(reopened.quizStore().find(original.saved.id), undefined)
       assert.deepEqual(
@@ -105,7 +105,7 @@ test('a legacy version marker cannot reassign already account-owned records', ()
     malformed.exec('DROP INDEX quiz_sessions_status; PRAGMA user_version = 2')
     malformed.close()
     assert.throws(() => {
-      const unexpected = new LibraryRepository(path, 'alice', 'alice')
+      const unexpected = new LibraryRepository(path, 'alice', { legacyOwnerId: 'alice' })
       unexpected.close()
     }, /already.*ownership|owned.*records|schema.*ownership/i)
     const unchanged = new DatabaseSync(path, { readOnly: true })

@@ -1,5 +1,5 @@
 import type { CertificationProgress, HomeSummary } from '../../shared/home-contracts.ts'
-import type { LibraryRepository } from '../questions/library-repository.ts'
+import type { StudyRepository } from '../questions/study-library.ts'
 import { certificationReadiness, emptyReadiness } from './readiness.ts'
 import { masteryHistory } from '../quizzes/mastery-history.ts'
 import { studyDay } from '../quizzes/mastery.ts'
@@ -9,10 +9,10 @@ import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 
 /** Supply the home screen with certification-level aggregates only. */
 export class HomeService {
-  private repository: LibraryRepository
+  private repository: StudyRepository
   private now: () => number
 
-  constructor(repository: LibraryRepository, now = Date.now) {
+  constructor(repository: StudyRepository, now = Date.now) {
     this.repository = repository
     this.now = now
   }

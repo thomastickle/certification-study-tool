@@ -5,7 +5,8 @@ import type {
   ConceptScope,
   ConceptSuggestion,
 } from '../../../shared/concept-contracts.ts'
-import { useApi } from '../../shared/lib/workspace-api.ts'
+import type { LibraryVisibility } from '../../../shared/contracts.ts'
+import { useLibraryApi } from './use-library-api.ts'
 
 type ScopeLibrary = ConceptScope & { members: ConceptMember[] }
 
@@ -21,11 +22,13 @@ type Editor = ConceptScope & { id?: string; name: string; members: ConceptMember
 export function ConceptPanel({
   refreshKey,
   canManage = false,
+  visibility = 'shared',
 }: {
   refreshKey: number
   canManage?: boolean
+  visibility?: LibraryVisibility
 }) {
-  const api = useApi()
+  const api = useLibraryApi(visibility)
   const [data, setData] = useState<ReviewData>({ groups: [], suggestions: [], library: [] })
   const [editor, setEditor] = useState<Editor>()
   const [search, setSearch] = useState('')
@@ -86,8 +89,10 @@ export function ConceptPanel({
       <summary>Reviewed concept groups</summary>
       <p>
         Suggestions use the same study area and topic. Matching labels do not prove that questions
-        test the same concept. Administrators review and activate shared groups before they affect
-        normal quiz and exam variations.
+        test the same concept.{' '}
+        {visibility === 'private'
+          ? 'Your reviewed private groups affect only your own practice.'
+          : 'Administrators review and activate shared groups before they affect normal quiz and exam variations.'}
       </p>
       <p>
         Each question keeps its own results and retention checks. Overlapping groups do not join

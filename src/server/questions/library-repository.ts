@@ -3,14 +3,38 @@ import { ConceptRepository, migrateConcepts } from '../concepts/concept-reposito
 import { migrateQuizzes, QuizRepository } from '../quizzes/quiz-repository.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 import { CertificationRepository, migrateCertifications } from '../home/certification-repository.ts'
-import type { JsonObject, QuestionPage, Source, StoredQuestion } from '../../shared/contracts.ts'
+import type {
+  JsonObject,
+  LibraryItemId,
+  QuestionPage,
+  Source,
+  StoredQuestion,
+} from '../../shared/contracts.ts'
 import { migrateStudyOwnership } from './study-schema.ts'
+import { StudyLibrary } from './study-library.ts'
+import { migrateLibraryVisibility } from './library-visibility-schema.ts'
+import { migratePrivateStudy } from './migrate-private-study.ts'
+import { finishStudySeparation } from './study-separation.ts'
 
-export type SourceRecord = Omit<Source, 'questionCount'> & { metadata: JsonObject }
+export type SourceRecord = Omit<Source, 'questionCount' | 'id'> & {
+  id: number
+  metadata: JsonObject
+}
 
-export type QuestionRecord = StoredQuestion & { fingerprint: string; answerKey: string }
+export type QuestionRecord = Omit<StoredQuestion, 'id' | 'sourceId'> & {
+  id: LibraryItemId
+  sourceId: LibraryItemId
+  fingerprint: string
+  answerKey: string
+}
 
-type LibraryConnection = { db: DatabaseSync; transactionDepth: number }
+type LocalQuestionRecord = QuestionRecord & { id: number; sourceId: number }
+
+type LocalSource = Source & { id: number }
+
+type LibraryConnection = { db: DatabaseSync; transactionDepth: number; privateOwnerId?: string }
+
+export type LibraryOptions = { legacyOwnerId?: string; privateOwnerId?: string }
 
 /** SQLite access only. Application services own transactions. */
 export class LibraryRepository {
@@ -19,7 +43,7 @@ export class LibraryRepository {
   private ownsConnection: boolean
   private accountId: string
 
-  constructor(path: string | LibraryConnection, accountId = 'local', legacyOwnerId?: string) {
+  constructor(path: string | LibraryConnection, accountId = 'local', options: LibraryOptions = {}) {
     this.accountId = accountId
     this.ownsConnection = typeof path === 'string'
     if (typeof path !== 'string') {
@@ -28,8 +52,29 @@ export class LibraryRepository {
       return
     }
     this.db = new DatabaseSync(path, { timeout: 5000 })
-    this.connection = { db: this.db, transactionDepth: 0 }
+    this.connection = { db: this.db, transactionDepth: 0, privateOwnerId: options.privateOwnerId }
     this.db.exec('PRAGMA foreign_keys = ON')
+    const privateMarker = this.db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'private_library_owner'",
+      )
+      .get()
+    if (privateMarker || options.privateOwnerId) {
+      try {
+        if (!options.privateOwnerId || options.privateOwnerId !== accountId) {
+          throw new Error('A private library cannot be opened as the shared library.')
+        }
+        const owner = this.db
+          .prepare('SELECT account_id FROM private_library_owner WHERE singleton = 1')
+          .get()
+        if (owner?.account_id !== options.privateOwnerId) {
+          throw new Error('Private library owner does not match the selected account.')
+        }
+      } catch (error) {
+        this.db.close()
+        throw error
+      }
+    }
     const version = this.db.prepare('PRAGMA user_version').get()?.user_version
     const appId = this.db.prepare('PRAGMA application_id').get()?.application_id
     const occupied =
@@ -44,7 +89,7 @@ export class LibraryRepository {
       this.db.close()
       throw new Error('Unrecognized database. Use a separate application database.')
     }
-    if (version !== 0 && version !== 1 && version !== 2 && version !== 3) {
+    if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4) {
       this.db.close()
       throw new Error('Unsupported database version. Use a separate application database.')
     }
@@ -75,7 +120,8 @@ export class LibraryRepository {
       migrateQuizzes(this.db)
       migrateConcepts(this.db)
       migrateCertifications(this.db)
-      migrateStudyOwnership(this.db, legacyOwnerId)
+      migrateStudyOwnership(this.db, options.legacyOwnerId)
+      migrateLibraryVisibility(this.db)
     } catch (error) {
       this.db.close()
       throw error
@@ -83,11 +129,93 @@ export class LibraryRepository {
   }
 
   /** Bind personal study stores to an authenticated account while sharing the content connection. */
-  forAccount(accountId: string): LibraryRepository {
+  forAccount(accountId: string): LibraryRepository
+
+  forAccount(accountId: string, privateLibrary: LibraryRepository): StudyLibrary
+
+  forAccount(
+    accountId: string,
+    privateLibrary?: LibraryRepository,
+  ): LibraryRepository | StudyLibrary {
     if (!accountId.trim()) {
       throw new Error('A study account ID is required.')
     }
-    return new LibraryRepository(this.connection, accountId)
+    if (this.connection.privateOwnerId && this.connection.privateOwnerId !== accountId) {
+      throw new Error('A private library cannot select another account’s study evidence.')
+    }
+    const progress = new LibraryRepository(this.connection, accountId)
+    return privateLibrary
+      ? new StudyLibrary(this, privateLibrary, privateLibrary.forAccount(accountId))
+      : progress
+  }
+
+  /** Find only owners with pending migration, not all accounts registered with the identity provider. */
+  studyAccounts(): string[] {
+    return this.db
+      .prepare(
+        `
+      SELECT account_id FROM quiz_sessions
+      UNION SELECT account_id FROM quiz_mastery
+      UNION SELECT account_id FROM earned_certifications
+    `,
+      )
+      .all()
+      .map((row) => String(row.account_id))
+  }
+
+  /** Transfer one account's study evidence before serving any requests against the new layout. */
+  moveStudyTo(destination: string, accountId: string): void {
+    migratePrivateStudy(this.db, destination, accountId)
+  }
+
+  /** Startup must finish shared-file byte cleanup even when all owner transfers already committed. */
+  finishStudyMigration(): void {
+    finishStudySeparation(this.db)
+  }
+
+  /** Publish a shared deletion in the same transaction that removes its source. */
+  recordSourceDeletion(source: LocalSource): void {
+    this.db
+      .prepare(
+        `
+      INSERT INTO deleted_sources(source_id, provider, certification, name, kind)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+      )
+      .run(source.id, source.provider, source.certification, source.name, source.kind)
+  }
+
+  deletedSourcesAfter(sequence: number) {
+    return this.db
+      .prepare(
+        `
+      SELECT sequence, source_id AS sourceId, provider, certification, name, kind
+      FROM deleted_sources
+      WHERE sequence > ?
+      ORDER BY sequence
+    `,
+      )
+      .all(sequence) as {
+      sequence: number
+      sourceId: number
+      provider: string
+      certification: string
+      name: string
+      kind: string
+    }[]
+  }
+
+  sharedDeletionCursor(): number {
+    return Number(
+      this.db.prepare('SELECT sequence FROM shared_deletion_cursor WHERE singleton = 1').get()
+        ?.sequence,
+    )
+  }
+
+  saveSharedDeletionCursor(sequence: number): void {
+    this.db
+      .prepare('UPDATE shared_deletion_cursor SET sequence = ? WHERE singleton = 1')
+      .run(sequence)
   }
 
   /** Expiry and retention jobs visit only accounts with unfinished timer or deletion work. */
@@ -126,6 +254,11 @@ export class LibraryRepository {
     return new ConceptRepository(this.db)
   }
 
+  /** Study selection reads mappings without gaining access to concept mutation methods. */
+  reviewedConcepts() {
+    return this.conceptStore().all()
+  }
+
   quizStore(): QuizRepository {
     return new QuizRepository(this.db, this.accountId)
   }
@@ -159,7 +292,7 @@ export class LibraryRepository {
     }
   }
 
-  sources(): Source[] {
+  sources(): LocalSource[] {
     return this.db
       .prepare(
         `SELECT s.id, s.name, s.kind, s.source_key AS key,
@@ -167,7 +300,7 @@ export class LibraryRepository {
       COUNT(q.id) AS questionCount FROM sources s LEFT JOIN questions q ON q.source_id = s.id
       GROUP BY s.id ORDER BY s.name, s.id`,
       )
-      .all() as unknown as Source[]
+      .all() as unknown as LocalSource[]
   }
 
   source(provider: string, certification: string, key: string): SourceRecord | undefined {
@@ -202,7 +335,7 @@ export class LibraryRepository {
     return this.source(provider, certification, key)!.id
   }
 
-  allQuestions(): QuestionRecord[] {
+  allQuestions(): LocalQuestionRecord[] {
     const rows = this.db
       .prepare(
         `SELECT q.id, q.source_id AS sourceId, s.name AS sourceName,
@@ -213,7 +346,7 @@ export class LibraryRepository {
     return rows.map((row) => ({
       ...row,
       data: JSON.parse(String(row.data)),
-    })) as unknown as QuestionRecord[]
+    })) as unknown as LocalQuestionRecord[]
   }
 
   questions(sourceId?: number, search = '', page = 1): QuestionPage {

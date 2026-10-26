@@ -1,8 +1,9 @@
 # Application architecture
 
 One Node HTTP server serves React and the API. The default deployment is local;
-remote origins require HTTPS. SQLite holds shared bank content and account-scoped
-study records; a second database holds identities and hashed application sessions.
+remote origins require HTTPS. One SQLite database holds shared bank content; each
+user has a separate file for private banks and study records. Another database
+holds identities and hashed application sessions.
 
 ```mermaid
 flowchart LR
@@ -18,7 +19,8 @@ flowchart LR
   Import --> Repo[SQLite repository]
   Library --> Repo
   Queries --> Repo
-  Repo --> DB[(Shared content and private study rows)]
+  Repo --> DB[(Shared banks and deletion events)]
+  Repo --> Private[(Owner's private banks and study history)]
   CLI[Future prompt-driven CLI] -.-> Import
   CLI -.-> Library
   TUI[Future full-screen TUI] -.-> Import
@@ -55,25 +57,29 @@ search and pagination can follow if measured size or latency requires them.
 ## Quiz services
 
 `src/server/quizzes/` owns domain mapping, weighted selection, timed quiz use
-cases, and quiz persistence. The library repository owns the shared SQLite
-connection and exposes a quiz store; quiz writes use separate transactions
+cases, and quiz persistence. The combined study view reads both authorized
+libraries and exposes the owner's private quiz store; quiz writes use separate transactions
 without invalidating library import revisions. Schema version 2 adds quiz and
-mastery tables transactionally; version 3 adds explicit study ownership. Snapshots preserve completed results across
+mastery tables transactionally; version 3 adds explicit study ownership and version
+4 adds durable deletion events for the separate private files. Snapshots preserve completed results across
 source edits/deletions. React and HTTP use public DTOs without answer keys until
 completion. See [quiz rules](quizzes.md).
 
 ## Account and role boundaries
 
 The server derives account ID and role from a verified application session, then
-creates an account-bound study view over the shared SQLite connection. Every
-attempt, mastery, and earned-certification query includes that account ID.
+opens that account's owner-verified private database and creates a combined study
+view over shared and private content. Study records stay in the private file;
+queries retain their account binding as defense in depth.
 Composite keys also isolate deliberately colliding record IDs. Admins receive
 shared-content mutation permissions, not another user's study history.
 
 Sources, questions, reviewed concept groups, and concept-suggestion moderation
-are shared. Shared-bank deletion annotates saved provenance across accounts in
-the same content transaction; it never returns those private snapshots to the
-administrator. Expiry and retention jobs visit account-scoped stores.
+are local to their owning library. Shared-bank deletion records a durable event
+in the content transaction; each private file reconciles events before its next
+read. Private-bank deletion and its snapshot annotations share one transaction.
+Expiry and retention jobs visit owner-verified private stores. See
+[private libraries](private-libraries.md) for migration and backup requirements.
 
 The browser's account binding detects stale tabs; it does not select the server's
 account. React replaces the workspace client when account or role changes, and

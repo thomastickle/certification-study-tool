@@ -70,7 +70,7 @@ jobs:
         with:
           node-version-file: package.json
           check-latest: true
-      - name: Verify shared banks and private progress against Keycloak
+      - name: Verify shared banks, private libraries and history against Keycloak
         env:
           STUDY_IMAGE: study-tool:ci
         run: node tests/shared-users-smoke.ts --project study-login-ci --app-url http://127.0.0.1:13000 --issuer http://127.0.0.1:18080/realms/study

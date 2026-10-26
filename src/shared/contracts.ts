@@ -1,5 +1,10 @@
 export type JsonObject = { [key: string]: unknown }
 
+export type LibraryVisibility = 'shared' | 'private'
+
+/** Shared IDs retain their existing numbers; private IDs are scoped to the signed-in workspace. */
+export type LibraryItemId = number | `private:${number}`
+
 export type Answer = JsonObject & { text: string; correct: boolean; rationale?: string | null }
 
 export type Question = JsonObject & {
@@ -20,7 +25,8 @@ export type Bank = JsonObject & {
 }
 
 export type Source = {
-  id: number
+  id: LibraryItemId
+  visibility?: LibraryVisibility
   name: string
   kind: string
   key: string

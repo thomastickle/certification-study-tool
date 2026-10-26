@@ -6,7 +6,7 @@ import type { QuizQuestion } from '../../shared/quiz-contracts.ts'
 import type { StudyReport, ReportCounts, ReportBreakdown } from '../../shared/report-contracts.ts'
 import { ApplicationError } from '../errors.ts'
 import { domainNames } from '../quizzes/domain-mapping.ts'
-import type { LibraryRepository } from '../questions/library-repository.ts'
+import type { StudyRepository } from '../questions/study-library.ts'
 
 /** Null percentages distinguish no evidence from a measured zero. */
 function counts(questions: QuizQuestion[]): ReportCounts {
@@ -54,10 +54,10 @@ type ReportInput = {
 
 /** Reports read saved snapshots, so source deletions cannot rewrite study history. */
 export class ReportService {
-  private repository: LibraryRepository
+  private repository: StudyRepository
   private now: () => number
 
-  constructor(repository: LibraryRepository, now = Date.now) {
+  constructor(repository: StudyRepository, now = Date.now) {
     this.repository = repository
     this.now = now
   }

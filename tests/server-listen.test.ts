@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer, request } from 'node:http'
 import { networkInterfaces, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -78,6 +78,11 @@ test('server permits its configured Host but requires login for study data', asy
     }
     assert.equal(await status(`localhost:${port}`, '/public/../api/questions'), 401)
     assert.equal(await status(`localhost:${port}`, '/api/../auth/logout'), 404)
+    assert.equal(
+      existsSync(join(directory, 'users')),
+      false,
+      'Anonymous requests must not create private databases',
+    )
   } finally {
     child.kill('SIGTERM')
     await exit

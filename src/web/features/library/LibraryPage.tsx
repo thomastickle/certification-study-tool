@@ -1,30 +1,55 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
   JsonObject,
+  LibraryItemId,
+  LibraryVisibility,
   Preview,
   Question,
   QuestionPage,
   Source,
   StoredQuestion,
 } from '../../../shared/contracts.ts'
-import { useApi } from '../../shared/lib/workspace-api.ts'
+import { useLibraryApi } from './use-library-api.ts'
 import { ConceptPanel } from './ConceptPanel.tsx'
 
-type Removal = { kind: 'sources' | 'questions'; id: number; name: string; count?: number }
+type Removal = { kind: 'sources' | 'questions'; id: LibraryItemId; name: string; count?: number }
 
 const emptyPage: QuestionPage = { items: [], total: 0, page: 1, pageSize: 25 }
 
-export function LibraryPage({
-  onLibraryChange,
-  canManage = false,
-}: {
+type LibraryPageProps = {
   onLibraryChange?: () => Promise<void>
   canManage?: boolean
+}
+
+/** Changing libraries discards the former view's preview, selection, dialogs and in-flight UI state. */
+export function LibraryPage(props: LibraryPageProps) {
+  const [visibility, setVisibility] = useState<LibraryVisibility>('private')
+  return (
+    <LibraryView
+      key={visibility}
+      {...props}
+      visibility={visibility}
+      onVisibilityChange={setVisibility}
+    />
+  )
+}
+
+/** Bind every library action to one explicit visibility without changing the workspace client. */
+export function LibraryView({
+  onLibraryChange,
+  canManage: canManageShared = false,
+  visibility,
+  onVisibilityChange,
+}: LibraryPageProps & {
+  visibility: LibraryVisibility
+  onVisibilityChange: (visibility: LibraryVisibility) => void
 }) {
-  const api = useApi()
+  const api = useLibraryApi(visibility)
+  const privateLibrary = visibility === 'private'
+  const canManage = privateLibrary || canManageShared
   const [sources, setSources] = useState<Source[]>([])
   const [questions, setQuestions] = useState<QuestionPage>(emptyPage)
-  const [sourceId, setSourceId] = useState<number>()
+  const [sourceId, setSourceId] = useState<LibraryItemId>()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [refresh, setRefresh] = useState(0)
@@ -146,15 +171,31 @@ export function LibraryPage({
   const hasChanges = Boolean(
     preview && (preview.added || preview.changed.length || preview.metadataChange),
   )
+  let emptyMessage = 'Try another search or choose a different source.'
+  if (total === 0) {
+    emptyMessage = canManage
+      ? 'Import a question bank to start this library.'
+      : 'An administrator can import question banks for everyone to study.'
+  }
 
   return (
     <>
-      <main className="library-page">
+      <main className="library-page" data-library-visibility={visibility}>
+        <div className="library-visibility" role="group" aria-label="Choose library">
+          <button aria-pressed={privateLibrary} onClick={() => onVisibilityChange('private')}>
+            My private library
+          </button>
+          <button aria-pressed={!privateLibrary} onClick={() => onVisibilityChange('shared')}>
+            Shared library
+          </button>
+        </div>
         <div className="page-heading">
           <div>
             <h1>Question library</h1>
             <p className="intro">
-              Browse shared question banks. Administrators manage this library.
+              {privateLibrary
+                ? 'Only you can access and manage these question banks.'
+                : 'Everyone can study these banks. Administrators manage shared content.'}
             </p>
           </div>
           {canManage && (
@@ -183,14 +224,18 @@ export function LibraryPage({
           <section className="import-panel" aria-label="Import question bank">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">ADD TO THE SHARED LIBRARY</p>
+                <p className="eyebrow">
+                  {privateLibrary ? 'ADD TO MY PRIVATE LIBRARY' : 'ADD TO THE SHARED LIBRARY'}
+                </p>
                 <h2>Import a question bank</h2>
               </div>
               <span className="step-label">Preview before saving</span>
             </div>
             <p>
-              Choose a version 2 JSON bank. Imported questions are shared with this application’s
-              users.
+              Choose a version 2 JSON bank.{' '}
+              {privateLibrary
+                ? 'Imported questions stay in your private library.'
+                : 'Imported questions are shared with this application’s users.'}
             </p>
             <div className="file-row">
               <label className={`file-button ${busy ? 'disabled' : ''}`}>
@@ -314,7 +359,7 @@ export function LibraryPage({
             )}
           </section>
         )}
-        <ConceptPanel refreshKey={refresh} canManage={canManage} />
+        <ConceptPanel refreshKey={refresh} canManage={canManage} visibility={visibility} />
         <div className="library-layout">
           <aside className="source-panel" aria-label="Question sources">
             <div className="source-heading">
@@ -351,10 +396,15 @@ export function LibraryPage({
               </button>
             ))}
             <div className="privacy-note">
-              <strong>Shared questions, private progress.</strong>
+              <strong>
+                {privateLibrary
+                  ? 'Your private question library.'
+                  : 'Shared questions, private progress.'}
+              </strong>
               <p>
-                Everyone can study these banks. Your attempts, results, and earned certifications
-                belong to your account.
+                {privateLibrary
+                  ? 'Other users cannot browse these banks. Practice can use your private banks alongside shared banks.'
+                  : 'Everyone can study these banks. Your attempts, results, and earned certifications belong to your account.'}
               </p>
             </div>
           </aside>
@@ -418,11 +468,7 @@ export function LibraryPage({
                 <h3>
                   {total === 0 ? 'Your library starts with a question.' : 'No matching questions.'}
                 </h3>
-                <p>
-                  {total === 0
-                    ? 'An administrator can import question banks for everyone to study.'
-                    : 'Try another search or choose a different source.'}
-                </p>
+                <p>{emptyMessage}</p>
                 {canManage && total === 0 && (
                   <button onClick={() => setImportOpen(true)}>Import your first bank</button>
                 )}
