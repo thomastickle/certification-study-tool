@@ -1,10 +1,10 @@
-import type { LibraryRepository, QuestionRecord } from './library-repository.ts'
+import type { LibraryView, QuestionRecord } from './library-repository.ts'
 import type { Source } from '../../shared/contracts.ts'
 import { privateItemId } from '../../shared/library-identity.ts'
 import { sameCertification } from '../quizzes/certification-scope.ts'
 
 export type StudyRepository = Pick<
-  LibraryRepository,
+  LibraryView,
   'quizStore' | 'certificationStore' | 'reviewedConcepts'
 > & {
   sources(): Source[]
@@ -13,11 +13,11 @@ export type StudyRepository = Pick<
 
 /** Combine authorized content for study without copying banks or accepting a browser-selected owner. */
 export class StudyLibrary implements StudyRepository {
-  private shared: LibraryRepository
-  private personal: LibraryRepository
-  private progress: LibraryRepository
+  private shared: LibraryView
+  private personal: LibraryView
+  private progress: LibraryView
 
-  constructor(shared: LibraryRepository, personal: LibraryRepository, progress: LibraryRepository) {
+  constructor(shared: LibraryView, personal: LibraryView, progress: LibraryView) {
     this.shared = shared
     this.personal = personal
     this.progress = progress

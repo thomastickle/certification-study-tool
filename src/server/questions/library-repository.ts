@@ -1,8 +1,8 @@
-import { DatabaseSync } from 'node:sqlite'
-import { ConceptRepository, migrateConcepts } from '../concepts/concept-repository.ts'
-import { migrateQuizzes, QuizRepository } from '../quizzes/quiz-repository.ts'
+import type { DatabaseSync } from 'node:sqlite'
+import { ConceptRepository } from '../concepts/concept-repository.ts'
+import { QuizRepository } from '../quizzes/quiz-repository.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
-import { CertificationRepository, migrateCertifications } from '../home/certification-repository.ts'
+import { CertificationRepository } from '../home/certification-repository.ts'
 import type {
   JsonObject,
   LibraryItemId,
@@ -10,11 +10,11 @@ import type {
   Source,
   StoredQuestion,
 } from '../../shared/contracts.ts'
-import { migrateStudyOwnership } from './study-schema.ts'
 import { StudyLibrary } from './study-library.ts'
-import { migrateLibraryVisibility } from './library-visibility-schema.ts'
 import { migratePrivateStudy } from './migrate-private-study.ts'
 import { finishStudySeparation } from './study-separation.ts'
+import { openLibraryDatabase } from './open-library-database.ts'
+import type { LibraryOptions } from './open-library-database.ts'
 
 export type SourceRecord = Omit<Source, 'questionCount' | 'id'> & {
   id: number
@@ -34,143 +34,36 @@ type LocalSource = Source & { id: number }
 
 type LibraryConnection = { db: DatabaseSync; transactionDepth: number; privateOwnerId?: string }
 
-export type LibraryOptions = { legacyOwnerId?: string; privateOwnerId?: string }
+export type { LibraryOptions } from './open-library-database.ts'
 
-/** SQLite access only. Application services own transactions. */
-export class LibraryRepository {
+/** Borrowed SQLite queries bound to one account; only the owning root can close the connection. */
+export class LibraryView {
   private db: DatabaseSync
   private connection: LibraryConnection
-  private ownsConnection: boolean
   private accountId: string
 
-  constructor(path: string | LibraryConnection, accountId = 'local', options: LibraryOptions = {}) {
+  protected constructor(connection: LibraryConnection, accountId: string) {
+    this.connection = connection
+    this.db = connection.db
     this.accountId = accountId
-    this.ownsConnection = typeof path === 'string'
-    if (typeof path !== 'string') {
-      this.connection = path
-      this.db = path.db
-      return
-    }
-    this.db = new DatabaseSync(path, { timeout: 5000 })
-    this.connection = { db: this.db, transactionDepth: 0, privateOwnerId: options.privateOwnerId }
-    this.db.exec('PRAGMA foreign_keys = ON')
-    const privateMarker = this.db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'private_library_owner'",
-      )
-      .get()
-    if (privateMarker || options.privateOwnerId) {
-      try {
-        if (!options.privateOwnerId || options.privateOwnerId !== accountId) {
-          throw new Error('A private library cannot be opened as the shared library.')
-        }
-        const owner = this.db
-          .prepare('SELECT account_id FROM private_library_owner WHERE singleton = 1')
-          .get()
-        if (owner?.account_id !== options.privateOwnerId) {
-          throw new Error('Private library owner does not match the selected account.')
-        }
-      } catch (error) {
-        this.db.close()
-        throw error
-      }
-    }
-    const version = this.db.prepare('PRAGMA user_version').get()?.user_version
-    const appId = this.db.prepare('PRAGMA application_id').get()?.application_id
-    const occupied =
-      Number(
-        this.db
-          .prepare(
-            "SELECT count(*) AS total FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-          )
-          .get()?.total,
-      ) > 0
-    if ((version === 0 && occupied) || (version !== 0 && appId !== 1096242004)) {
-      this.db.close()
-      throw new Error('Unrecognized database. Use a separate application database.')
-    }
-    if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4) {
-      this.db.close()
-      throw new Error('Unsupported database version. Use a separate application database.')
-    }
-    if (version === 0)
-      this.db.exec(`
-      BEGIN;
-      CREATE TABLE library_state (id INTEGER PRIMARY KEY CHECK (id = 1), revision INTEGER NOT NULL);
-      INSERT INTO library_state VALUES (1, 0);
-      CREATE TABLE sources (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        provider TEXT NOT NULL, certification TEXT NOT NULL, certification_name TEXT NOT NULL,
-        source_key TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, metadata TEXT NOT NULL,
-        UNIQUE(provider, certification, source_key)
-      );
-      CREATE TABLE questions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
-        reference TEXT NOT NULL, data TEXT NOT NULL,
-        fingerprint TEXT NOT NULL, answer_key TEXT NOT NULL,
-        UNIQUE(source_id, reference)
-      );
-      CREATE INDEX questions_fingerprint ON questions(fingerprint);
-      PRAGMA application_id = 1096242004;
-      PRAGMA user_version = 1;
-      COMMIT;
-    `)
-    try {
-      migrateQuizzes(this.db)
-      migrateConcepts(this.db)
-      migrateCertifications(this.db)
-      migrateStudyOwnership(this.db, options.legacyOwnerId)
-      migrateLibraryVisibility(this.db)
-    } catch (error) {
-      this.db.close()
-      throw error
-    }
   }
 
   /** Bind personal study stores to an authenticated account while sharing the content connection. */
-  forAccount(accountId: string): LibraryRepository
+  forAccount(accountId: string): LibraryView
 
-  forAccount(accountId: string, privateLibrary: LibraryRepository): StudyLibrary
+  forAccount(accountId: string, privateLibrary: LibraryView): StudyLibrary
 
-  forAccount(
-    accountId: string,
-    privateLibrary?: LibraryRepository,
-  ): LibraryRepository | StudyLibrary {
+  forAccount(accountId: string, privateLibrary?: LibraryView): LibraryView | StudyLibrary {
     if (!accountId.trim()) {
       throw new Error('A study account ID is required.')
     }
     if (this.connection.privateOwnerId && this.connection.privateOwnerId !== accountId) {
       throw new Error('A private library cannot select another account’s study evidence.')
     }
-    const progress = new LibraryRepository(this.connection, accountId)
+    const progress = new LibraryView(this.connection, accountId)
     return privateLibrary
       ? new StudyLibrary(this, privateLibrary, privateLibrary.forAccount(accountId))
       : progress
-  }
-
-  /** Find only owners with pending migration, not all accounts registered with the identity provider. */
-  studyAccounts(): string[] {
-    return this.db
-      .prepare(
-        `
-      SELECT account_id FROM quiz_sessions
-      UNION SELECT account_id FROM quiz_mastery
-      UNION SELECT account_id FROM earned_certifications
-    `,
-      )
-      .all()
-      .map((row) => String(row.account_id))
-  }
-
-  /** Transfer one account's study evidence before serving any requests against the new layout. */
-  moveStudyTo(destination: string, accountId: string): void {
-    migratePrivateStudy(this.db, destination, accountId)
-  }
-
-  /** Startup must finish shared-file byte cleanup even when all owner transfers already committed. */
-  finishStudyMigration(): void {
-    finishStudySeparation(this.db)
   }
 
   /** Publish a shared deletion in the same transaction that removes its source. */
@@ -261,12 +154,6 @@ export class LibraryRepository {
 
   quizStore(): QuizRepository {
     return new QuizRepository(this.db, this.accountId)
-  }
-
-  close(): void {
-    if (this.ownsConnection) {
-      this.db.close()
-    }
   }
 
   revision(): number {
@@ -391,5 +278,49 @@ export class LibraryRepository {
 
   deleteSource(id: number): boolean {
     return this.db.prepare('DELETE FROM sources WHERE id = ?').run(id).changes === 1
+  }
+}
+
+/** Own one initialized SQLite connection; request/account views borrow it without a close capability. */
+export class LibraryRepository extends LibraryView {
+  private ownedDatabase: DatabaseSync
+  private closed = false
+
+  constructor(path: string, accountId = 'local', options: LibraryOptions = {}) {
+    const db = openLibraryDatabase(path, accountId, options)
+    super({ db, transactionDepth: 0, privateOwnerId: options.privateOwnerId }, accountId)
+    this.ownedDatabase = db
+  }
+
+  /** Release the root's connection once, invalidating all of its borrowed views. */
+  close(): void {
+    if (!this.closed) {
+      this.ownedDatabase.close()
+      this.closed = true
+    }
+  }
+
+  /** Find only owners with pending migration, not all accounts registered with the identity provider. */
+  studyAccounts(): string[] {
+    return this.ownedDatabase
+      .prepare(
+        `
+      SELECT account_id FROM quiz_sessions
+      UNION SELECT account_id FROM quiz_mastery
+      UNION SELECT account_id FROM earned_certifications
+    `,
+      )
+      .all()
+      .map((row) => String(row.account_id))
+  }
+
+  /** Transfer one account's study evidence before serving any requests against the new layout. */
+  moveStudyTo(destination: string, accountId: string): void {
+    migratePrivateStudy(this.ownedDatabase, destination, accountId)
+  }
+
+  /** Startup must finish shared-file byte cleanup even when all owner transfers already committed. */
+  finishStudyMigration(): void {
+    finishStudySeparation(this.ownedDatabase)
   }
 }
