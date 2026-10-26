@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
@@ -54,7 +56,7 @@ export async function navigationCheck(
   }
 
   async function attempt() {
-    return (await originalFetch(`/api/quizzes/${attemptId}`)).json()
+    return (await workspaceFetch(`/api/quizzes/${attemptId}`, {}, originalFetch)).json()
   }
 
   window.confirm = () => {
@@ -150,7 +152,7 @@ export async function navigationCheck(
       click('Library')
       await new Promise((resolve) => window.setTimeout(resolve, 50))
       assert(
-        document.querySelector('[aria-current=page]')?.textContent === 'Practice',
+        document.querySelector('[aria-current=page]')?.textContent?.trim() === 'Practice',
         'Navigation orphaned pending start',
       )
       release()
@@ -160,14 +162,14 @@ export async function navigationCheck(
           'Lost start error missing',
         )
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
+          document.querySelector('[aria-current=page]')?.textContent?.trim() === 'Practice',
           'Lost start navigated away',
         )
         if (outcome === 'recovery-failure') {
           click('Reports')
           await new Promise((resolve) => window.setTimeout(resolve, 50))
           assert(
-            document.querySelector('[aria-current=page]')?.textContent === 'Practice',
+            document.querySelector('[aria-current=page]')?.textContent?.trim() === 'Practice',
             'Unknown start state was orphaned',
           )
         }
@@ -180,7 +182,7 @@ export async function navigationCheck(
           'Start failure missing',
         )
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
+          document.querySelector('[aria-current=page]')?.textContent?.trim() === 'Practice',
           'Failed start navigated away',
         )
         fail = false
@@ -263,7 +265,7 @@ export async function navigationCheck(
       ) {
         await new Promise((resolve) => window.setTimeout(resolve, 50))
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
+          document.querySelector('[aria-current=page]')?.textContent?.trim() === 'Practice',
           'Navigation did not wait for mutation',
         )
         release()
@@ -283,7 +285,7 @@ export async function navigationCheck(
         await until(() => document.body.innerText.includes(message), 'Navigation error missing')
         await new Promise((resolve) => window.setTimeout(resolve, 50))
         assert(
-          document.querySelector('[aria-current=page]')?.textContent === 'Practice',
+          document.querySelector('[aria-current=page]')?.textContent?.trim() === 'Practice',
           'Failed suspension left attempt',
         )
         fail = false
@@ -315,7 +317,7 @@ export async function navigationCheck(
         assert(saved.questions[0].flagged, 'Review mark was lost')
       }
     }
-    const report = await (await originalFetch('/api/reports')).json()
+    const report = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       !report.attempts.some((item: { id: string }) => item.id === attemptId),
       'Paused attempt entered report',
@@ -346,7 +348,7 @@ export async function navigationCheck(
       'Submission failed',
     )
     const completed = await attempt()
-    const finalReport = await (await originalFetch('/api/reports')).json()
+    const finalReport = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       finalReport.attempts.filter((item: { id: string }) => item.id === attemptId).length === 1,
       'Completed attempt not counted once',

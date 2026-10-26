@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
+import type { SessionUser } from '../../shared/auth-contracts.ts'
 import type { Source } from '../../shared/contracts.ts'
-import { api } from '../shared/lib/api.ts'
+import { useWorkspaceApi } from '../shared/lib/workspace-api.ts'
 import { CertificationPicker } from '../features/certifications/CertificationPicker.tsx'
 import {
   certificationKey,
@@ -22,8 +24,20 @@ import type { CertificationProgress } from '../../shared/home-contracts.ts'
 type Page =
   'home' | 'quiz' | 'exam' | 'review' | 'reports' | 'importer' | 'certifications' | 'settings'
 
+type WorkspaceTransition =
+  | { kind: 'page'; next: Page; presetChange: boolean }
+  | {
+      kind: 'certification'
+      next: Certification
+      studyPage?: 'quiz' | 'exam' | 'review'
+      sourceIds?: number[]
+    }
+  | { kind: 'logout'; form: HTMLFormElement }
+
 /** Keep every workspace destination behind the existing practice suspension guard. */
-export function App() {
+export function App({ account }: { account: SessionUser }) {
+  const workspace = useWorkspaceApi()
+  const { api } = workspace
   const appearance = useAppearance()
   const [page, setPage] = useState<Page>('home')
   const [practiceVisit, setPracticeVisit] = useState(0)
@@ -33,7 +47,7 @@ export function App() {
   const [selected, setSelected] = useState<Certification | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
-  const [selectionError, setSelectionError] = useState('')
+  const [transitionError, setTransitionError] = useState('')
   const selectedRef = useRef<Certification | null>(null)
   const [focusPreset, setFocusPreset] = useState(false)
   const destination = page === 'quiz' || page === 'exam' ? 'practice' : page
@@ -44,12 +58,13 @@ export function App() {
   /** Refresh after imports without replacing the workspace that is currently in use. */
   const refreshCertifications = useCallback(async () => {
     try {
-      const items = certificationsFromSources(await api<Source[]>('/sources'))
+      const sources = await api<Source[]>('/sources')
+      const items = certificationsFromSources(sources)
       setCertifications(items)
       if (!selectedRef.current) {
         let remembered: string | null = null
         try {
-          remembered = localStorage.getItem('study-certification')
+          remembered = localStorage.getItem(`study-certification:${account.id}`)
         } catch {
           // Storage is optional; the workspace still works for this session.
         }
@@ -64,63 +79,120 @@ export function App() {
     } finally {
       setCatalogLoading(false)
     }
-  }, [])
+  }, [account.id, api])
 
   useEffect(() => {
     void refreshCertifications()
   }, [refreshCertifications])
 
-  /** Switch only after the current session has safely saved and paused. */
-  async function selectCertification(
+  /** Pause saved work for the previous certification before committing a new selection. */
+  async function applyCertificationSelection(
+    transition: Extract<WorkspaceTransition, { kind: 'certification' }>,
+  ) {
+    const { next, studyPage, sourceIds } = transition
+    const switching = !selected || certificationKey(next) !== certificationKey(selected)
+    if (selected && switching) {
+      await pauseCertificationAttempts(selected, workspace)
+    }
+    if (!workspace.isActive()) {
+      return
+    }
+    selectedRef.current = next
+    setSelected(next)
+    try {
+      localStorage.setItem(`study-certification:${account.id}`, certificationKey(next))
+    } catch {
+      // Selection remains usable when storage is unavailable.
+    }
+    if (studyPage) {
+      if (sourceIds) {
+        setPracticeSources((current) => ({ ...current, [certificationKey(next)]: sourceIds }))
+      }
+      if (studyPage === 'quiz' || studyPage === 'exam') {
+        setPracticeMode(studyPage)
+      }
+      setFocusPreset(false)
+      setPage(studyPage)
+    }
+  }
+
+  /** Commit page state only after the shared practice-exit coordinator permits the transition. */
+  function applyPageChange(next: Page, presetChange: boolean) {
+    if (next === 'quiz' || next === 'exam') {
+      setPracticeMode(next)
+    }
+    setFocusPreset(presetChange)
+    if (next === page) {
+      setPracticeVisit((visit) => visit + 1)
+    }
+    setPage(next)
+  }
+
+  /** Serialize exits, retain failed work with feedback, and ignore obsolete workspace continuations. */
+  async function transitionWorkspace(transition: WorkspaceTransition) {
+    const inPractice = page === 'quiz' || page === 'exam' || page === 'review'
+    if (navigating.current) {
+      return
+    }
+    if (transition.kind === 'page' && transition.next === page && !inPractice) {
+      return
+    }
+    if (transition.kind === 'certification') {
+      const sameSelection =
+        selected && certificationKey(transition.next) === certificationKey(selected)
+      if (sameSelection && !transition.studyPage) {
+        return
+      }
+    }
+    navigating.current = true
+    setTransitionError('')
+    try {
+      if (inPractice) {
+        const canLeave = await leaveQuiz.current()
+        if (!canLeave) {
+          return
+        }
+      }
+      if (!workspace.isActive()) {
+        return
+      }
+      switch (transition.kind) {
+        case 'certification':
+          await applyCertificationSelection(transition)
+          break
+        case 'page':
+          applyPageChange(transition.next, transition.presetChange)
+          break
+        case 'logout':
+          transition.form.submit()
+          break
+      }
+    } catch (reason) {
+      if (!workspace.isActive()) {
+        return
+      }
+      const message =
+        reason instanceof Error ? reason.message : 'Could not save and pause the current attempt.'
+      let recovery = 'Your page has not changed. Retry navigation to pause saved work safely.'
+      if (transition.kind === 'certification') {
+        recovery =
+          'Your certification has not changed. Retry the selection to pause saved work safely.'
+      } else if (transition.kind === 'logout') {
+        recovery = 'You are still signed in. Retry Sign out to pause saved work safely.'
+      }
+      setTransitionError(`${message} ${recovery}`)
+    } finally {
+      navigating.current = false
+    }
+  }
+
+  /** Adapt picker and Home selections to the explicit certification transition. */
+  function selectCertification(
     next: Certification,
     studyPage?: 'quiz' | 'exam' | 'review',
     sourceIds?: number[],
   ) {
-    if (navigating.current) {
-      return
-    }
-    const switching = !selected || certificationKey(next) !== certificationKey(selected)
-    if (!switching && !studyPage) {
-      return
-    }
-    navigating.current = true
-    setSelectionError('')
-    try {
-      if (
-        (page === 'quiz' || page === 'exam' || page === 'review') &&
-        !(await leaveQuiz.current())
-      ) {
-        return
-      }
-      if (selected && switching) {
-        await pauseCertificationAttempts(selected)
-      }
-      selectedRef.current = next
-      setSelected(next)
-      try {
-        localStorage.setItem('study-certification', certificationKey(next))
-      } catch {
-        // Selection remains usable when storage is unavailable.
-      }
-      if (studyPage) {
-        if (sourceIds) {
-          setPracticeSources((current) => ({ ...current, [certificationKey(next)]: sourceIds }))
-        }
-        if (studyPage === 'quiz' || studyPage === 'exam') {
-          setPracticeMode(studyPage)
-        }
-        setFocusPreset(false)
-        setPage(studyPage)
-      }
-    } catch (reason) {
-      const message =
-        reason instanceof Error ? reason.message : 'Could not suspend the previous attempt.'
-      setSelectionError(
-        `${message} Your certification has not changed. Retry the selection to pause saved work safely.`,
-      )
-    } finally {
-      navigating.current = false
-    }
+    return transitionWorkspace({ kind: 'certification', next, studyPage, sourceIds })
   }
 
   /** Open a Home action in its named certification using the same safe switch as the picker. */
@@ -129,7 +201,7 @@ export function App() {
       (certification) => certificationKey(certification) === certificationKey(track),
     )
     if (!target) {
-      setSelectionError(
+      setTransitionError(
         'Import eligible question banks for this certification before starting practice or review.',
       )
       return
@@ -143,30 +215,19 @@ export function App() {
 
   const scopeKey = selected ? certificationKey(selected) : 'empty'
 
-  /** Serialize page changes while practice work is being suspended. */
-  async function navigate(next: Page, presetChange = false) {
-    const inPractice = page === 'quiz' || page === 'exam' || page === 'review'
-    if (navigating.current || (next === page && !inPractice)) {
-      return
-    }
-    navigating.current = true
-    try {
-      if (inPractice && !(await leaveQuiz.current())) {
-        return
-      }
-      if (next === 'quiz' || next === 'exam') setPracticeMode(next)
-      setFocusPreset(presetChange)
-      if (next === page) {
-        setPracticeVisit((visit) => visit + 1)
-      }
-      setPage(next)
-    } finally {
-      navigating.current = false
-    }
+  /** Adapt sidebar and preset changes to the same practice-exit transition. */
+  function navigate(next: Page, presetChange = false) {
+    return transitionWorkspace({ kind: 'page', next, presetChange })
+  }
+
+  /** Preserve native form submission after the shared save/pause guard has completed. */
+  function signOut(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    return transitionWorkspace({ kind: 'logout', form: event.currentTarget })
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-study-account={account.id}>
       <header className="workspace-header">
         <button
           className="brand-button"
@@ -185,10 +246,17 @@ export function App() {
           loading={catalogLoading}
           onSelect={selectCertification}
         />
-        <span className="local-badge">
-          <span aria-hidden="true" />
-          Local workspace
-        </span>
+        <form
+          className="workspace-account"
+          action="/auth/logout"
+          method="post"
+          onSubmit={(event) => {
+            void signOut(event)
+          }}
+        >
+          <span title={account.name}>{account.name}</span>
+          <button type="submit">Sign out</button>
+        </form>
       </header>
       <WorkspaceSidebar
         destination={destination}
@@ -197,9 +265,9 @@ export function App() {
         }}
       />
       <div className="workspace-content">
-        {selectionError && (
+        {transitionError && (
           <div className="message error" role="alert">
-            {selectionError}
+            {transitionError}
           </div>
         )}
         {catalogError && (

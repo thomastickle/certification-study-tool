@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Run in the app against the dedicated synthetic issue16 database, with no initial groups. */
 export async function conceptsBrowserTest(): Promise<string> {
   function assert(condition: unknown, message: string): asserts condition {
@@ -31,7 +33,7 @@ export async function conceptsBrowserTest(): Promise<string> {
   }
 
   async function state() {
-    const response = await fetch('/api/concepts')
+    const response = await workspaceFetch('/api/concepts')
     assert(response.ok, 'Concept API failed')
     return response.json()
   }
@@ -135,7 +137,7 @@ export async function conceptsBrowserTest(): Promise<string> {
     ['d1-0', 'd1-5'].includes(member.occurrences[0]!.reference),
   )
   assert(pair.length === 2, 'Selection fixture needs an old and an unseen variation')
-  const createdResponse = await fetch('/api/concepts', {
+  const createdResponse = await workspaceFetch('/api/concepts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...catalog, name: 'Browser selection pair', members: pair }),
@@ -152,7 +154,7 @@ export async function conceptsBrowserTest(): Promise<string> {
   )
   button('Start 20-question quiz').click()
   await until(() => !!document.querySelector('.question-navigation'), 'Quiz did not start')
-  const current = await (await fetch('/api/quizzes/current?mode=quiz')).json()
+  const current = await (await workspaceFetch('/api/quizzes/current?mode=quiz')).json()
   assert(
     current.questions.some((question: { reference: string }) => question.reference === 'd1-5'),
     'Unseen variation was not selected',
@@ -171,7 +173,7 @@ export async function conceptsBrowserTest(): Promise<string> {
     ) === '[5,6,7,2]',
     'Concept selection changed domain quotas',
   )
-  await fetch(`/api/quizzes/${current.id}/abandon`, { method: 'POST' })
-  await fetch(`/api/concepts/${created.id}`, { method: 'DELETE' })
+  await workspaceFetch(`/api/quizzes/${current.id}/abandon`, { method: 'POST' })
+  await workspaceFetch(`/api/concepts/${created.id}`, { method: 'DELETE' })
   return 'PASS: inactive suggestions, content/provenance review, subset activation, edit, deletion, manual creation dismissal, and UI-started normal selection with quotas'
 }

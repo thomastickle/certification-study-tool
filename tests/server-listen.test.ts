@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 
 // Exercise the actual entry point through a container-like, non-loopback connection.
-test('server can listen beyond loopback while retaining local Host restrictions', async (t) => {
+test('server permits its configured Host but requires owner login for study data', async (t) => {
   const address = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry?.family === 'IPv4' && !entry.internal)?.address
@@ -30,6 +30,9 @@ test('server can listen beyond loopback while retaining local Host restrictions'
       STUDY_HOST: '0.0.0.0',
       STUDY_PORT: String(port),
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+      STUDY_ACCOUNTS_PATH: join(directory, 'accounts.sqlite3'),
+      STUDY_OWNER_SUBJECT: 'synthetic-owner',
+      STUDY_ORIGIN: `http://localhost:${port}`,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -49,10 +52,10 @@ test('server can listen beyond loopback while retaining local Host restrictions'
       })
     })
 
-    const status = (host: string) =>
+    const status = (host: string, path = '/api/health') =>
       new Promise<number | undefined>((resolve, reject) => {
         const req = request(
-          { hostname: address, port, path: '/api/questions', headers: { Host: host } },
+          { hostname: address, port, path, headers: { Host: host } },
           (response) => {
             response.resume()
             resolve(response.statusCode)
@@ -63,6 +66,7 @@ test('server can listen beyond loopback while retaining local Host restrictions'
       })
 
     assert.equal(await status(`localhost:${port}`), 200)
+    assert.equal(await status(`localhost:${port}`, '/api/questions'), 401)
     assert.equal(await status(`untrusted.example:${port}`), 403)
   } finally {
     child.kill('SIGTERM')

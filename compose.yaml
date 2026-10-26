@@ -1,12 +1,30 @@
 services:
-  study:
-    build: .
+  keycloak:
+    extends:
+      file: compose.keycloak.yaml
+      service: keycloak
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:${STUDY_WEB_PORT:-3000}:3000'
+
+  study:
+    image: ${STUDY_IMAGE:-certification-study-tool-study:local}
+    build: .
+    # Both processes use the same loopback namespace, so browser and server see
+    # the identical local issuer URL without enabling HTTP on a remote hostname.
+    network_mode: service:keycloak
+    depends_on:
+      keycloak:
+        condition: service_healthy
     volumes:
       - study-data:/data
+    environment:
+      STUDY_OIDC_ISSUER: ${STUDY_OIDC_ISSUER:-http://127.0.0.1:${STUDY_KEYCLOAK_PORT:-8080}/realms/study}
+      STUDY_OIDC_CLIENT_ID: ${STUDY_OIDC_CLIENT_ID:-study-tool}
+      STUDY_ORIGIN: ${STUDY_ORIGIN:-http://127.0.0.1:${STUDY_WEB_PORT:-3000}}
+      STUDY_OWNER_SUBJECT: ${STUDY_OWNER_SUBJECT:?Set the verified owner subject before starting the app}
     restart: unless-stopped
     init: true
 
 volumes:
   study-data:
+  keycloak-data:

@@ -8,11 +8,12 @@ import type {
 import type { Certification } from '../certifications/certifications.ts'
 import { ResultIndicator, ResultLegend } from '../../shared/ui/ResultIndicator.tsx'
 import { StudyIcon } from '../../shared/ui/StudyIcon.tsx'
-import { api } from '../../shared/lib/api.ts'
+import { useApi } from '../../shared/lib/workspace-api.ts'
 import { DeletedBankNotice } from '../../shared/ui/DeletedBankNotice.tsx'
 
 /** Keeps completion evidence visible while its saved result is pending deletion. */
 export function ResultCompletionHeader({ quiz, label }: { quiz: QuizView; label?: string }) {
+  const api = useApi()
   const [pending, setPending] = useState<DeletedQuizSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -102,6 +103,7 @@ export function CompletedResults({
   mode: PracticeMode
   onOpen: (id: string) => void
 }) {
+  const api = useApi()
   const [items, setItems] = useState<(QuizSummary | DeletedQuizSummary)[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')

@@ -1,0 +1,31 @@
+{
+  "realm": "study",
+  "enabled": true,
+  "displayName": "Certification Study Tool (local development)",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": false,
+  "clients": [
+    {
+      "clientId": "study-tool",
+      "name": "Certification Study Tool",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "${STUDY_WEB_ORIGIN}/auth/callback",
+        "${STUDY_PREVIEW_ORIGIN}/auth/callback"
+      ],
+      "webOrigins": ["${STUDY_WEB_ORIGIN}", "${STUDY_PREVIEW_ORIGIN}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${STUDY_WEB_ORIGIN}/##${STUDY_PREVIEW_ORIGIN}/"
+      },
+      "defaultClientScopes": ["profile"]
+    }
+  ]
+}

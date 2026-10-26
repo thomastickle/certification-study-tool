@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Exercise deferred saves through the real UI against a disposable populated library. */
@@ -31,7 +33,7 @@ export async function quizSaveBoundariesTest(mode: 'quiz' | 'exam', failures = f
   }
 
   async function snapshot() {
-    return (await originalFetch(`/api/quizzes/${attemptId}`)).json()
+    return (await workspaceFetch(`/api/quizzes/${attemptId}`, {}, originalFetch)).json()
   }
 
   function actions() {
@@ -151,7 +153,7 @@ export async function quizSaveBoundariesTest(mode: 'quiz' | 'exam', failures = f
     window.fetch = originalFetch
     rejectSave = false
     if (attemptId) {
-      await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
+      await workspaceFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' }, originalFetch)
     }
     window.confirm = originalConfirm
   }

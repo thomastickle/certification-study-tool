@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Exercise the workspace picker against disposable multi-certification fixtures. */
 export async function certificationWorkspaceTest() {
   function assert(value: unknown, message: string): asserts value {
@@ -122,7 +124,7 @@ export async function certificationWorkspaceTest() {
     'Answer did not save',
   )
   const current = await (
-    await fetch('/api/quizzes/current?mode=quiz&provider=AWS&certification=DEA-C01')
+    await workspaceFetch('/api/quizzes/current?mode=quiz&provider=AWS&certification=DEA-C01')
   ).json()
   assert(current?.questions[0].selected.length === 1, 'Answer was not persisted')
   const originalFetch = window.fetch
@@ -150,7 +152,7 @@ export async function certificationWorkspaceTest() {
   }
   await choose('microsoft', 'AZ-900')
   const paused = await (
-    await fetch('/api/quizzes/current?mode=quiz&provider=AWS&certification=DEA-C01')
+    await workspaceFetch('/api/quizzes/current?mode=quiz&provider=AWS&certification=DEA-C01')
   ).json()
   assert(
     paused?.id === current.id && paused.status === 'paused',
@@ -162,7 +164,7 @@ export async function certificationWorkspaceTest() {
     () => document.querySelector('main')?.textContent?.includes('Continue quiz') ?? false,
     'Original paused attempt was not recovered',
   )
-  await fetch(`/api/quizzes/${current.id}/abandon`, { method: 'POST' })
+  await workspaceFetch(`/api/quizzes/${current.id}/abandon`, { method: 'POST' })
   assert(document.documentElement.scrollWidth <= innerWidth + 1, 'Workspace overflows horizontally')
   return 'Alias search, page scoping, persistence, saved-answer pause/recovery, and failed-pause protection passed'
 }

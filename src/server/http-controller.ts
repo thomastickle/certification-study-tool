@@ -10,16 +10,23 @@ import { LibraryService } from './questions/library-service.ts'
 import { HomeService } from './home/home-service.ts'
 
 /** Prevent other websites from driving a local library through this server. */
-export function checkLocalRequest(request: IncomingMessage): void {
+export function checkLocalRequest(
+  request: IncomingMessage,
+  publicOrigin?: URL,
+  publicNavigation = false,
+): void {
   const port = request.socket.localPort
-  const hosts = [`127.0.0.1:${port}`, `localhost:${port}`]
-  if (!hosts.includes(request.headers.host ?? ''))
+  const hosts = publicOrigin ? [publicOrigin.host] : [`127.0.0.1:${port}`, `localhost:${port}`]
+  if (!hosts.includes(request.headers.host ?? '')) {
     throw new ApplicationError('Local access only.', 403)
+  }
   const origin = request.headers.origin
-  if (
-    (origin && !hosts.map((host) => `http://${host}`).includes(origin)) ||
-    request.headers['sec-fetch-site'] === 'cross-site'
-  ) {
+  const origins = publicOrigin ? [publicOrigin.origin] : hosts.map((host) => `http://${host}`)
+  const foreignOrigin = origin && !origins.includes(origin)
+  const crossSite = !publicNavigation && request.headers['sec-fetch-site'] === 'cross-site'
+  const mutation = !['GET', 'HEAD'].includes(request.method ?? '')
+  const missingMutationOrigin = publicOrigin && mutation && origin !== publicOrigin.origin
+  if (foreignOrigin || crossSite || missingMutationOrigin) {
     throw new ApplicationError('Cross-site requests are not allowed.', 403)
   }
 }
@@ -71,7 +78,7 @@ function positiveInteger(text: string | null, fallback?: number): number {
   return Number(text)
 }
 
-export function apiController(repository: LibraryRepository) {
+export function apiController(repository: LibraryRepository, origin?: URL) {
   const concepts = new ConceptService(repository)
   const quizzes = new QuizService(repository)
   const reports = new ReportService(repository)
@@ -80,7 +87,7 @@ export function apiController(repository: LibraryRepository) {
   const home = new HomeService(repository)
   return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     try {
-      checkLocalRequest(request)
+      checkLocalRequest(request, origin)
       const url = new URL(request.url ?? '/', 'http://localhost')
       const scope = {
         provider: url.searchParams.get('provider') ?? undefined,

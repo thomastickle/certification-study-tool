@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 /** Completed result views expose both a top-level return and a working Practice destination. */
 export async function resultNavigationCheck() {
   /** Waits for the public view rather than relying on route implementation details. */
@@ -87,7 +89,9 @@ export async function practiceReselectSafetyCheck() {
     )
     click('Start 20-question quiz')
     await until(() => !!document.querySelector('.practice-session'), 'Question did not open')
-    const current = await (await originalFetch('/api/quizzes/current?mode=quiz')).json()
+    const current = await (
+      await workspaceFetch('/api/quizzes/current?mode=quiz', {}, originalFetch)
+    ).json()
     id = current.id
     window.fetch = async (input, init) => {
       if (String(input) === `/api/quizzes/${id}/answers` && init?.method === 'PUT' && rejectSave) {
@@ -104,7 +108,7 @@ export async function practiceReselectSafetyCheck() {
       () => rejectedSave && !!document.querySelector('.practice-session .message.error'),
       'Practice reselect bypassed the save guard',
     )
-    const stillActive = await (await originalFetch(`/api/quizzes/${id}`)).json()
+    const stillActive = await (await workspaceFetch(`/api/quizzes/${id}`, {}, originalFetch)).json()
     if (stillActive.status !== 'active' || document.querySelector('.practice-setup')) {
       throw new Error('Failed save must keep the running attempt open')
     }
@@ -114,7 +118,7 @@ export async function practiceReselectSafetyCheck() {
       () => !!document.querySelector('.practice-setup'),
       'Practice retry did not return to setup',
     )
-    const paused = await (await originalFetch(`/api/quizzes/${id}`)).json()
+    const paused = await (await workspaceFetch(`/api/quizzes/${id}`, {}, originalFetch)).json()
     if (paused.status !== 'paused' || paused.pauseHistory?.intervals.length !== 1) {
       throw new Error('Practice reselect must save and pause once before returning to setup')
     }
@@ -122,11 +126,15 @@ export async function practiceReselectSafetyCheck() {
   } finally {
     window.fetch = originalFetch
     if (id) {
-      await originalFetch(`/api/quizzes/${id}/abandon`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      })
+      await workspaceFetch(
+        `/api/quizzes/${id}/abandon`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        },
+        originalFetch,
+      )
     }
   }
 }

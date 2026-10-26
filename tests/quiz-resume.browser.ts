@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticeActions, openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Run in a disposable populated app after transpiling with TypeScript (ESNext). */
@@ -43,7 +45,7 @@ export async function lostResumeCheck(
   }
 
   async function attempt() {
-    return (await originalFetch(`/api/quizzes/${attemptId}`)).json()
+    return (await workspaceFetch(`/api/quizzes/${attemptId}`, {}, originalFetch)).json()
   }
 
   window.confirm = () => true
@@ -86,7 +88,9 @@ export async function lostResumeCheck(
     )
     click(startLabel)
     await until(() => !!document.querySelector('.quiz-question'), 'Question did not load')
-    const current = await (await originalFetch(`/api/quizzes/current?mode=${mode}`)).json()
+    const current = await (
+      await workspaceFetch(`/api/quizzes/current?mode=${mode}`, {}, originalFetch)
+    ).json()
     attemptId = current.id
     await until(
       () => document.querySelector<HTMLInputElement>('.answer-choices input')?.disabled === false,
@@ -168,7 +172,7 @@ export async function lostResumeCheck(
     const frozen = await attempt()
     assert(frozen.deadline === paused.deadline, 'Paused deadline moved')
     assert(frozen.pausedAt === paused.pausedAt, 'Paused remaining time changed')
-    const report = await (await originalFetch('/api/reports')).json()
+    const report = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       !report.attempts.some((item: { id: string }) => item.id === attemptId),
       'Unfinished attempt entered reports',
@@ -194,11 +198,15 @@ export async function lostResumeCheck(
     )
     const completed = await attempt()
     const repeated = await (
-      await originalFetch(`/api/quizzes/${attemptId}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: [] }),
-      })
+      await workspaceFetch(
+        `/api/quizzes/${attemptId}/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: [] }),
+        },
+        originalFetch,
+      )
     ).json()
     assert(repeated.finishedAt === completed.finishedAt, 'Retry graded the attempt again')
     assert(completed.pauseHistory.intervals.length === 2, 'Completion duplicated intervals')
@@ -206,7 +214,7 @@ export async function lostResumeCheck(
       completed.pauseHistory.intervals.every((p: { endedAt: number | null }) => p.endedAt !== null),
       'Completion left an ongoing pause',
     )
-    const finalReport = await (await originalFetch('/api/reports')).json()
+    const finalReport = await (await workspaceFetch('/api/reports', {}, originalFetch)).json()
     assert(
       finalReport.attempts.filter((item: { id: string }) => item.id === attemptId).length === 1,
       'Completed attempt was not reported exactly once',
@@ -217,11 +225,15 @@ export async function lostResumeCheck(
     window.fetch = originalFetch
     window.confirm = originalConfirm
     if (attemptId) {
-      await originalFetch(`/api/quizzes/${attemptId}/abandon`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      })
+      await workspaceFetch(
+        `/api/quizzes/${attemptId}/abandon`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        },
+        originalFetch,
+      )
     }
   }
 }

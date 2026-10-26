@@ -1,3 +1,5 @@
+import { workspaceFetch } from './browser-api.ts'
+
 import { openPracticePreset } from './practice-browser-helpers.ts'
 
 /** Browser-only fixture checks for stable controls with short and long questions. */
@@ -137,7 +139,8 @@ export async function practiceViewportTest(mode: 'quiz' | 'exam'): Promise<strin
     window.fetch = originalFetch
     click('Reports')
     await until(() => document.querySelector('.reports-page') !== null, 'Cleanup failed')
-    if (attemptId) await originalFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' })
+    if (attemptId)
+      await workspaceFetch(`/api/quizzes/${attemptId}/abandon`, { method: 'POST' }, originalFetch)
     window.confirm = originalConfirm
   }
 }
