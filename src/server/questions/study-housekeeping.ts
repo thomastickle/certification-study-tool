@@ -88,8 +88,13 @@ export class StudyHousekeeping {
           break
         }
         sweep.delete(accountId)
+        const attemptedAt = this.now()
         this.maintain(accountId)
-        this.attempted.add(accountId)
+        const deadline = this.deadlines.get(accountId)
+        // Suppress failed or still-due work, but let a future deadline interrupt this sweep later.
+        if (deadline !== undefined && deadline <= attemptedAt) {
+          this.attempted.add(accountId)
+        }
         // One owner's synchronous SQLite work is indivisible; never carry its connection over a yield.
         await yieldTurn()
       }

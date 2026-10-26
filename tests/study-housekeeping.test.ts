@@ -394,6 +394,145 @@ test('owner batches yield closed connections, prioritize new deadlines and coale
   }
 })
 
+for (const initiallyDue of [false, true]) {
+  test(`a visited owner's future deadline interrupts the idle sweep (initially due: ${initiallyDue})`, async (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'study-due-after-visit-'))
+    const shared = new LibraryRepository(':memory:')
+    const libraries = new PrivateLibraries(directory)
+    const ids = Array.from({ length: 4 }, () => randomUUID())
+    let time = 1_000_000
+    const scheduler = new StudyHousekeeping(
+      shared,
+      libraries,
+      () => 0,
+      () => time,
+    )
+    const open = libraries.open.bind(libraries)
+    const opened: string[] = []
+    const closed: string[] = []
+    try {
+      for (const id of ids) {
+        open(id).close()
+      }
+      const firstId = ids[0]!
+      const personal = open(firstId)
+      let pendingId: string
+      let dueId: string | undefined
+      try {
+        populate(personal)
+        const quizzes = new QuizService(shared.forAccount(firstId, personal), () => time)
+        pendingId = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' }).id
+        const pending = personal.quizStore().find(pendingId)!
+        pending.deadline = time + 1000
+        personal.quizStore().save(pending)
+        if (initiallyDue) {
+          dueId = randomUUID()
+          personal.quizStore().save({ ...structuredClone(pending), id: dueId, deadline: time - 1 })
+        }
+        scheduler.observe(firstId, personal)
+      } finally {
+        personal.close()
+      }
+      t.mock.method(libraries, 'accounts', () => ids)
+      t.mock.method(libraries, 'open', (id: string) => {
+        opened.push(id)
+        const personal = open(id)
+        const close = personal.close.bind(personal)
+        t.mock.method(personal, 'close', () => {
+          close()
+          closed.push(id)
+        })
+        return personal
+      })
+      const pass = scheduler.tick()
+      assert.deepEqual(opened, [firstId])
+      assert.deepEqual(closed, opened, 'The first visit closes before the deadline arrives')
+      time += 1000
+      assert.equal(scheduler.tick(), pass, 'An overlapping tick coalesces with the sweep')
+      await yieldTurn()
+      assert.equal(opened[1], firstId, 'Newly due work precedes every remaining idle owner')
+      assert.deepEqual(closed, opened, 'The priority visit also closes before yielding')
+      const check = open(firstId)
+      try {
+        assert.equal(check.quizStore().find(pendingId)!.status, 'completed')
+        if (dueId !== undefined) {
+          assert.equal(check.quizStore().find(dueId)!.status, 'completed')
+        }
+      } finally {
+        check.close()
+      }
+      await pass
+      assert.deepEqual(opened, [firstId, ...ids])
+      assert.deepEqual(closed, opened)
+    } finally {
+      await scheduler.stop()
+      shared.close()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const metadata of ['failure', 'stale'] as const) {
+  test(`${metadata} deadline metadata cannot spin or starve the remaining owners`, async (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'study-unproductive-deadline-'))
+    const shared = new LibraryRepository(':memory:')
+    const libraries = new PrivateLibraries(directory)
+    const ids = Array.from({ length: 4 }, () => randomUUID())
+    const time = 1_000_000
+    const scheduler = new StudyHousekeeping(
+      shared,
+      libraries,
+      () => 0,
+      () => time,
+    )
+    const open = libraries.open.bind(libraries)
+    const opened: string[] = []
+    const closed: string[] = []
+    t.mock.method(console, 'error', () => {})
+    try {
+      for (const id of ids) {
+        open(id).close()
+      }
+      t.mock.method(libraries, 'accounts', () => ids)
+      t.mock.method(libraries, 'open', (id: string) => {
+        opened.push(id)
+        const personal = open(id)
+        if (id === ids[0]) {
+          const store = personal.quizStore()
+          t.mock.method(personal, 'quizStore', () => store)
+          t.mock.method(store, 'nextHousekeepingAt', () => {
+            if (metadata === 'failure') {
+              throw new Error('Synthetic metadata failure')
+            }
+            return time - 1
+          })
+        }
+        const close = personal.close.bind(personal)
+        t.mock.method(personal, 'close', () => {
+          close()
+          closed.push(id)
+        })
+        return personal
+      })
+      const pass = scheduler.tick()
+      // Bound the probe so a spinning implementation fails instead of hanging the test runner.
+      for (let slice = 0; slice < ids.length + 1; slice++) {
+        await yieldTurn()
+      }
+      assert.deepEqual(opened, ids, 'Unproductive due work must let the idle sweep finish')
+      assert.deepEqual(closed, opened)
+      await pass
+      await scheduler.tick()
+      assert.deepEqual(opened, [...ids, ids[0]], 'Suppression ends on the next tick')
+      assert.deepEqual(closed, opened)
+    } finally {
+      await scheduler.stop()
+      shared.close()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
 test('stop cancels a yielded sweep and drains before the root repository closes', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-stop-'))
   const shared = new LibraryRepository(':memory:')
