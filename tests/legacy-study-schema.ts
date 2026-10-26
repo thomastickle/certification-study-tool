@@ -1,5 +1,7 @@
 /** Deployed Epic 1 study tables, reconstructed only inside disposable test databases. */
 export const legacyStudySchema = `
+  DROP TABLE IF EXISTS deleted_sources;
+  DROP TABLE IF EXISTS shared_deletion_cursor;
       BEGIN IMMEDIATE;
       ALTER TABLE quiz_sessions RENAME TO scoped_sessions;
       ALTER TABLE quiz_mastery RENAME TO scoped_mastery;

@@ -1,7 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { Source } from '../../../shared/contracts.ts'
+import type { LibraryItemId, Source } from '../../../shared/contracts.ts'
 
-type Props = { sources: Source[]; selected: number[]; onChange: (ids: number[]) => void }
+type Props = {
+  sources: Source[]
+  selected: LibraryItemId[]
+  onChange: (ids: LibraryItemId[]) => void
+}
 
 export function QuizSourcePicker({ sources, selected, onChange }: Props) {
   const id = useId()
@@ -153,7 +157,9 @@ export function QuizSourcePicker({ sources, selected, onChange }: Props) {
                       )
                     }
                   />
-                  <span>{source.name}</span>
+                  <span>
+                    {source.name} · {source.visibility === 'private' ? 'Private' : 'Shared'}
+                  </span>
                   <small>{source.questionCount} questions</small>
                 </label>
               ))}

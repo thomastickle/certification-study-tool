@@ -1,12 +1,17 @@
 import { ApplicationError } from '../errors.ts'
 import { LibraryRepository } from './library-repository.ts'
+import { pinLegacySources } from './bank-provenance.ts'
+import { privateItemId } from '../../shared/library-identity.ts'
+import type { LibraryVisibility } from '../../shared/contracts.ts'
 import { sameCertification } from '../quizzes/certification-scope.ts'
 
 export class LibraryService {
   private repository: LibraryRepository
+  private visibility: LibraryVisibility
 
-  constructor(repository: LibraryRepository) {
+  constructor(repository: LibraryRepository, visibility: LibraryVisibility = 'shared') {
     this.repository = repository
+    this.visibility = visibility
   }
 
   deleteQuestion(id: number): void {
@@ -27,52 +32,23 @@ export class LibraryService {
       if (!source) {
         throw new ApplicationError('Source not found.', 404)
       }
-      const scope = { provider: source.provider, certification: source.certification }
-      const candidates = new Set(
-        sources
-          .filter(
-            (candidate) =>
-              candidate.name === source.name &&
-              candidate.kind === source.kind &&
-              sameCertification(candidate, scope),
-          )
-          .map((candidate) => candidate.id),
-      )
-      const references = new Map<string, Set<number>>()
-      for (const question of this.repository.allQuestions()) {
-        if (candidates.has(question.sourceId)) {
-          const ids = references.get(question.reference) ?? new Set<number>()
-          ids.add(question.sourceId)
-          references.set(question.reference, ids)
-        }
-      }
+      const questions = this.repository.allQuestions()
+      const snapshotId = this.visibility === 'private' ? privateItemId(id) : id
       this.repository.annotateSnapshots((quiz) => {
-        if (!sameCertification(quiz.options, scope)) {
+        if (!sameCertification(quiz.options, source)) {
           return false
         }
-        let resolvedLegacy = false
-        for (const question of quiz.questions) {
-          if (
-            question.sourceId !== undefined ||
-            question.sourceName !== source.name ||
-            question.sourceKind !== source.kind
-          ) {
-            continue
-          }
-          const ids = [...(references.get(question.reference) ?? [])].filter(
-            (candidateId) =>
-              !quiz.options.sourceIds || quiz.options.sourceIds.includes(candidateId),
-          )
-          // Pin ambiguity before deletion so a later deletion cannot turn it into a false match.
-          question.sourceId = ids.length === 1 ? ids[0]! : null
-          resolvedLegacy = true
-        }
-        const affected = quiz.questions.some((question) => question.sourceId === id)
+        const resolvedLegacy =
+          this.visibility === 'shared' && pinLegacySources(quiz, sources, questions, source)
+        const affected = quiz.questions.some((question) => question.sourceId === snapshotId)
         if (affected) {
           quiz.deletedBankNames = [...new Set([...(quiz.deletedBankNames ?? []), source.name])]
         }
         return affected || resolvedLegacy
       })
+      if (this.visibility === 'shared') {
+        this.repository.recordSourceDeletion(source)
+      }
       if (!this.repository.deleteSource(id)) throw new ApplicationError('Source not found.', 404)
     })
   }

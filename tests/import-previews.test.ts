@@ -18,3 +18,21 @@ test('import tickets are account-bound, single-use, time-limited and capacity-bo
   const fresh = previews.issue('charlie', 'fresh-revision')
   assert.equal(previews.consume('charlie', fresh), 'fresh-revision')
 })
+
+test('one student cannot reserve the global preview capacity', () => {
+  const previews = new ImportPreviews(() => 1000, 1000, 2)
+  previews.issue('alice', 'first', 'private')
+  previews.issue('alice', 'second', 'private')
+  assert.throws(() => previews.issue('alice', 'third', 'private'), /Too many pending/)
+  assert.ok(previews.issue('bob', 'shared-admin-work', 'shared'))
+})
+
+test('review tickets cannot be moved between shared and private import destinations', () => {
+  const previews = new ImportPreviews()
+  const shared = previews.issue('alice', 'same-content-revision', 'shared')
+  const personal = previews.issue('alice', 'same-content-revision', 'private')
+  assert.throws(() => previews.consume('alice', shared, 'private'), /another workspace/)
+  assert.throws(() => previews.consume('alice', personal, 'shared'), /another workspace/)
+  assert.equal(previews.consume('alice', shared, 'shared'), 'same-content-revision')
+  assert.equal(previews.consume('alice', personal, 'private'), 'same-content-revision')
+})

@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { mkdirSync, chmodSync, existsSync, statSync, createReadStream } from 'node:fs'
 import { resolve, dirname, extname, sep } from 'node:path'
 import { QuizService } from './quizzes/quiz-service.ts'
@@ -8,6 +9,8 @@ import { ApplicationAuthentication } from './auth/application-authentication.ts'
 import { ImportPreviews } from './importer/import-previews.ts'
 import { applicationRequestHandler } from './request-handler.ts'
 import type { ApplicationHandlers } from './request-handler.ts'
+import type { SessionUser } from '../shared/auth-contracts.ts'
+import { PrivateLibraries } from './questions/private-libraries.ts'
 
 const host = process.env.STUDY_HOST ?? '127.0.0.1'
 const port = Number(process.env.STUDY_PORT ?? '3000')
@@ -30,18 +33,28 @@ const authenticationOptions = {
 }
 const authentication = new ApplicationAuthentication(authenticationOptions)
 const previews = new ImportPreviews()
+const privateLibraries = new PrivateLibraries(
+  process.env.STUDY_PRIVATE_LIBRARIES_DIR ?? resolve(dirname(databasePath), 'users'),
+)
 mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 })
 const legacySubject = process.env.STUDY_LEGACY_OWNER_SUBJECT
 const legacyOwner = legacySubject ? authentication.legacyOwnerId(legacySubject) : undefined
 let repository: LibraryRepository
 try {
-  repository = new LibraryRepository(databasePath, 'local', legacyOwner)
+  repository = new LibraryRepository(databasePath, 'local', { legacyOwnerId: legacyOwner })
 } catch (error) {
   authentication.close()
   throw error
 }
 chmodSync(databasePath, 0o600)
-expireStudyWork()
+try {
+  privateLibraries.migrateFrom(repository)
+  expireStudyWork()
+} catch (error) {
+  repository.close()
+  authentication.close()
+  throw error
+}
 const expiryTimer = setInterval(() => {
   try {
     expireStudyWork()
@@ -57,16 +70,34 @@ let webHandler: (
 ) => void
 const handlers: ApplicationHandlers = {
   authentication,
-  study: (user) => apiController(repository, user, origin, previews),
+  study: (user) => (request, response) => serveStudy(user, request, response),
   web: (request, response) => webHandler(request, response),
 }
 
 const server = createServer(applicationRequestHandler(handlers))
 
-/** Score overdue attempts and purge expired deleted results without mixing account histories. */
+/** Keep a private connection alive through its request, including body reads and failure cleanup. */
+async function serveStudy(user: SessionUser, request: IncomingMessage, response: ServerResponse) {
+  const privateLibrary = privateLibraries.open(user.id)
+  try {
+    const api = apiController(repository, user, origin, previews, privateLibrary)
+    await api(request, response)
+  } finally {
+    privateLibrary.close()
+  }
+}
+
+/** Score overdue attempts and reconcile shared deletions in each owner’s file without exposing history. */
 function expireStudyWork(): void {
-  for (const accountId of repository.pendingStudyAccounts()) {
-    new QuizService(repository.forAccount(accountId)).expireDue()
+  for (const accountId of privateLibraries.accounts()) {
+    const privateLibrary = privateLibraries.open(accountId)
+    try {
+      const study = repository.forAccount(accountId, privateLibrary)
+      study.synchronizeDeletions()
+      new QuizService(study).expireDue()
+    } finally {
+      privateLibrary.close()
+    }
   }
 }
 

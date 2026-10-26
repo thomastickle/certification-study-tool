@@ -15,6 +15,7 @@ import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { ImportPreviews } from '../src/server/importer/import-previews.ts'
 import { applicationRequestHandler } from '../src/server/request-handler.ts'
 import type { ApplicationHandlers } from '../src/server/request-handler.ts'
+import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 
 /** Exercise verified identities and role checks in front of the shared-content/private-study API. */
 async function fixture(issuerPath = '/realms/test') {
@@ -24,6 +25,7 @@ async function fixture(issuerPath = '/realms/test') {
   }))
   const directory = mkdtempSync(join(tmpdir(), 'study-owner-login-'))
   const library = new LibraryRepository(join(directory, 'library.sqlite3'))
+  const privateLibraries = new PrivateLibraries(join(directory, 'users'))
   const importer = new ImportService(library)
   const input = bank()
   input.questions = Array.from({ length: 20 }, (_, index) => ({
@@ -37,7 +39,14 @@ async function fixture(issuerPath = '/realms/test') {
   const previews = new ImportPreviews(() => now)
   const handlers: ApplicationHandlers = {
     authentication: { handle: (request, response) => authentication.handle(request, response) },
-    study: (user) => apiController(library, user, origin, previews),
+    study: (user) => async (request, response) => {
+      const privateLibrary = privateLibraries.open(user.id)
+      try {
+        await apiController(library, user, origin, previews, privateLibrary)(request, response)
+      } finally {
+        privateLibrary.close()
+      }
+    },
     web: (_request, response) => {
       response.writeHead(200, { 'Content-Type': 'text/html' })
       response.end('<!doctype html><title>Study workspace</title>')
@@ -109,6 +118,7 @@ async function fixture(issuerPath = '/realms/test') {
     provider,
     directory,
     library,
+    privateLibraries,
     origin,
     setAdmin: (subject: string, admin: boolean) => {
       if (admin) {
@@ -289,7 +299,8 @@ test('shared content and personal history do not require a database copy per use
   try {
     const owner = await app.login('alice')
     const user = (await app.json('/api/session', owner.cookie)).user
-    const service = new QuizService(app.library.forAccount(user.id))
+    const personal = app.privateLibraries.open(user.id)
+    const service = new QuizService(app.library.forAccount(user.id, personal))
     const quiz = service.start({
       provider: 'Example',
       certification: 'DEMO-1',
@@ -303,6 +314,7 @@ test('shared content and personal history do not require a database copy per use
       flagged: false,
     }))
     service.submit(quiz.id, { answers })
+    personal.close()
     assert.equal((await app.call('/api/questions')).status, 401)
     assert.equal(owner.response.status, 302)
     const library = await app.call('/api/questions', owner.cookie)
@@ -312,7 +324,8 @@ test('shared content and personal history do not require a database copy per use
       owner.cookie,
     )
     assert.equal((await history.json()).length, 1)
-    assert.equal(existsSync(join(app.directory, 'users')), false)
+    assert.equal(existsSync(join(app.directory, 'users', `${user.id}.sqlite3`)), true)
+    assert.deepEqual(app.library.forAccount(user.id).quizStore().snapshots(), [])
     assert.equal(app.library.allQuestions().length, 20)
   } finally {
     await app.close()

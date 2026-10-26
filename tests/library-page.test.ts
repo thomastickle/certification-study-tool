@@ -20,7 +20,7 @@ test('library renders page content without duplicating the application header', 
     },
   })
   try {
-    const { LibraryPage } = await import('../src/web/features/library/LibraryPage.tsx')
+    const { LibraryPage, LibraryView } = await import('../src/web/features/library/LibraryPage.tsx')
     const html = renderToStaticMarkup(createElement(LibraryPage, { canManage: true }))
     assert.equal((html.match(/<header\b/g) ?? []).length, 0, 'the app shell owns the shared header')
     assert.equal((html.match(/<main\b/g) ?? []).length, 1)
@@ -30,7 +30,28 @@ test('library renders page content without duplicating the application header', 
     assert.doesNotMatch(html, /A place to build your knowledge/)
     const student = renderToStaticMarkup(createElement(LibraryPage, { canManage: false }))
     assert.match(student, /Question library/)
-    assert.doesNotMatch(student, /Import a bank|Create concept group|Delete source|Delete question/)
+    assert.match(student, /Import a bank/)
+    assert.match(student, /My private library/)
+    const sharedStudent = renderToStaticMarkup(
+      createElement(LibraryView, {
+        canManage: false,
+        visibility: 'shared',
+        onVisibilityChange: () => {},
+      }),
+    )
+    assert.doesNotMatch(
+      sharedStudent,
+      /Import a bank|Create concept group|Delete source|Delete question/,
+    )
+    assert.match(sharedStudent, /Administrators manage shared content/)
+    const sharedAdmin = renderToStaticMarkup(
+      createElement(LibraryView, {
+        canManage: true,
+        visibility: 'shared',
+        onVisibilityChange: () => {},
+      }),
+    )
+    assert.match(sharedAdmin, /Import a bank/)
   } finally {
     hooks.deregister()
   }

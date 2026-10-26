@@ -19,7 +19,8 @@ filters, saved answer review, and local Markdown exports. See
 
 Use Node **24.14 or later in the 24.x line** and npm.
 First complete [Keycloak enrollment and application-role setup](docs/authentication.md).
-Users study shared banks with private progress; administrators manage shared content.
+Users study shared banks and their own private banks; administrators manage shared content.
+Each user has a separate database for private banks and study history.
 
 ```sh
 npm ci
@@ -39,7 +40,9 @@ NODE_ENV=production npm start
 The database defaults to `private/app/library.sqlite3`. `STUDY_DB_PATH` selects a
 separate database path and `STUDY_PORT` selects a port. Do not point this app at
 the original Python app's database; existing unrelated databases are refused.
-The current study schema is version 3 and uses an application identifier to recognize
+Private databases default to `private/app/users/<internal-ID>.sqlite3`; identities
+and sessions remain in `accounts.sqlite3`. See [private-library storage and upgrade](docs/private-libraries.md).
+The current library schema is version 4 and uses an application identifier to recognize
 its own databases. Upgrading owner-only study history requires an explicit
 [legacy-owner mapping](docs/authentication.md#upgrade-from-the-owner-only-release).
 
@@ -78,7 +81,9 @@ active in either mode.
 
 ## Import and review
 
-1. Choose **Import a bank**, then a version-2 JSON file (maximum 10 MB).
+1. In **Library**, choose **My private library**, or **Shared library** if you are
+   an administrator managing shared content. Choose **Import a bank**, then a
+   version-2 JSON file (maximum 10 MB).
 2. Inspect new, unchanged, changed, duplicate, and unclassified question counts.
 3. Review stored/incoming versions for changed questions or source metadata.
    Check the approval box before confirming those changes.
@@ -87,7 +92,8 @@ active in either mode.
 
 The prepared banks live in the Git-ignored `private/question-banks/` folder.
 Keep bank files and databases out of Git. Imported banks are sent to your study
-server and shared with its users. Banks and progress are not sent to the identity
+server. Private banks stay with your account; shared-bank imports are available
+to its users. Banks and progress are not sent to the identity
 provider; the app has no analytics, remote fonts, or cloud database. Imported data
 is persisted in SQLite; the app
 does not save a separate copy of the selected input file. Original files are

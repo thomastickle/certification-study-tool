@@ -36,6 +36,8 @@ primitives that require a later storage feature to become usable.
 
 ## Epic 2: Multiple users with admin-managed shared banks ([#58](https://github.com/thomastickle/certification-study-tool/issues/58))
 
+Delivered in [PR #61](https://github.com/thomastickle/certification-study-tool/pull/61).
+
 Admit multiple users. Everyone can study the shared question banks; only users
 with the admin role can create, import, modify, or delete shared bank content.
 Study attempts, progress, and personal study state belong to the individual user.

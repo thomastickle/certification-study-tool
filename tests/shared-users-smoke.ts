@@ -337,16 +337,131 @@ try {
   assert.equal(restartedQuestions.total, 21)
   assert.equal(restartedOwner.role, 'admin')
   assert.equal(restartedStudent.role, 'student')
+
+  const privateBank = bank('student-private')
+  privateBank.source.name = 'Student private bank'
+  privateBank.questions = Array.from({ length: 20 }, (_, index) => ({
+    ...structuredClone(privateBank.questions[0]!),
+    source_ref: String(index),
+    question: `Private ${other.id} sample ${index}?`,
+  }))
+  const privatePreview = await studyJson(student.browser, '/api/private/imports/preview', {
+    method: 'POST',
+    body: JSON.stringify({ bank: privateBank }),
+  })
+  const privateConfirmation = {
+    method: 'POST',
+    body: JSON.stringify({ bank: privateBank, token: privatePreview.token, reviewed: false }),
+  }
+  assert.equal(
+    (await study(secondAdmin.browser, '/api/private/imports/confirm', privateConfirmation)).status,
+    409,
+  )
+  assert.equal(
+    (await study(student.browser, '/api/private/imports/confirm', privateConfirmation)).status,
+    201,
+  )
+  assert.equal((await studyJson(signedIn.browser, '/api/private/questions')).total, 0)
+  assert.equal((await studyJson(student.browser, '/api/private/questions')).total, 20)
+  assert.equal((await studyJson(student.browser, '/api/shared/questions')).total, 21)
+  const availableSources = await studyJson(student.browser, '/api/sources')
+  assert.ok(
+    availableSources.some(
+      (source: { id: unknown; visibility: string }) =>
+        source.id === 'private:1' && source.visibility === 'private',
+    ),
+  )
+  const privateStarted = await study(student.browser, '/api/quizzes', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider: 'Example',
+      certification: 'DEMO-1',
+      sourceFilter: 'mixed',
+      questionType: 'mixed',
+      sourceIds: ['private:1'],
+    }),
+  })
+  assert.equal(privateStarted.status, 201)
+  const privateQuiz = await privateStarted.json()
+  assert.ok(
+    privateQuiz.questions.every(
+      (question: { sourceId: unknown }) => question.sourceId === 'private:1',
+    ),
+  )
+  assert.equal((await study(signedIn.browser, '/api/quizzes/' + privateQuiz.id)).status, 404)
+  const privateAnswers = privateQuiz.questions.map((question: { questionId: number }) => ({
+    questionId: question.questionId,
+    selected: [],
+    confidence: 'Unsure',
+    flagged: false,
+  }))
+  assert.equal(
+    (
+      await study(student.browser, `/api/quizzes/${privateQuiz.id}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ answers: privateAnswers }),
+      })
+    ).status,
+    200,
+  )
+  const storageCheck = `
+    import assert from 'node:assert/strict'
+    import { readFileSync, statSync } from 'node:fs'
+    import { DatabaseSync } from 'node:sqlite'
+    const shared = new DatabaseSync('/data/library.sqlite3', { readOnly: true })
+    assert.equal(shared.prepare('SELECT count(*) AS total FROM quiz_sessions').get().total, 0)
+    assert.equal(shared.prepare('SELECT count(*) AS total FROM earned_certifications').get().total, 0)
+    shared.close()
+    const path = '/data/users/' + ${JSON.stringify(studentSession.id)} + '.sqlite3'
+    const personal = new DatabaseSync(path, { readOnly: true })
+    assert.equal(personal.prepare('SELECT count(*) AS total FROM quiz_sessions').get().total, 2)
+    assert.equal(personal.prepare('SELECT count(*) AS total FROM questions').get().total, 20)
+    personal.close()
+    const privateQuestion = ${JSON.stringify(privateBank.questions[0]!.question)}
+    assert.equal(readFileSync('/data/library.sqlite3').includes(Buffer.from(privateQuestion)), false)
+    assert.equal(readFileSync(path).includes(Buffer.from(privateQuestion)), true)
+    assert.equal(statSync(path).mode & 0o777, 0o600)
+  `
+  compose('exec', '-T', 'study', 'node', '--input-type=module', '-e', storageCheck)
+  assert.equal(
+    (await study(student.browser, '/api/private/sources/1', { method: 'DELETE' })).status,
+    204,
+  )
+  const deletedPrivateResult = await studyJson(student.browser, '/api/quizzes/' + privateQuiz.id)
+  assert.deepEqual(deletedPrivateResult.deletedBankNames, ['Student private bank'])
+  assert.equal(deletedPrivateResult.questions.length, 20)
+  compose(
+    'up',
+    '--no-build',
+    '--no-deps',
+    '--force-recreate',
+    '-d',
+    '--wait',
+    '--wait-timeout',
+    '90',
+    'study',
+  )
+  await waitForApplication(app)
+  const preservedPrivateResult = await studyJson(student.browser, '/api/quizzes/' + privateQuiz.id)
+  assert.deepEqual(preservedPrivateResult, {
+    ...deletedPrivateResult,
+    serverNow: preservedPrivateResult.serverNow,
+  })
+  assert.deepEqual(await history(signedIn.browser), originalHistory)
+  assert.equal((await history(student.browser)).length, 2)
   console.log(
     JSON.stringify({
       adminAndStudentLogin: true,
       legacyOwnerHistory: 1,
-      privateStudentHistory: 1,
+      privateStudentHistory: 2,
       sharedQuestions: 21,
       studentMutationDenied: true,
       crossAccountPreviewDenied: true,
       staleWorkspaceDenied: true,
       sessionsSurviveRecreation: true,
+      privateBankIsolation: true,
+      physicalHistorySeparation: true,
+      privateDeletionPreservesResult: true,
     }),
   )
 } finally {

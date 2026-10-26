@@ -1,3 +1,5 @@
+import type { LibraryItemId } from './contracts.ts'
+
 export type Confidence = 'Confident' | 'Educated Guess' | 'Unsure'
 
 export type PracticeMode = 'quiz' | 'exam' | 'review'
@@ -7,7 +9,7 @@ export type QuizOptions = {
   certification?: string
   mode?: PracticeMode
   sourceFilter: 'mixed' | 'official' | 'third_party'
-  sourceIds?: number[]
+  sourceIds?: LibraryItemId[]
   questionType: 'mixed' | 'single_select' | 'multi_select'
 }
 
@@ -20,7 +22,7 @@ export type QuizAnswer = {
 
 export type QuizQuestion = QuizAnswer & {
   /** Drawn bank occurrence. Undefined is legacy; null is unresolved legacy provenance. */
-  sourceId?: number | null
+  sourceId?: LibraryItemId | null
   question: string
   type: 'single_select' | 'multi_select'
   selectCount: number

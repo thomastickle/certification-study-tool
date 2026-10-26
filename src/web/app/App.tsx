@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { SessionUser } from '../../shared/auth-contracts.ts'
-import type { Source } from '../../shared/contracts.ts'
+import type { LibraryItemId, Source } from '../../shared/contracts.ts'
 import { useWorkspaceApi } from '../shared/lib/workspace-api.ts'
 import { CertificationPicker } from '../features/certifications/CertificationPicker.tsx'
 import {
@@ -30,7 +30,7 @@ type WorkspaceTransition =
       kind: 'certification'
       next: Certification
       studyPage?: 'quiz' | 'exam' | 'review'
-      sourceIds?: number[]
+      sourceIds?: LibraryItemId[]
     }
   | { kind: 'logout'; form: HTMLFormElement }
 
@@ -42,7 +42,7 @@ export function App({ account }: { account: SessionUser }) {
   const [page, setPage] = useState<Page>('home')
   const [practiceVisit, setPracticeVisit] = useState(0)
   const [practiceMode, setPracticeMode] = useState<'quiz' | 'exam'>('quiz')
-  const [practiceSources, setPracticeSources] = useState<Record<string, number[]>>({})
+  const [practiceSources, setPracticeSources] = useState<Record<string, LibraryItemId[]>>({})
   const [certifications, setCertifications] = useState<Certification[]>([])
   const [selected, setSelected] = useState<Certification | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
@@ -190,7 +190,7 @@ export function App({ account }: { account: SessionUser }) {
   function selectCertification(
     next: Certification,
     studyPage?: 'quiz' | 'exam' | 'review',
-    sourceIds?: number[],
+    sourceIds?: LibraryItemId[],
   ) {
     return transitionWorkspace({ kind: 'certification', next, studyPage, sourceIds })
   }
