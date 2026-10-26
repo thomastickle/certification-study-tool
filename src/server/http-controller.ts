@@ -118,17 +118,27 @@ export function apiController(
       const concepts = new ConceptService(content.forAccount(actor.id))
       const importer = new ImportService(content)
       const library = new LibraryService(content, visibility)
-      const changesContent =
-        !['GET', 'HEAD'].includes(request.method ?? '') &&
-        /^\/api\/(imports|questions|sources|concepts|concept-suggestions)(\/|$)/.test(url.pathname)
-      if (changesContent && visibility === 'shared' && actor.role !== 'admin') {
-        throw new ApplicationError('Only an administrator can change shared question banks.', 403)
+
+      /** Authorize before reading a mutation body or consuming a preview ticket.
+       * @throws {ApplicationError} When a verified student targets shared content.
+       */
+      const authorizeLibraryWrite = (): void => {
+        if (visibility === 'shared' && actor.role !== 'admin') {
+          throw new ApplicationError('Only an administrator can change shared question banks.', 403)
+        }
       }
+
       const scope = {
         provider: url.searchParams.get('provider') ?? undefined,
         certification: url.searchParams.get('certification') ?? undefined,
       }
-      const conceptResponse = await conceptRoute(concepts, request, url, body)
+      const conceptResponse = await conceptRoute(
+        concepts,
+        request,
+        url,
+        body,
+        authorizeLibraryWrite,
+      )
       if (conceptResponse) {
         return send(response, conceptResponse.status, conceptResponse.value)
       }
@@ -221,12 +231,14 @@ export function apiController(
         )
       }
       if (request.method === 'POST' && url.pathname === '/api/imports/preview') {
+        authorizeLibraryWrite()
         const input = await body(request)
         const preview = importer.preview(input.bank)
         const token = previews.issue(actor.id, preview.token, visibility)
         return send(response, 200, { ...preview, token })
       }
       if (request.method === 'POST' && url.pathname === '/api/imports/confirm') {
+        authorizeLibraryWrite()
         const input = await body(request)
         if (typeof input.token !== 'string' || typeof input.reviewed !== 'boolean')
           throw new ApplicationError('Preview token and review confirmation are required.')
@@ -236,6 +248,7 @@ export function apiController(
       }
       const match = url.pathname.match(/^\/api\/(questions|sources)\/(\d+)$/)
       if (request.method === 'DELETE' && match) {
+        authorizeLibraryWrite()
         const id = positiveInteger(match[2]!)
         if (match[1] === 'questions') library.deleteQuestion(id)
         else library.deleteSource(id)
