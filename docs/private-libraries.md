@@ -66,8 +66,14 @@ unavailable after their bank is removed, as before.
 Each owner transfer uses one attached-database transaction. It checks both modes
 under write locks, requires a matching destination owner and refuses conflicting
 destination evidence. A failed transfer rolls back both files. A completed transfer
-removes the old study rows using secure deletion; existing backups remain sensitive.
+removes the old study rows using secure deletion. Before HTTP starts, a one-time
+VACUUM clears pages freed by older ownership upgrades as well. Cleanup completion
+is recorded only after success, so a failed cleanup is retried even if all owner
+transfers already committed. Allow up to twice the shared file's size in free
+space for this step. Existing backups remain sensitive.
 See SQLite's [attached-database transaction requirements](https://www.sqlite.org/lang_attach.html).
+Its [VACUUM documentation](https://www.sqlite.org/lang_vacuum.html) explains the
+physical cleanup and temporary-space requirement.
 Transfers completed before a later owner's failure remain completed; startup can
 be retried after resolving the reported conflict. Do not combine unrelated backups
 or overwrite a user file to bypass the ownership checks.

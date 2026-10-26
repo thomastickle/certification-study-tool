@@ -58,6 +58,7 @@ export class PrivateLibraries {
       library.close()
       shared.moveStudyTo(join(this.directory, `${accountId}.sqlite3`), accountId)
     }
+    shared.finishStudyMigration()
   }
 
   /** Install a complete empty database without replacing a file created by a concurrent process. */

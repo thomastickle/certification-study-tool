@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { Source } from '../../shared/contracts.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 import { pinLegacySources } from './bank-provenance.ts'
+import { requireStudyCleanup } from './study-separation.ts'
 
 const studyTables = {
   quiz_sessions: 'account_id, id, status, started_at, data',
@@ -57,6 +58,7 @@ export function migratePrivateStudy(
         )
       }
       if (incoming) {
+        requireStudyCleanup(db)
         // Clear removed study records from reusable pages, not just from SQL query results.
         db.exec('PRAGMA main.secure_delete = ON')
         for (const [table, columns] of Object.entries(studyTables)) {

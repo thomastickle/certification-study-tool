@@ -14,6 +14,7 @@ import { migrateStudyOwnership } from './study-schema.ts'
 import { StudyLibrary } from './study-library.ts'
 import { migrateLibraryVisibility } from './library-visibility-schema.ts'
 import { migratePrivateStudy } from './migrate-private-study.ts'
+import { finishStudySeparation } from './study-separation.ts'
 
 export type SourceRecord = Omit<Source, 'questionCount' | 'id'> & {
   id: number
@@ -165,6 +166,11 @@ export class LibraryRepository {
   /** Transfer one account's study evidence before serving any requests against the new layout. */
   moveStudyTo(destination: string, accountId: string): void {
     migratePrivateStudy(this.db, destination, accountId)
+  }
+
+  /** Startup must finish shared-file byte cleanup even when all owner transfers already committed. */
+  finishStudyMigration(): void {
+    finishStudySeparation(this.db)
   }
 
   /** Publish a shared deletion in the same transaction that removes its source. */

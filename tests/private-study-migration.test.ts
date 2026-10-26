@@ -10,6 +10,8 @@ import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { bank } from './fixtures.ts'
+import { legacyStudySchema } from './legacy-study-schema.ts'
+import { migrateStudyOwnership } from '../src/server/questions/study-schema.ts'
 
 test('existing study evidence moves to its owner file without copying shared content or other accounts', () => {
   const directory = mkdtempSync(join(tmpdir(), 'private-study-migration-'))
@@ -150,3 +152,85 @@ test('migration refuses WAL mode before moving any study evidence', () => {
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+for (const earlierOwnershipUpgrade of [false, true]) {
+  test(`startup removes previously freed history bytes after a v${earlierOwnershipUpgrade ? 3 : 2} upgrade`, (t) => {
+    const directory = mkdtempSync(join(tmpdir(), 'private-study-freed-pages-'))
+    const path = join(directory, 'shared.sqlite3')
+    const accountId = randomUUID()
+    const old = new LibraryRepository(path)
+    const input = bank()
+    input.questions = Array.from({ length: 20 }, (_, index) => ({
+      ...structuredClone(input.questions[0]!),
+      source_ref: String(index),
+      question: `Freed-page fixture ${index}?`,
+    }))
+    const importer = new ImportService(old)
+    importer.confirm(input, importer.preview(input).token, false)
+    const service = new QuizService(old)
+    const ids = []
+    for (let index = 0; index < 10; index++) {
+      const quiz = service.start({
+        provider: 'Example',
+        certification: 'DEMO-1',
+        sourceFilter: 'mixed',
+        questionType: 'mixed',
+      })
+      const answers = quiz.questions.map((question) => ({
+        questionId: question.questionId,
+        selected: [],
+        confidence: null,
+        flagged: false,
+      }))
+      service.submit(quiz.id, { answers })
+      ids.push(quiz.id)
+    }
+    old.close()
+    const legacy = new DatabaseSync(path)
+    legacy.exec(legacyStudySchema)
+    legacy.exec('VACUUM')
+    if (earlierOwnershipUpgrade) {
+      migrateStudyOwnership(legacy, accountId)
+    }
+    legacy.close()
+    const shared = new LibraryRepository(path, 'local', { legacyOwnerId: accountId })
+    const libraries = new PrivateLibraries(join(directory, 'users'))
+    try {
+      if (earlierOwnershipUpgrade) {
+        const execute = DatabaseSync.prototype.exec
+        t.mock.method(DatabaseSync.prototype, 'exec', function (this: DatabaseSync, sql: string) {
+          if (sql === 'VACUUM') {
+            throw new Error('Synthetic cleanup interruption')
+          }
+          return execute.call(this, sql)
+        })
+        assert.throws(() => libraries.migrateFrom(shared), /Synthetic cleanup interruption/)
+        t.mock.restoreAll()
+        assert.deepEqual(
+          shared.studyAccounts(),
+          [],
+          'Transfers have committed before cleanup fails',
+        )
+        assert.ok(ids.some((id) => readFileSync(path).includes(Buffer.from(id))))
+      }
+      libraries.migrateFrom(shared)
+      assert.equal(shared.studyAccounts().length, 0)
+      const bytes = readFileSync(path)
+      for (const id of ids) {
+        assert.equal(
+          bytes.includes(Buffer.from(id)),
+          false,
+          'Old attempt bytes must leave the shared file',
+        )
+      }
+      const personal = libraries.open(accountId)
+      assert.equal(personal.quizStore().completed().length, 10)
+      personal.close()
+      libraries.migrateFrom(shared)
+      assert.equal(shared.sources().length, 1)
+    } finally {
+      shared.close()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}

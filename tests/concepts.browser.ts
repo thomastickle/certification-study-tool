@@ -39,6 +39,17 @@ export async function conceptsBrowserTest(): Promise<string> {
   }
 
   button('Library').click()
+  await until(
+    () => !!document.querySelector('[aria-label="Choose library"]'),
+    'Library choices did not load',
+  )
+  button('Shared library').click()
+  await until(
+    () =>
+      document.querySelector<HTMLElement>('[data-library-visibility]')?.dataset
+        .libraryVisibility === 'shared',
+    'Shared library did not load',
+  )
   await until(() => !!document.querySelector('.concept-panel'), 'Library did not load')
   const panel = document.querySelector<HTMLDetailsElement>('.concept-panel')!
   panel.open = true

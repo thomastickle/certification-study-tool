@@ -39,7 +39,7 @@ export async function workspaceRaceBrowserTest(change: 'account' | 'role' = 'acc
       if (path === '/api/home') return Response.json({ generatedAt: Date.now(), providers: [] })
       throw new Error('Unexpected replacement-account request during the browser check.')
     }
-    if (path === '/api/questions' && requestAccount === account) {
+    if (path === '/api/private/questions' && requestAccount === account) {
       return new Promise<Response>((resolve) => {
         finishOld = resolve
       }).finally(() => {
