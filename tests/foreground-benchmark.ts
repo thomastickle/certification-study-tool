@@ -4,7 +4,7 @@ import { availableParallelism, cpus, freemem, loadavg, platform, release, totalm
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 import type { Bank } from '../src/shared/contracts.ts'
-import type { QuizSummary, QuizView } from '../src/shared/quiz-contracts.ts'
+import type { QuizAnswer, QuizSummary, QuizView } from '../src/shared/quiz-contracts.ts'
 import type { FixtureInfo, Workload } from './foreground-benchmark-worker.ts'
 import { summarize } from './performance-metrics.ts'
 import { benchmarkWorkerLifetime } from './benchmark-worker-lifetime.ts'
@@ -13,6 +13,7 @@ const profiles: Record<string, Workload> = {
   small: { owners: 10, histories: 10, questions: 48, backlog: 1 },
   bank: { owners: 10, histories: 100, questions: 1000, backlog: 25 },
   history: { owners: 100, histories: 2000, questions: 1000, backlog: 100 },
+  diverse: { owners: 100, histories: 2000, questions: 1000, backlog: 100, answered: true },
 }
 const selected = process.argv[2] ?? 'small'
 const workload = profiles[selected]
@@ -32,6 +33,7 @@ console.log(
       freeMemory: freemem(),
       loadAverage: loadavg(),
     },
+    workloadVersion: 'study-history-v2-answered',
     selected,
     workload,
     repetitions,
@@ -139,6 +141,7 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
           repetition,
           phase: name,
           httpLatencyMs: summarize(latencies),
+          httpSamplesMs: latencies,
           workloadElapsedMs,
           server,
         }),
@@ -172,17 +175,19 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
         call<QuizView>('/api/quizzes', { sourceFilter: 'mixed', questionType: 'mixed' }),
       ),
     )
-    const answers = quiz.questions.map((question) => ({
-      questionId: question.questionId,
-      selected: [],
-      confidence: null,
-      flagged: false,
-    }))
+    const answers: QuizAnswer[] = workload.answered
+      ? await command<QuizAnswer[]>('answers', quiz.id)
+      : quiz.questions.map((question) => ({
+          questionId: question.questionId,
+          selected: [],
+          confidence: null,
+          flagged: false,
+        }))
     const submitted = await phase('quiz-complete', (sample) =>
       sample(() => call<QuizView>(`/api/quizzes/${quiz.id}/submit`, { answers })),
     )
     assert.equal(submitted.status, 'completed')
-    assert.equal(submitted.correctCount, 0)
+    assert.equal(submitted.correctCount, workload.answered ? 15 : 0)
     await phase('due-read', (sample) => sample(() => call('/api/quizzes/due', undefined, 'GET')))
     await command('replay')
     await phase('foreground-reconcile-backlog', (sample) =>
@@ -219,6 +224,7 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
         repetition,
         phase: 'contention-by-actor',
         httpLatencyMs: actorLatencies.map(summarize),
+        httpSamplesMs: actorLatencies,
       }),
     )
     console.log(
@@ -250,6 +256,14 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
         expected.sort((a, b) => a.id.localeCompare(b.id)),
       )
     }
+    console.log(
+      JSON.stringify({
+        selected,
+        repetition,
+        phase: 'evidence-costs',
+        measurement: await command('evidence-costs'),
+      }),
+    )
     failed = false
   } finally {
     const exit = await lifetime.stop(failed)

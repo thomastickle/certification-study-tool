@@ -1,9 +1,7 @@
 import { ApplicationError } from '../errors.ts'
 import type { LibraryView } from './library-repository.ts'
-import { pinLegacySources } from './bank-provenance.ts'
 import { privateItemId } from '../../shared/library-identity.ts'
 import type { LibraryVisibility } from '../../shared/contracts.ts'
-import { sameCertification } from '../quizzes/certification-scope.ts'
 
 export class LibraryService {
   private repository: LibraryView
@@ -34,18 +32,8 @@ export class LibraryService {
       }
       const questions = this.repository.allQuestions()
       const snapshotId = this.visibility === 'private' ? privateItemId(id) : id
-      this.repository.annotateSnapshots((quiz) => {
-        if (!sameCertification(quiz.options, source)) {
-          return false
-        }
-        const resolvedLegacy =
-          this.visibility === 'shared' && pinLegacySources(quiz, sources, questions, source)
-        const affected = quiz.questions.some((question) => question.sourceId === snapshotId)
-        if (affected) {
-          quiz.deletedBankNames = [...new Set([...(quiz.deletedBankNames ?? []), source.name])]
-        }
-        return affected || resolvedLegacy
-      })
+      const legacy = this.visibility === 'shared' ? { sources, questions, source } : undefined
+      this.repository.annotateDeletedBanks([{ ...source, sourceId: snapshotId }], legacy)
       if (this.visibility === 'shared') {
         this.repository.recordSourceDeletion(source)
       }

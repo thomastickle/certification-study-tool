@@ -61,4 +61,13 @@ function verifyEmptySharedStudy(db: DatabaseSync): void {
       throw new Error('Shared study cleanup requires every account transfer to finish first.')
     }
   }
+  // Derived rows can outlive a legacy table replacement. They are private evidence too.
+  // Force the same physical cleanup before trusting an earlier completion marker.
+  if (Number(db.prepare('SELECT count(*) AS total FROM main.quiz_evidence').get()?.total) > 0) {
+    ensureCleanupRecord(db)
+    db.exec(`
+      DELETE FROM main.quiz_evidence;
+      UPDATE main.private_study_separation SET complete = 0 WHERE singleton = 1;
+    `)
+  }
 }

@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { DatabaseSync } from 'node:sqlite'
+import { answeredBenchmarkHistory } from './answered-benchmark-history.ts'
+import { masteryHistory } from '../src/server/quizzes/mastery-history.ts'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -30,6 +33,7 @@ export interface Workload {
   histories: number
   questions: number
   backlog: number
+  answered?: boolean
 }
 
 export interface FixtureInfo {
@@ -41,7 +45,9 @@ export interface FixtureInfo {
 
 const config: Workload = JSON.parse(process.argv[2]!)
 const directory = mkdtempSync(join(tmpdir(), 'study-foreground-benchmark-'))
+const initializeStart = performance.now()
 const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
+const initialSchemaOpenMs = performance.now() - initializeStart
 process.on('exit', () => {
   shared.close()
   rmSync(directory, { recursive: true, force: true })
@@ -130,12 +136,15 @@ for (const [index, id] of owners.entries()) {
     const count = index === 0 ? config.histories : 10
     personal.quizStore().transaction(() => {
       for (let history = 0; history < count; history++) {
-        const template = history % 2 === 0 ? sharedTemplate : privateTemplate
+        const original = history % 2 === 0 ? sharedTemplate : privateTemplate
+        const template = config.answered
+          ? answeredBenchmarkHistory(original, history, epoch, config.questions)
+          : original
         personal.quizStore().save({
           ...structuredClone(template),
           id: randomUUID(),
           status: 'completed',
-          correctCount: 0,
+          correctCount: template.correctCount,
         })
       }
       personal.quizStore().save({
@@ -245,6 +254,19 @@ for (const [index, id] of owners.entries()) {
     assertHistoryEvidence(histories, seededSnapshots.get(id)!, new Map([[1, 'shared-original']]), [
       overdueIds.get(id)!,
     ])
+    const store = personal.quizStore()
+    if ('studyHistory' in store) {
+      assert.deepEqual(store.studyHistory(), masteryHistory(histories))
+    }
+    if (config.answered && index === 0) {
+      const states = masteryHistory(histories).states
+      assert.ok(
+        [...states.values()].filter((state) => state.dueDay !== null).length >= 100,
+        'Answered history must exercise a large nonempty due set',
+      )
+      assert.ok([...states.values()].some((state) => state.recovery === 'miss'))
+      assert.ok([...states.values()].some((state) => state.recovery === 'uncertainty'))
+    }
     originalSnapshots.set(id, originals)
   } finally {
     personal.close()
@@ -277,12 +299,28 @@ async function command(name: string, completedId?: string) {
     assert.equal(activeConnections, 0)
     return {
       requestServiceMs: summarize(durations),
+      serviceSamplesMs: durations,
+      actorServiceSamplesMs: actorDurations,
       actorServiceMs: actorDurations.map(summarize),
       memory: { start: memoryStart, end: process.memoryUsage(), sampledPeakRss: peakRss },
       opens: opens - observedOpens,
       timerDelay,
       activeConnections,
       peakConnections,
+    }
+  }
+  if (name === 'answers') {
+    const personal = libraries.open(target)
+    try {
+      const quiz = personal.quizStore().find(completedId!)!
+      return quiz.questions.map((question, index) => ({
+        questionId: question.questionId,
+        selected: index % 4 === 0 ? [] : quiz.keys[index]!.correct,
+        confidence: index % 3 === 0 ? 'Confident' : 'Unsure',
+        flagged: false,
+      }))
+    } finally {
+      personal.close()
     }
   }
   if (name === 'bank') {
@@ -327,11 +365,98 @@ async function command(name: string, completedId?: string) {
       }
     })
   }
+  if (name === 'evidence-costs') {
+    const personal = libraries.open(target)
+    const sql = new DatabaseSync(join(directory, 'users', `${target}.sqlite3`))
+    try {
+      const study = shared.forAccount(target, personal)
+      const service = new QuizService(study)
+      const store = personal.quizStore()
+      const timer = new TimerProbe()
+      const phases: Record<string, number> = {}
+      const gaps: Record<string, unknown> = {}
+
+      const measure = async (label: string, work: () => unknown) => {
+        const probe = new TimerProbe()
+        const start = performance.now()
+        const result = work()
+        phases[label] = performance.now() - start
+        gaps[label] = await probe.stop()
+        return result
+      }
+
+      const original = await measure('fullReplayMs', () => masteryHistory(store.completed()))
+      const aggregate = JSON.stringify(original, (_, value) =>
+        value instanceof Map ? [...value] : value,
+      )
+      await measure('aggregateDecodeLowerBoundMs', () => JSON.parse(aggregate))
+      const hasEvidence = Boolean(
+        sql.prepare("SELECT name FROM sqlite_master WHERE name = 'quiz_evidence'").get(),
+      )
+      if (hasEvidence) {
+        await measure('restartOpenDueMs', () => {
+          const reopened = libraries.open(target)
+          try {
+            return new QuizService(shared.forAccount(target, reopened)).due({
+              sourceFilter: 'mixed',
+              questionType: 'mixed',
+            })
+          } finally {
+            reopened.close()
+          }
+        })
+        await measure('persistedDueMs', () =>
+          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        )
+        await measure('invalidateAllMs', () => sql.exec('DELETE FROM quiz_evidence'))
+        await measure('firstUseBackfillDueMs', () =>
+          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        )
+        await measure('markVersionMs', () => sql.exec('UPDATE quiz_evidence SET version = -1'))
+        await measure('versionRebuildDueMs', () =>
+          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        )
+        await measure('corruptRowMs', () =>
+          sql.exec(
+            "UPDATE quiz_evidence SET payload = 'corrupt' WHERE id = (SELECT id FROM quiz_evidence LIMIT 1)",
+          ),
+        )
+        await measure('corruptRecoveryDueMs', () =>
+          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        )
+        sql.exec('DROP TABLE quiz_evidence')
+        await measure('derivedSchemaReopenMs', () => {
+          const reopened = libraries.open(target)
+          reopened.close()
+        })
+        await measure('schemaBackfillDueMs', () =>
+          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        )
+      }
+      const bytes = hasEvidence
+        ? sql.prepare('SELECT sum(length(payload)) AS bytes FROM quiz_evidence').get()!.bytes
+        : null
+      const timerDelay = await timer.stop()
+      return {
+        phases,
+        gaps,
+        initialSchemaOpenMs,
+        timerDelay,
+        aggregateBytes: aggregate.length,
+        evidencePayloadBytes: bytes,
+        memory: process.memoryUsage(),
+      }
+    } finally {
+      sql.close()
+      personal.close()
+    }
+  }
   if (name === 'verify') {
     const personal = libraries.open(target)
     const other = libraries.open(owners[1]!)
     try {
       const histories = personal.quizStore().completed()
+      assertCompletedBenchmarkEvidence(histories)
       assert.equal(personal.sharedDeletionCursor(), config.backlog + 1)
       assert.equal(histories.length, config.histories + 2)
       assert.ok(completedId)

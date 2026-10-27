@@ -16,7 +16,6 @@ import type { StudyRepository } from '../questions/study-library.ts'
 import { isLibraryItemId } from '../../shared/library-identity.ts'
 import type { StoredQuiz } from './quiz-repository.ts'
 import { eligibleQuestions, selectQuestions, shuffled } from './quiz-selection.ts'
-import { masteryHistory } from './mastery-history.ts'
 import { currentQuestionIdentities } from './question-identity.ts'
 import { studyDay } from './mastery.ts'
 
@@ -170,11 +169,7 @@ export class QuizService {
 
   /** Load authoritative evidence and library occurrences once, after any expiry changes. */
   private studyContext(options: QuizOptions) {
-    const completed = this.repository
-      .quizStore()
-      .completed()
-      .filter((quiz) => sameCertification(quiz.options, options))
-    const history = masteryHistory(completed)
+    const history = this.repository.quizStore().studyHistory(options)
     const sources = this.repository.sources()
     const records = this.repository.allQuestions()
     const identities = currentQuestionIdentities(records, sources)

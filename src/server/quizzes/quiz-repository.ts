@@ -1,3 +1,11 @@
+import {
+  initializeStudyEvidence,
+  evidenceSavepoint,
+  persistedStudyHistory,
+  saveStudyEvidence,
+} from './study-evidence.ts'
+import { sameCertification } from './certification-scope.ts'
+import type { CertificationScope } from './certification-scope.ts'
 import { masteryHistory } from './mastery-history.ts'
 import { completedQuestionIdentity } from './question-identity.ts'
 import type { DatabaseSync } from 'node:sqlite'
@@ -26,6 +34,7 @@ export class QuizRepository {
   constructor(db: DatabaseSync, accountId = 'local') {
     this.db = db
     this.accountId = accountId
+    initializeStudyEvidence(db)
   }
 
   transaction<T>(work: () => T): T {
@@ -53,13 +62,19 @@ export class QuizRepository {
   }
 
   save(quiz: StoredQuiz): void {
-    this.db
-      .prepare(
-        `INSERT INTO quiz_sessions(account_id, id, status, started_at, data)
+    const data = JSON.stringify(quiz)
+    evidenceSavepoint(this.db, () => {
+      this.db
+        .prepare(
+          `INSERT INTO quiz_sessions(account_id, id, status, started_at, data)
          VALUES (?, ?, ?, ?, ?) ON CONFLICT(account_id, id) DO
         UPDATE SET status=excluded.status, data =excluded.data`,
-      )
-      .run(this.accountId, quiz.id, quiz.status, quiz.startedAt, JSON.stringify(quiz))
+        )
+        .run(this.accountId, quiz.id, quiz.status, quiz.startedAt, data)
+      if (quiz.status === 'completed') {
+        saveStudyEvidence(this.db, this.accountId, JSON.parse(data))
+      }
+    })
   }
 
   /** Include unfinished and recoverable results when recording library provenance changes. */
@@ -144,6 +159,14 @@ export class QuizRepository {
       )
       .all(this.accountId)
       .map((row) => JSON.parse(String(row.data)))
+  }
+
+  /** Replay validated compact events, recovering damaged or legacy rows from snapshots. */
+  studyHistory(scope: CertificationScope = {}) {
+    return (
+      persistedStudyHistory(this.db, this.accountId, scope) ??
+      masteryHistory(this.completed().filter((quiz) => sameCertification(quiz.options, scope)))
+    )
   }
 
   active(): StoredQuiz[] {

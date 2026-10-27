@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 import { migrateConcepts } from '../concepts/concept-repository.ts'
+import { initializeStudyEvidence } from '../quizzes/study-evidence.ts'
 import { migrateQuizzes } from '../quizzes/quiz-repository.ts'
 import { migrateCertifications } from '../home/certification-repository.ts'
 import { migrateStudyOwnership } from './study-schema.ts'
@@ -104,4 +105,5 @@ function initializeLibraryDatabase(
   migrateCertifications(db)
   migrateStudyOwnership(db, options.legacyOwnerId)
   migrateLibraryVisibility(db)
+  initializeStudyEvidence(db)
 }
