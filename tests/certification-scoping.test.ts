@@ -138,9 +138,9 @@ test('mastery, due review, recent and reports stay scoped even after library del
 
 test('HTTP current, recent, due and reports honor the complete certification pair', async () => {
   const { createServer } = await import('node:http')
-  const { apiController } = await import('../src/server/http-controller.ts')
+  const { apiTestHandler } = await import('./support/api-test-handler.ts')
   const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

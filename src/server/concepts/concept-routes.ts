@@ -7,7 +7,7 @@ export type ConceptResponse = { status: number; value?: unknown }
 export async function conceptRoute(
   service: ConceptService,
   request: IncomingMessage,
-  url: URL,
+  url: Pick<URL, 'pathname'>,
   body: (request: IncomingMessage) => Promise<Record<string, unknown>>,
   authorizeLibraryWrite: () => void,
 ): Promise<ConceptResponse | undefined> {

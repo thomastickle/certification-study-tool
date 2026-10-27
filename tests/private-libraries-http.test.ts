@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { ImportPreviews } from '../src/server/importer/import-previews.ts'
@@ -21,7 +21,7 @@ async function fixture(aliceRole: 'admin' | 'student' = 'student') {
     ['alice', 'bob'].map(async (id) => {
       const library = new LibraryRepository(join(directory, `${id}.sqlite3`))
       const actor = { id, role: id === 'alice' ? aliceRole : ('student' as const) }
-      const server = createServer(apiController(shared, actor, undefined, previews, library))
+      const server = createServer(apiTestHandler(shared, actor, undefined, previews, library))
       await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
       const address = server.address()
       assert.ok(address && typeof address !== 'string')

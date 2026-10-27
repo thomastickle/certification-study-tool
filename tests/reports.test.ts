@@ -3,13 +3,13 @@ import { createServer } from 'node:http'
 import { test } from 'node:test'
 import type { StoredQuiz } from '../src/server/quizzes/quiz-repository.ts'
 import { ReportService } from '../src/server/reports/report-service.ts'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 
 /** Exercises the report through the same local HTTP boundary as the dashboard. */
 async function withReports(work: (base: string, repository: LibraryRepository) => Promise<void>) {
   const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

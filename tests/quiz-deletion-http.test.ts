@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { populate } from './quiz-fixtures.ts'
@@ -19,7 +19,7 @@ test('HTTP deletes, lists, restores and permanently deletes results without allo
       flagged: false,
     })),
   })
-  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
