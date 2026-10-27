@@ -196,3 +196,8 @@ connections remained one, with zero left open. All scoring, purge, deletion curs
 and history annotation assertions passed. These are single synthetic runs, with
 cache and host-load noise; timing differences do not establish a universal speedup.
 The structural guarantee is a yield between owners, not a time threshold.
+
+For reproducible foreground HTTP and large-owner measurements, captured repeated-run
+baselines, deployment assumptions and the optimization decision, see the
+[performance investigation](performance-investigation.md). Those measurements
+are separate from the housekeeping-only results above.
