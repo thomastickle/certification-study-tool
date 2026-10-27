@@ -69,3 +69,27 @@ for all ranges, gaps, memory and methodology limits; no answered/diverse claim.
 The next entry reruns approved `47a54e6` using the common v2 harness before
 comparing compact events. It must not imply a comparison across incompatible
 fixtures. Detailed design/recovery boundaries: [persisted evidence report](study-evidence-performance.md).
+
+## 2026-10-27 — compact validated events, workload v2
+
+[Full results, all normal HTTP observations and remaining slow paths](study-evidence-performance.md#comparable-series--2026-10-27).
+Approved base `47a54e647c93ec0e0669d073ef3cb256baf07cbf` versus measured
+`0c10eb1e4e48903d4b152b0f356e7eb1e0b73ecf`; common
+`study-history-v2-answered` harness, three fresh-fixture sequential repetitions per
+revision/profile (18 total). Same Node 24.22.1 / i5-8265U / eight logical CPUs;
+shared host, warm setup/OS cache, no CPU pinning or production authentication.
+Exact load/free memory, sources, overlays and sample counts are in the report.
+
+History HTTP medians: quiz-start 958.5 → 198.4 ms; due 926.9 → 171.4 ms.
+Answered/diverse: quiz-start 3232.8 → 182.2 ms; due 3250.7 → 161.5 ms.
+All 12 large-history normal samples were below 300 ms; 11 below 200 ms, max 218.1.
+The target remains 300/preferred 200; it was not relaxed. Diverse was added because
+empty answers missed answered replay/ICU costs and nonempty due obligations.
+
+Pooled other-account HTTP p95/max: history 310.9/332.8 ms; diverse 341.4/358.3 ms.
+Contention still misses 300 ms. Full rebuilds reached 2301.3 ms; provenance
+annotation regressed and still blocks the shared loop. Normal completion write
+cost, all first-use/restart/schema/rebuild/write observations, gaps and sampled
+memory are reported separately. Aggregate JSON parsing is a lower-bound design
+comparison, not an implemented equivalent cache. Keep issue #81 open; parent
+review and CI/readiness remain pending. No scheduler or telemetry platform added.
