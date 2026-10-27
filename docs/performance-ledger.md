@@ -93,3 +93,59 @@ cost, all first-use/restart/schema/rebuild/write observations, gaps and sampled
 memory are reported separately. Aggregate JSON parsing is a lower-bound design
 comparison, not an implemented equivalent cache. Keep issue #81 open; parent
 review and CI/readiness remain pending. No scheduler or telemetry platform added.
+
+## 2026-10-27 — correct the provenance extraction regression
+
+Independent review P2 required avoiding redundant evidence extraction during
+production deletion/reconciliation. The preceding regression and old 18-run
+series remain historical evidence for the original PR83 head, not the correction.
+[Correction design, measurements, every normal observation and limits](study-evidence-performance.md#2026-10-27--provenance-retention-correction-p2).
+
+Before `13b83fda1f3dbc2cdc62662f553c40c55a0a412e` → measured correction
+`9370c33a4e920cf9ee867580fe707d280cca329f`. Three fresh-fixture repetitions per
+revision/profile, common unchanged `study-history-v2-answered` history/diverse
+harness (12 runs; small not repeated), before history/diverse then correction
+history/diverse. Same Node 24.22.1 / Linux 7.0.0-38 / i5-8265U / eight CPUs /
+31.1 GiB RAM; shared host, warm setup/OS cache, no CPU pinning, no production
+auth/network. Report and retained metadata include per-series load/free memory,
+UTC timestamps, exact source/harness manifests/patches and raw samples.
+
+HTTP milliseconds median (range), three samples per cell:
+
+| Profile / operation                    |               Before |          Correction |
+| -------------------------------------- | -------------------: | ------------------: |
+| history quiz-start                     |  166.9 (157.2–170.5) | 177.1 (172.1–182.7) |
+| history due-read                       |  160.0 (158.8–160.0) | 175.8 (159.6–179.0) |
+| history foreground-reconcile-backlog   |  786.9 (784.1–856.4) | 444.5 (418.7–457.9) |
+| history private-delete-with-annotation |  809.2 (729.4–842.7) | 402.1 (377.6–454.7) |
+| diverse quiz-start                     |  187.1 (179.3–231.5) | 182.3 (171.0–187.4) |
+| diverse due-read                       |  169.8 (158.7–246.0) | 178.3 (168.2–195.5) |
+| diverse foreground-reconcile-backlog   | 881.7 (874.4–1089.3) | 469.4 (432.1–484.9) |
+| diverse private-delete-with-annotation | 855.8 (820.4–1039.1) | 427.1 (411.0–442.5) |
+
+Corrected normal target: 12/12 under 300 ms,
+12/12 under preferred 200 ms, maximum 195.5 ms.
+No target or timing-CI policy change. The dedicated three-pair
+`annotation-v2-retained-bank-eager-repair` probe has 2,000 valid confident attempts /
+40,000 snapshots referring to the deleted bank plus a surviving identical-content
+1,000-question bank, explicitly added to permit measuring the next quiz/due calls.
+It is compared only against its own before-source run. Deletion service median
+1573.0 → 682.7 ms; other-account HTTP 1587.6 → 683.1 ms. All 6,000 retained
+projection rows were byte-identical; next due/start succeeded with evidence INSERTs
+prohibited (corrected HTTP maxima 169.9/225.2 ms). No deferred full rebuild.
+This removes extraction work; annotation still blocks for hundreds of milliseconds.
+
+The unchanged single-bank reviewer shape was also rerun in three pairs:
+deletion service median 1460.9 → 678.0 ms; other-account HTTP 1460.4 → 679.9 ms;
+all 6,000 projection comparisons were byte-identical. See the report for ranges.
+
+The report includes current service/gaps/RSS, actor distributions, write cost and
+first-use/reopen/rebuild/startup results. Historical 358.3 ms contention,
+2301.3 ms rebuild and 5475.7 ms startup observations remain historical limits.
+Issue #81 stays open for contention/first-use and remaining unbounded work; fresh
+independent review/CI/readiness remain with the parent, PR83 stays draft.
+`npm run check` passed all 354 tests, formatting, lint, native TypeScript and build;
+red/green work evidence, focused 22 tests, manifest/sample audits, diff checks and
+redacted installed Gitleaks scans are retained. Sources/logs:
+`/tmp/pr83-correction` and `/tmp/study-performance-p4lzv7uq`, 0700/0600.
+Original evidence is unchanged. GPT-6.1 Sol medium; no agents/watchers/installations.

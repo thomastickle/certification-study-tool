@@ -5,11 +5,12 @@ quiz-start and due HTTP reads. First-use, rebuilds and contention are reported
 separately. These are synthetic engineering targets on recorded hardware, not
 production guarantees. Refs #81; parent independent review remains required.
 
-The final three-run series kept all **12 normal large-history quiz-start/due HTTP
-observations below 300 ms; 11 were below 200 ms**. The largest was 218.1 ms.
+The original pre-review three-run series kept all **12 normal large-history
+quiz-start/due HTTP observations below 300 ms; 11 were below 200 ms**. The largest was 218.1 ms.
 This meets the normal-request target in this bounded series, not a general latency
 SLO. Other-account contention still reached 358.3 ms; full rebuilds reached
-2301.3 ms, and large provenance annotation became slower. The issue stays open.
+2301.3 ms, and large provenance annotation became slower. These are historical observations
+for the pre-correction head; see the correction below. The issue stays open.
 
 ## Design and tradeoffs
 
@@ -35,8 +36,9 @@ writers. `QuizRepository.save` uses a savepoint around snapshot plus projection
 replacement, even outside a caller-owned transaction. It derives from the exact
 serialized snapshot, preserving JSON normalization. Enclosing completion, expiry,
 delete/restore and library transactions keep ownership and roll back both rows.
-Annotation writes proactively replace projections. Private transfer copies only
-authoritative snapshots; destination invalidation and lazy reconstruction avoid
+Annotation writes proactively replace projections; the owned provenance-only path
+retains validated identical rows as detailed in the correction below. Private
+transfer copies only authoritative snapshots; destination invalidation and lazy reconstruction avoid
 trusting the source's derived data. Shared physical cleanup also discards orphaned
 projections after a legacy table replacement before the existing VACUUM gate.
 
@@ -302,10 +304,11 @@ Head payload sizes after rebuild (bytes; SQLite pages/indexes/checksums excluded
 | history |   4,296,292–4,296,292 |        20,493–21,564 |
 | diverse |   4,437,803–4,437,803 |      267,848–269,277 |
 
-Provenance annotation conservatively replaces affected projections rather than
-assuming a generic annotation callback cannot change scoring. This adds substantial
-work to large bulk annotations. It is a measured regression/tradeoff, not a solved
-write path. Relevant non-target HTTP operations, ms:
+At the original pre-correction head, provenance annotation conservatively replaced
+affected projections rather than assuming a generic callback cannot change scoring. This added substantial
+work to large bulk annotations. It was a measured regression and the blocking P2 finding. The correction below
+removes redundant extraction; the historical table is retained. Relevant non-target
+HTTP operations, ms:
 
 | Profile / operation                    |           Base HTTP |            Head HTTP | Head largest timer gap |
 | -------------------------------------- | ------------------: | -------------------: | ---------------------: |
@@ -327,8 +330,8 @@ Maintenance remains separate from HTTP; elapsed ms median (range):
 | diverse startup-recovery         | 1982.3 (1928.1–2130.2) | 2917.8 (2897.7–3033.3) |            934.1 |
 | diverse recurring-reconciliation |    622.5 (565.3–702.4) |   697.0 (623.5–3125.2) |             72.5 |
 
-A possible follow-up is safe projection retention for proven provenance-only
-mutations, plus investigation of remaining compact replay/current-library costs.
+The correction below implements safe retention for proven provenance-only
+mutations. Remaining compact replay/current-library costs still need investigation.
 Do not weaken invalidation or move work into an unreported startup phase. Larger
 histories, many distinct completion times, much larger due sets/banks, long text,
 slow disks, lock contention, concurrent writers/upkeep, cold process/disk,
@@ -366,3 +369,196 @@ No real app, personal DBs, root `.env`/private/attachments/`.run`, Keycloak,
 Docker/volumes or fixed ports 3000/8080 were accessed. No installation, system/gate
 change, signing-key use, shared push, merge or deployment. One GPT-6.1 Sol medium
 implementer; no child agents or watchers. This is a draft scoped follow-up, Refs #81.
+
+## 2026-10-27 — provenance retention correction (P2)
+
+The first independent review requested changes for unconditional evidence extraction
+in production bank-deletion annotation. Its measurements and the preceding tables
+remain historical evidence for `13b83fd`, not results for the correction. The
+reviewer's approved-PR82 → original-PR83 deletion service median was
+415.7 → 1487.5 ms, and other-account HTTP 425.8 → 1488.9 ms. It found no additional
+substantiated correctness/isolation/migration/calendar defect. This correction is
+implemented and locally verified; fresh independent review and CI belong to the
+parent, and PR83 remains draft. Refs #81.
+
+### Retention invariant
+
+Both production callers now use repository-owned `annotateDeletedBanks`, which
+accepts deletion data, never a caller-supplied mutation callback. Its only writes
+are `deletedBankNames` and legacy question `sourceId` (via existing
+`pinLegacySources`). Neither is read by `completedQuestionIdentity`,
+`evidenceWithIdentity`, scope extraction or attempt/time serialization. All
+content, keys, scoring/confidence, order, embedded ID/status, timestamps and scope
+remain unchanged. If extraction ever starts using these provenance fields, this
+retention proof must change along with the extraction-version policy.
+
+Inside the same savepoint, capture the exact account/SQL-row-bound projection,
+validate current version/checksum/JSON using the normal decoder, perform the
+snapshot UPDATE (whose trigger still invalidates evidence), and reinsert the
+validated row. Missing, stale or corrupt rows eagerly rebuild from the serialized
+snapshot before annotation returns. Generic `annotateSnapshots` callbacks always
+extract again. Sentinels and unknown/mismatched legacy evidence retain existing
+fallback/replay/error behavior; a provenance label never upgrades scoring.
+Standalone failures and enclosing rollback restore snapshots and projections
+together. Raw-writer invalidation and schema versions are unchanged.
+
+### Paired correction measurements
+
+Pinned before: `13b83fda1f3dbc2cdc62662f553c40c55a0a412e`;
+pinned measured correction: `9370c33a4e920cf9ee867580fe707d280cca329f`.
+Later documentation-only changes do not change measured runtime/tests/harness.
+Node 24.22.1, Linux 7.0.0-38-generic, i5-8265U/eight logical CPUs, 31.1 GiB RAM;
+shared host, fresh synthetic files, warm setup/OS cache, no CPU pinning or cache
+flush, no production authentication/network. No competing checks/benchmarks were
+launched by this implementer. This is sequential sampling, not randomized crossover
+or a production guarantee. Targets remain under 300/preferred under 200 ms.
+
+The reviewer's original single-bank probe shape was also rerun separately with
+three paired exact-before/correction repetitions: 2,000 valid confident answered
+attempts/40,000 snapshots, all referencing the deleted source, no surviving bank.
+It used the same retained common external driver/worker for each revision.
+Initial load/free GiB: 1.09/13.5. Deletion service and
+other-account HTTP milliseconds, median (range):
+
+| Original single-bank shape |                 Before |          Correction |
+| -------------------------- | ---------------------: | ------------------: |
+| Deletion service           | 1460.9 (1443.7–1562.3) | 678.0 (671.6–687.6) |
+| Other-account HTTP         | 1460.4 (1447.8–1571.7) | 679.9 (674.7–690.1) |
+| Other-account service      |          3.8 (2.8–4.3) |       3.4 (3.2–4.6) |
+
+All 6,000 projection comparisons were byte-identical. This directly reproduces
+and corrects the original shape; next quiz/due is tested by the surviving-bank
+variant below. The older approved-PR82 timings remain historical, not a new
+approved-base comparison.
+
+The dedicated `annotation-v2-retained-bank-eager-repair` probe runs three paired
+before/after repetitions. Each has 2,000 accepted, correctly timed, confident
+answered attempts × 20 snapshots, all referencing deleted source 1; a second
+identical-content 1,000-question bank survives so the next quiz can be measured.
+A separate small account/library requests due while real `LibraryService.deleteSource`
+blocks the same server. The extra surviving bank, fixed post-history clock and
+subsequent requests are a declared methodology boundary from the reviewer's
+single-bank probe: compare only this probe's paired before/after, not its numbers
+directly with the reviewer's old timings. Initial load/free GiB: 3.23/13.5.
+
+Milliseconds, median (range), three samples each:
+
+| Dedicated annotation probe         |                 Before |          Correction |
+| ---------------------------------- | ---------------------: | ------------------: |
+| Deletion service                   | 1573.0 (1566.4–1599.8) | 682.7 (680.1–761.2) |
+| Other-account HTTP during deletion | 1587.6 (1570.2–1608.4) | 683.1 (681.0–763.6) |
+| Other-account service              |          4.2 (3.7–6.7) |       3.2 (3.0–4.2) |
+| Next due HTTP                      |    154.8 (149.8–175.8) | 161.5 (160.7–169.9) |
+| Next quiz HTTP                     |    168.8 (156.6–180.0) | 170.8 (168.1–225.2) |
+| Next due service                   |    153.7 (148.0–174.5) | 160.6 (159.6–168.1) |
+| Next quiz service                  |    166.5 (151.2–178.9) | 169.0 (166.9–223.1) |
+
+All 6,000 corrected projection rows were byte-identical before/after deletion.
+Before the next due/quiz calls, a BEFORE INSERT trigger rejects any evidence
+rebuild: every call still succeeds with 20 due/eligible questions and 20 selected
+questions. No full rebuild was deferred. These are service-boundary synthetic HTTP
+handlers; the common benchmark below exercises actual API routing/reconciliation.
+Bulk annotation still costs hundreds of milliseconds and delays the other account;
+this removes repeated extraction, not synchronous snapshot rewriting or all stalls.
+
+The unchanged common `study-history-v2-answered` harness ran three repetitions per
+revision/profile in order: before history/diverse, then correction history/diverse
+(12 complete runs). It retains the corrected chronology/scoring/timer guards,
+empty-answer history and answered/diverse due obligations, connection/worker cleanup,
+snapshot/key/provenance/account assertions, timer-drain and sampled-memory metrics.
+The small profile and the old approved-PR82 comparison were not repeated; their
+preceding results remain explicitly historical. No flaky timing CI gate was added.
+
+| Common workload / operation            |          Before HTTP |     Correction HTTP |  Correction service | Largest corrected timer gap |
+| -------------------------------------- | -------------------: | ------------------: | ------------------: | --------------------------: |
+| history quiz-start                     |  166.9 (157.2–170.5) | 177.1 (172.1–182.7) | 176.3 (170.1–180.6) |                       181.9 |
+| history due-read                       |  160.0 (158.8–160.0) | 175.8 (159.6–179.0) | 174.3 (159.0–177.4) |                       178.8 |
+| history foreground-reconcile-backlog   |  786.9 (784.1–856.4) | 444.5 (418.7–457.9) | 447.7 (418.7–461.3) |                       462.3 |
+| history private-delete-with-annotation |  809.2 (729.4–842.7) | 402.1 (377.6–454.7) | 402.3 (378.1–455.2) |                       456.1 |
+| history foreground-reconcile-new-event |  130.2 (127.6–139.2) | 131.4 (129.5–154.1) | 130.7 (128.0–153.2) |                       154.2 |
+| history quiz-complete                  |        9.5 (8.6–9.6) |     10.4 (8.5–14.7) |      9.3 (7.0–12.3) |                        13.2 |
+| diverse quiz-start                     |  187.1 (179.3–231.5) | 182.3 (171.0–187.4) | 181.4 (170.4–185.2) |                       185.9 |
+| diverse due-read                       |  169.8 (158.7–246.0) | 178.3 (168.2–195.5) | 177.6 (167.5–193.8) |                       195.1 |
+| diverse foreground-reconcile-backlog   | 881.7 (874.4–1089.3) | 469.4 (432.1–484.9) | 470.6 (436.4–489.9) |                       490.7 |
+| diverse private-delete-with-annotation | 855.8 (820.4–1039.1) | 427.1 (411.0–442.5) | 427.6 (411.4–443.2) |                       444.0 |
+| diverse foreground-reconcile-new-event |  134.3 (134.3–199.5) | 140.7 (139.3–147.7) | 140.0 (138.8–146.4) |                       147.7 |
+| diverse quiz-complete                  |       8.4 (8.2–12.0) |       8.4 (8.2–9.7) |       7.5 (7.3–8.1) |                         9.4 |
+
+Corrected normal quiz/due samples: **12/12 under 300 ms; 12/12 under 200 ms**, max 195.5 ms. All observations (sorted; raw run order retained privately):
+
+- history quiz-start: 172.1, 177.1, 182.7 ms.
+- history due-read: 159.6, 175.8, 179.0 ms.
+- diverse quiz-start: 171.0, 182.3, 187.4 ms.
+- diverse due-read: 168.2, 178.3, 195.5 ms.
+
+Common series initial one-minute load / free GiB / UTC timestamp:
+
+- base history: 2.81 / 13.4 / 2026-10-27T16:46:14.571Z.
+- head history: 3.83 / 13.3 / 2026-10-27T16:50:07.007Z.
+- base diverse: 2.29 / 13.5 / 2026-10-27T16:48:01.621Z.
+- head diverse: 3.13 / 13.4 / 2026-10-27T16:51:49.787Z.
+
+Other-account due contention (30 samples per profile/revision), HTTP median (range),
+then corrected p95/max and corrected service median (range):
+
+| Profile |         Before HTTP |     Correction HTTP | Correction p95/max | Correction service |
+| ------- | ------------------: | ------------------: | -----------------: | -----------------: |
+| history | 159.3 (125.6–310.0) | 156.6 (127.7–286.5) |        286.3/286.5 |     3.1 (2.9–15.9) |
+| diverse | 214.7 (127.4–426.2) | 169.7 (128.3–314.9) |        310.7/314.9 |     3.3 (3.0–22.6) |
+
+Sampled peak RSS during normal quiz/due phases, MiB (min–max across both phases
+and all three repetitions); this samples phase boundaries/requests/timers rather
+than an OS high-water mark:
+
+- history: base 401.5–413.9; head 379.6–413.5.
+- diverse: base 419.4–439.2; head 419.7–424.7.
+
+Separated slow paths, elapsed milliseconds median (range), plus largest corrected timer gap:
+
+| Profile / operation              |                 Before |             Correction | Correction largest gap |
+| -------------------------------- | ---------------------: | ---------------------: | ---------------------: |
+| history firstUseBackfillDueMs    |   973.1 (968.6–1040.9) |   986.5 (957.2–1088.4) |                 1091.7 |
+| history versionRebuildDueMs      | 1075.4 (1068.3–1079.0) | 1110.2 (1070.5–1147.4) |                 1147.8 |
+| history restartOpenDueMs         |    125.0 (123.5–131.6) |    128.5 (125.5–150.9) |                  153.5 |
+| history corruptRecoveryDueMs     |    141.9 (134.3–158.9) |    137.7 (135.9–153.7) |                  157.1 |
+| history schemaBackfillDueMs      |   985.5 (972.8–1001.4) |   993.5 (981.6–1008.9) |                 1009.5 |
+| history startup-recovery         | 2946.6 (2927.5–2950.0) | 2356.9 (2133.5–2411.4) |                  544.7 |
+| history recurring-reconciliation |    675.9 (649.9–677.5) |    655.4 (576.6–676.5) |                   20.5 |
+| diverse firstUseBackfillDueMs    | 1067.1 (1009.2–1383.2) |  1016.0 (999.0–1030.6) |                 1031.8 |
+| diverse versionRebuildDueMs      | 1355.9 (1075.9–1432.5) | 1111.9 (1073.7–1143.9) |                 1144.8 |
+| diverse restartOpenDueMs         |    131.9 (130.7–180.7) |    139.7 (129.9–151.7) |                  154.0 |
+| diverse corruptRecoveryDueMs     |    180.1 (157.8–182.4) |    157.4 (140.9–163.1) |                  165.7 |
+| diverse schemaBackfillDueMs      | 1239.9 (1006.2–1298.0) |  1010.6 (995.4–1048.9) |                 1049.6 |
+| diverse startup-recovery         | 3132.2 (3031.0–3164.3) | 2479.9 (2422.0–4101.1) |                  550.0 |
+| diverse recurring-reconciliation |    684.7 (603.0–805.6) |    679.5 (642.5–680.8) |                   22.2 |
+
+The target applies to bounded normal reads; contention, eager rebuild/first-use,
+startup and bulk annotation remain separate gaps. Earlier outliers (contention
+358.3 ms, rebuild 2301.3 ms, startup 5475.7 ms) remain historical limits, not
+remeasured claims for this commit. Larger histories, distinct timestamps, slower
+disks, production auth/network, concurrent writers/upkeep and deployment hardware
+remain unbounded/unmeasured. Issue #81 remains open.
+
+### Executed verification and retained evidence
+
+`npm run check` passed formatting, ESLint, **354/354 tests**, native TypeScript and
+Vite build. The new work regression was red on the old implementation (20 saved
+question content hashes, expected zero), then green. The focused 22-test suite
+passed production deletion, eager invalid-row repair, generic content/key/scoring/
+scope/time/ID/status mutations, account/SQL-row mismatch, legacy pinning/unknown
+scoring, standalone insertion failures and outer rollback. Existing raw-SQL,
+replay/lifecycle, migration and physical-cleanup tests also passed in the full suite.
+Source-manifest reconstruction, common-harness identity and all 12 measured-run
+semantic/request/actor/connection/timer/sample-count assertions passed. Diff checks
+and redacted installed Gitleaks staged/range scans are recorded before publication.
+Fresh independent review and CI are pending with the parent; no readiness claim.
+
+Private 0700 directories/0600 files: `/tmp/pr83-correction` contains red/green,
+checks, exact before/after archives/manifests, implementation patch, common external
+annotation harness and hashes, measurements and audits; `/tmp/study-performance-p4lzv7uq`
+contains pinned common-run sources/manifests/patches, metadata, every numeric sample
+and audited `metrics.json`. Original `/tmp/pr83-review-round1`,
+`/tmp/study-evidence81-R0NYza` and `/tmp/study-performance-nt8k0nj8` are retained
+unchanged. No dependencies installed, agent delegation/watchers, real application,
+personal databases, forbidden fixed ports, deployment or merge. Implementation:
+GPT-6.1 Sol, medium reasoning. Parent owns fresh review/CI.
