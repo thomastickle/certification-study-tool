@@ -23,7 +23,7 @@ test('server permits its configured Host but requires login for study data', asy
   const port = socket.port
   await new Promise<void>((resolve) => probe.close(() => resolve()))
   const directory = mkdtempSync(join(tmpdir(), 'study-listen-'))
-  const child = spawn(process.execPath, ['src/server/main.ts'], {
+  const child = spawn(process.execPath, ['build/src/server/main.js'], {
     env: {
       ...process.env,
       NODE_ENV: 'development',

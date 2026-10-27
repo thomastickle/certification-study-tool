@@ -43,7 +43,7 @@ docker compose up --build -d --wait
 
 The image contains no seeded users or passwords. Keep the Keycloak volume:
 recreating users can change their subjects. Native development can use
-`node --env-file=.env --watch src/server/main.ts` with Keycloak running.
+`npm run dev` with Keycloak running.
 The development client permits exact callbacks at ports 3000 and 3100; a native
 server on port 3100 needs matching `STUDY_PORT` and `STUDY_ORIGIN` settings.
 
@@ -110,7 +110,7 @@ cookies. Keycloak `start-dev` and the loopback Compose setup are for development
   revoke that account's application sessions. With the standard volume:
 
   ```sh
-  docker compose exec study node src/server/auth/revoke-sessions.ts --accounts /data/accounts.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
+  docker compose exec study node build/src/server/auth/revoke-sessions.js --accounts /data/accounts.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
   ```
 
   Native runs can use `npm run auth:revoke --` with the same arguments. Issuer and

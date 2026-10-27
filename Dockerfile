@@ -2,7 +2,8 @@ FROM node:24.17.0-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.json vite.config.ts ./
+COPY tsconfig.json tsconfig.server.json vite.config.ts ./
+COPY scripts/build-server.ts ./scripts/build-server.ts
 COPY src ./src
 COPY docs ./docs
 RUN npm run build && npm prune --omit=dev
@@ -15,13 +16,12 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --chown=node:node --from=build /app/package.json ./
 COPY --chown=node:node --from=build /app/node_modules ./node_modules
-COPY --chown=node:node --from=build /app/src/server ./src/server
-COPY --chown=node:node --from=build /app/src/shared ./src/shared
-COPY --chown=node:node --from=build /app/docs/question-bank.schema.json ./docs/question-bank.schema.json
+COPY --chown=node:node --from=build /app/build/src ./build/src
+COPY --chown=node:node --from=build /app/build/docs ./build/docs
 COPY --chown=node:node --from=build /app/dist ./dist
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD node -e "const origin = new URL(process.env.STUDY_ORIGIN || 'http://127.0.0.1:3000'); require('node:http').get({host:'127.0.0.1',port:3000,path:'/api/health',headers:{Host:origin.host}},r=>{r.resume();process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
-CMD ["node", "src/server/main.ts"]
+CMD ["node", "build/src/server/main.js"]

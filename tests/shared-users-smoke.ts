@@ -155,9 +155,9 @@ function seedLibrary(): void {
     question: `Synthetic seed ${index}?`,
   }))
   const script = `
-    import { LibraryRepository } from './src/server/questions/library-repository.ts'
-    import { ImportService } from './src/server/importer/import-service.ts'
-    import { QuizService } from './src/server/quizzes/quiz-service.ts'
+    import { LibraryRepository } from './build/src/server/questions/library-repository.js'
+    import { ImportService } from './build/src/server/importer/import-service.js'
+    import { QuizService } from './build/src/server/quizzes/quiz-service.js'
     import { DatabaseSync } from 'node:sqlite'
     const repo = new LibraryRepository('/data/library.sqlite3')
     const input = ${JSON.stringify(input)}

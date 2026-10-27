@@ -7,11 +7,13 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "scripts/*.ts", "vite.config.ts"]
 }
