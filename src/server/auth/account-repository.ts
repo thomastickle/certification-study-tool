@@ -12,21 +12,21 @@ export class AccountRepository {
 
   constructor(path: string) {
     this.db = new DatabaseSync(path, { timeout: 5000 })
-    const version = Number(this.db.prepare('PRAGMA user_version').get()?.user_version)
-    const appId = Number(this.db.prepare('PRAGMA application_id').get()?.application_id)
-    const existingTables = this.db.prepare(`
-      SELECT count(*) AS total
-      FROM sqlite_master
-      WHERE name NOT LIKE 'sqlite_%'
-    `)
-    const occupied = Number(existingTables.get()?.total) > 0
-    const unrecognizedSchema = version === 0 && occupied
-    const incompatibleVersion = version !== 0 && (appId !== 1096242005 || ![1, 2].includes(version))
-    if (unrecognizedSchema || incompatibleVersion) {
-      this.db.close()
-      throw new Error('Unrecognized account database. Use a separate application data directory.')
-    }
     try {
+      const version = Number(this.db.prepare('PRAGMA user_version').get()?.user_version)
+      const appId = Number(this.db.prepare('PRAGMA application_id').get()?.application_id)
+      const existingTables = this.db.prepare(`
+        SELECT count(*) AS total
+        FROM sqlite_master
+        WHERE name NOT LIKE 'sqlite_%'
+      `)
+      const occupied = Number(existingTables.get()?.total) > 0
+      const unrecognizedSchema = version === 0 && occupied
+      const incompatibleVersion =
+        version !== 0 && (appId !== 1096242005 || ![1, 2].includes(version))
+      if (unrecognizedSchema || incompatibleVersion) {
+        throw new Error('Unrecognized account database. Use a separate application data directory.')
+      }
       this.db.exec(`
       PRAGMA foreign_keys = ON;
       BEGIN IMMEDIATE;

@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
 import assert from 'node:assert/strict'
 import type { Server } from 'node:http'
 import { request } from 'node:http'
@@ -5,7 +9,9 @@ import { test } from 'node:test'
 import { createApplication } from '../../src/server/application.ts'
 
 test('compiled Nest decorators serve health through DI and close the listening application', async () => {
-  const app = await createApplication()
+  const directory = mkdtempSync(join(tmpdir(), 'study-nest-'))
+  const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  const app = await createApplication(configuration)
   const server = app.getHttpServer() as Server
   try {
     await app.listen(0, '127.0.0.1')
@@ -31,6 +37,7 @@ test('compiled Nest decorators serve health through DI and close the listening a
     assert.equal(status, 404, 'The foundation must leave JSON parsing to later authorized routes')
   } finally {
     await app.close()
+    rmSync(directory, { recursive: true, force: true })
   }
   assert.equal(server.listening, false)
   assert.equal(server.address(), null)
