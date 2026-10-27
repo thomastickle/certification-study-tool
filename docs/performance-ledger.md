@@ -96,6 +96,10 @@ review and CI/readiness remain pending. No scheduler or telemetry platform added
 
 ## 2026-10-27 — correct the provenance extraction regression
 
+Historical measured `9370c33` / documentation `ce8b092` series. The round2
+concurrency correction below supersedes standalone safety claims; these timing
+observations were not rerun as a twelve-sample current-head series.
+
 Independent review P2 required avoiding redundant evidence extraction during
 production deletion/reconciliation. The preceding regression and old 18-run
 series remain historical evidence for the original PR83 head, not the correction.
@@ -149,3 +153,48 @@ red/green work evidence, focused 22 tests, manifest/sample audits, diff checks a
 redacted installed Gitleaks scans are retained. Sources/logs:
 `/tmp/pr83-correction` and `/tmp/study-performance-p4lzv7uq`, 0700/0600.
 Original evidence is unchanged. GPT-6.1 Sol medium; no agents/watchers/installations.
+
+## 2026-10-27 — protect standalone provenance annotation (round2 P2)
+
+The round2 race at `ce8b092` committed new scoring between snapshot SELECT and
+projection capture, then retained new evidence while rewriting the old snapshot.
+Annotation now owns `BEGIN IMMEDIATE` before reading, or a savepoint inside any
+existing SQLite transaction (including QuizRepository-owned outer transactions).
+Real second-process test: baseline commits and survives restart with 19 due versus
+20 authoritative; correction returns BUSY, gives 20/20 after restart, then permits
+a successful retry with 19/19. Multirow failures roll back the whole annotation;
+existing-lock failure, generic callbacks, nested/outer rollback, eager repair and
+raw-writer invalidation remain covered. PR83 stays draft for parent fresh review/CI.
+
+[Exact sources, all observations, methodology and limits](study-evidence-performance.md#2026-10-27--protect-standalone-annotation-against-concurrent-writers-round2-p2).
+Baseline `ce8b092` versus that commit plus retained runtime.patch; four sequential
+common runs, one repetition per revision/history/diverse profile, same unchanged
+v2 harness on Node 24.22.1 / Linux 7.0.0-38 / i5-8265U / shared host. Corrected
+normal start/due HTTP: history **168.2/159.3 ms**, diverse **213.9/163.3 ms**.
+4/4 below 300 ms, 3/4 below 200 ms; baseline diverse start 209.9 ms. One sample per
+operation is a budget check, not a distribution or speedup claim. Previous 12/12
+below 200 ms is explicitly historical at `9370c33` / runtime-equivalent `ce8b092`.
+
+Corrected annotation HTTP 392.6/453.2 ms, backlog 437.0/453.3 ms and other-account
+contention maxima 290.2/296.7 ms (history/diverse). First-use 1046.6/971.9 ms,
+version rebuild 1034.4/1125.3 ms, startup 2404.5/2424.4 ms; baseline diverse
+startup outlier 21585.9 ms remains visible in the report. Older 314.9 contention,
+1147.4 rebuild, 4101.1 startup and 1088.4 first-use limits stay pinned historical.
+Two retained-bank probe pairs, opposite order, had deletion service base→head
+1352.4→1941.1 and 683.7→704.4 ms; other HTTP 1382.6→1945.9 and 683.5→712.1 ms.
+All 4,000 corrected rows stayed byte-identical and next due/start passed with
+INSERTs forbidden. No deferred rebuild or annotation speedup claim. Shared-host
+variation and only two pairs cannot isolate transaction overhead. Issue #81 remains
+open for blocking work, recovery costs and unbounded production-scale behavior.
+Sources/patches/manifests/raw logs and final checks: `/tmp/pr83-race-correction`,
+0700/0600. Full report includes service/gap/RSS, write cost and exact methodology.
+GPT-6.1 Sol medium; parent owns fresh review, CI and readiness; no approval claimed.
+
+Final runtime `npm run check` passed formatting, ESLint, **356/356 tests**, native
+TypeScript and Vite build; focused affected suite **37/37** passed. Deterministic
+real-writer red/green and final standalone/outer replay controls passed with the
+expected rejection before write, restart equivalence and post-release retry.
+Source reconstruction/common-harness audit, final diff checks and redacted staged
+Gitleaks passed. Independent review/CI remain pending with the parent; this is
+local verification, not PR readiness. The measured-source to publication-source
+code delta is one linter-required blank line, retained in `publication-format.patch`.

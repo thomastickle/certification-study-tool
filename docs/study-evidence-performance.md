@@ -372,6 +372,11 @@ implementer; no child agents or watchers. This is a draft scoped follow-up, Refs
 
 ## 2026-10-27 — provenance retention correction (P2)
 
+Historical round1 correction at measured `9370c33` / documentation head `ce8b092`.
+Round2 subsequently found a standalone concurrent-writer integrity defect; the
+transaction correction below supersedes its standalone safety claim. All numbers
+in this section remain pinned historical results, not current-head measurements.
+
 The first independent review requested changes for unconditional evidence extraction
 in production bank-deletion annotation. Its measurements and the preceding tables
 remain historical evidence for `13b83fd`, not results for the correction. The
@@ -562,3 +567,139 @@ and audited `metrics.json`. Original `/tmp/pr83-review-round1`,
 unchanged. No dependencies installed, agent delegation/watchers, real application,
 personal databases, forbidden fixed ports, deployment or merge. Implementation:
 GPT-6.1 Sol, medium reasoning. Parent owns fresh review/CI.
+
+## 2026-10-27 — protect standalone annotation against concurrent writers (round2 P2)
+
+The round2 reviewer reproduced a persistent mismatch at `ce8b092`: annotation
+read authoritative snapshots before its savepoint, a separate repository writer
+committed new scoring, then annotation wrote the old snapshot while retaining the
+new valid projection. A checksum authenticates the projection's payload and scope;
+it does not establish association with the earlier unprotected snapshot.
+
+`updateSnapshots` now enters the existing nestable library transaction before its
+SELECT. Standalone calls acquire `BEGIN IMMEDIATE`; calls inside any active SQLite
+transaction (including QuizRepository callers) use a savepoint and retain the outer lock/commit/rollback boundary.
+The protected view spans snapshot read, projection capture, update-trigger
+invalidation, restoration or eager rebuild, and all annotated rows. A later-row
+failure rolls back the entire annotation. Busy acquisition propagates without
+writes and restores transaction depth; no caller transaction precondition, retry,
+deferred repair, schema/version or checksum relaxation was added. Generic callbacks
+still rebuild. Standalone success uses the normal library revision increment;
+nested calls leave revision/commit to their owner. Existing production callers
+already held the outer write lock; their only extra boundary is a savepoint.
+
+The deterministic test pauses immediately after the real snapshot SELECT and
+runs a separate Node process through `QuizRepository.save` against a disposable
+file. On `ce8b092` it committed, and the original reviewer probe reproduced
+19 persisted due versus 20 from untouched PR82 full replay after restart. With the
+correction, the writer receives SQLite BUSY and restart produces 20/20. Retrying
+the writer after annotation returns succeeds, and another restart matches full
+replay with 19 due. Additional tests cover existing-lock acquisition failure,
+later-row rollback, a caught nested failure followed by a successful outer write,
+and recovery after trigger failure. Existing generic mutation, legacy, eager
+repair, raw-writer and outer rollback tests remain intact.
+
+Fresh independent review and CI/readiness belong to the parent. PR83 stays draft;
+PR82's prior approval is unaffected. Issue #81 stays open for remaining contention,
+first-use/rebuild/startup and unbounded history work. The previous 12/12 under
+200 ms series belongs to `9370c33` (runtime-equivalent to `ce8b092`), not this
+correction. Its limits remain historical: contention 314.9 ms, version rebuild
+1147.4 ms, startup 4101.1 ms and first use 1088.4 ms. Round2's fresh approved82
+versus `ce8b092` three-pair annotation comparison found deletion medians
+402.8 → 675.1 ms and other-account HTTP 412.5 → 677.0 ms. Integrity validation,
+reinsertion and trigger/write costs remain; this correction does not optimize them.
+
+### Bounded final-runtime comparison
+
+Baseline `ce8b092a08dbad8d2cdb2a0c5cf73ea0132fd4d8` versus that commit plus
+`/tmp/pr83-race-correction/runtime.patch`. Exact archive, per-file SHA256 manifests,
+patch reconstruction and identical six-file common harness are retained and
+verified. The final commit is recorded in the PR. A final publication patch adds only the linter-required blank line; its exact
+diff is retained as `publication-format.patch`. No behavior changed after
+these measurements. Unchanged `study-history-v2-answered` harness, one fresh-file
+repetition per revision/profile (four complete runs), sequential base history,
+base diverse, final history, final diverse. An intermediate wrapper failed the
+startup semantic assertion because it did not recognize QuizRepository's outer
+transaction; its exact source/patch/failed log are retained separately and excluded
+from measurements. The corrected boundary checks SQLite's actual transaction state.
+
+Node 24.22.1, Linux 7.0.0-38-generic, i5-8265U/eight logical CPUs, 31.1 GiB RAM,
+shared host, warm setup/OS cache, OS-selected loopback ports. Starting common-run
+load averages ranged 1.57–4.45 (one minute); free memory about 13 GiB. No tests or
+other benchmarks launched by this agent overlapped the measurement runs. Base
+preceded correction; drift/order and the shared host limit comparison. History
+uses coherent repeated empty answers; diverse uses validated graded answers and
+larger due sets. Limited identities/repeated timestamps, warmed recovery, synthetic
+auth and local transport remain boundaries. One observation per cell supports no
+percentile/distribution or speedup claim. All sample/actor/timer/service/memory,
+write, startup and rebuild records remain in the private logs/metrics.
+
+HTTP milliseconds, baseline → correction (startup is service elapsed):
+
+| Profile |    Quiz start |      Due read | Backlog reconcile | Private annotation | Complete write | Startup recovery |
+| ------- | ------------: | ------------: | ----------------: | -----------------: | -------------: | ---------------: |
+| history | 170.6 → 168.2 | 154.5 → 159.3 |     436.1 → 437.0 |      382.4 → 392.6 |      9.3 → 9.6 |  2393.8 → 2404.5 |
+| diverse | 209.9 → 213.9 | 175.9 → 163.3 |     461.5 → 453.3 |      403.7 → 453.2 |      8.7 → 9.3 | 21585.9 → 2424.4 |
+
+Corrected normal HTTP observations: **168.2, 159.3, 213.9, 163.3 ms**
+(history start/due, diverse start/due). **4/4 below 300 ms, 3/4 below preferred
+200 ms**, max 213.9 ms. Baseline diverse start was 209.9 ms; the preferred budget
+miss remains visible. These four samples do not replace the historical twelve.
+The baseline diverse startup outlier of 21585.9 ms is retained, not pooled away
+or attributed to this correction. Target and timing-CI policy are unchanged.
+
+Corrected normal service / maximum sampled event-loop gap / sampled peak RSS:
+
+| Profile / request  | Service ms | Gap ms | RSS MiB |
+| ------------------ | ---------: | -----: | ------: |
+| history quiz-start |      166.4 |  166.8 |   397.3 |
+| history due-read   |      157.7 |  159.1 |   407.1 |
+| diverse quiz-start |      211.8 |  212.5 |   393.3 |
+| diverse due-read   |      161.6 |  163.0 |   398.3 |
+
+Other-account contention maxima were 290.2 ms (history) and 296.7 ms (diverse)
+in the corrected common runs (ten samples per actor/profile). Corrected first-use
+backfill was 1046.6/971.9 ms, version rebuild 1034.4/1125.3 ms, reopen+due
+142.5/132.9 ms, and schema-backfill due 1069.4/1056.0 ms (history/diverse).
+Recovery remains expensive. Memory is sampled RSS, not a guaranteed peak; event-loop
+gaps include synchronous work and shared-host scheduling, not isolated CPU time.
+
+Two additional fresh-file pairs use the retained-bank probe: 2,000 valid confident
+attempts / 40,000 question snapshots, 250-question deleted source plus a surviving
+identical-content source. Pair one runs baseline then correction; pair two reverses
+order. Real deletion service / other-account HTTP milliseconds, with an independent
+client and another account; the external HTTP wrapper is not the production router:
+
+| Pair / order       | Deletion baseline → correction | Other HTTP baseline → correction | Next corrected due / start HTTP |
+| ------------------ | -----------------------------: | -------------------------------: | ------------------------------: |
+| 1 / base then head |                1352.4 → 1941.1 |                  1382.6 → 1945.9 |                   183.2 / 182.7 |
+| 2 / head then base |                  683.7 → 704.4 |                    683.5 → 712.1 |                   142.1 / 177.2 |
+
+All 4,000 corrected projection rows were byte-identical before/after annotation.
+Next due/start succeeded with evidence INSERTs prohibited, proving no deferred
+reconstruction in either corrected run. Pair one's high values are retained;
+reverse order was a bounded follow-up, not a replacement. Two pairs cannot isolate
+host/order effects or establish the cost of one savepoint; no annotation performance
+improvement is claimed. Bulk work still misses the responsiveness goal. The
+reviewer's approved82-versus-ce8b three-pair comparison above remains the stronger
+historical baseline-regression evidence. No statement-preparation or architecture
+rewrite was included in this correctness correction.
+
+Evidence directory `/tmp/pr83-race-correction` (0700/0600): baseline archive,
+source manifests and exact runtime patch; original red and final green real-process
+interleaving logs, standalone/outer control probes, 100-history / 12-selection /
+384-DST / raw-writer / abrupt-exit / migration/cleanup probes, focused tests,
+four common raw logs and derived metrics, both annotation pairs, source
+reconstruction audit and final publication checks. Earlier evidence directories
+are unchanged. Implementation: GPT-6.1 Sol, medium reasoning. No agents/watchers,
+installations, personal databases, real application, forbidden ports, merge or
+deployment. Fresh independent review and CI remain pending with the parent.
+
+Final runtime `npm run check` passed formatting, ESLint, **356/356 tests**, native
+TypeScript and Vite build; focused affected suite **37/37** passed. Deterministic
+real-writer red/green and final standalone/outer replay controls passed with the
+expected rejection before write, restart equivalence and post-release retry.
+Source reconstruction/common-harness audit, final diff checks and redacted staged
+Gitleaks passed. Independent review/CI remain pending with the parent; this is
+local verification, not PR readiness. The measured-source to publication-source
+code delta is one linter-required blank line, retained in `publication-format.patch`.

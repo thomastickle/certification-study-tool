@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { answeredBenchmarkHistory } from './answered-benchmark-history.ts'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { DatabaseSync } from 'node:sqlite'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
@@ -699,6 +699,161 @@ test('legacy source pinning preserves unknown scoring, sentinels and historical 
       /non-empty/,
     )
     assert.throws(() => repository.quizStore().studyHistory(), /non-empty/)
+  } finally {
+    sql.close()
+    repository.close()
+    rmSync(directory, { recursive: true })
+  }
+})
+
+test('standalone annotation protects snapshot and retained evidence from a real second writer', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'provenance-writer-'))
+  const path = join(directory, 'synthetic.sqlite3')
+  let repository = new LibraryRepository(path)
+  const prepare = DatabaseSync.prototype.prepare
+  try {
+    populate(repository)
+    const quiz = completed(repository)
+    const source = repository.sources()[0]!
+    let writerResult: ReturnType<typeof spawnSync> | undefined
+    const writerModule = new URL('../src/server/quizzes/quiz-repository.ts', import.meta.url).href
+    const writer = `
+      import { DatabaseSync } from 'node:sqlite'
+      import { QuizRepository } from ${JSON.stringify(writerModule)}
+      const db = new DatabaseSync(process.argv[1])
+      try {
+        const store = new QuizRepository(db)
+        const quiz = store.find(process.argv[2])
+        quiz.questions[0].selected = []
+        quiz.questions[0].correct = false
+        store.save(quiz)
+      } finally {
+        db.close()
+      }
+    `
+    const barrier = t.mock.method(
+      DatabaseSync.prototype,
+      'prepare',
+      function (this: DatabaseSync, query: string) {
+        const statement = prepare.call(this, query)
+        if (query === 'SELECT account_id, id, status, data FROM quiz_sessions') {
+          const all = statement.all.bind(statement)
+          t.mock.method(statement, 'all', function () {
+            const records = all()
+            // Pause after the authoritative SELECT; the child uses the real repository save path.
+            writerResult = spawnSync(
+              process.execPath,
+              ['--input-type=module', '-e', writer, path, quiz.id],
+              { encoding: 'utf8', timeout: 10000 },
+            )
+            return records
+          })
+        }
+        return statement
+      },
+    )
+    try {
+      repository.annotateDeletedBanks([{ ...source, sourceId: source.id }])
+    } finally {
+      barrier.mock.restore()
+    }
+    assert.ok(writerResult)
+    assert.equal(writerResult.error, undefined)
+    assert.equal(writerResult.status, 1, 'Concurrent writer must not commit across annotation')
+    assert.match(String(writerResult.stderr), /database is locked/)
+    repository.close()
+    repository = new LibraryRepository(path)
+    assert.deepEqual(
+      repository.quizStore().studyHistory(),
+      masteryHistory(repository.quizStore().completed()),
+    )
+    const service = new QuizService(repository, () => Date.parse('2026-03-09T17:00:00Z'))
+    assert.equal(service.due(options).total, 20)
+    assert.deepEqual(repository.quizStore().find(quiz.id)!.deletedBankNames, [source.name])
+    // The rejected writer can retry after annotation releases its lock; raw triggers stay active.
+    const retry = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', writer, path, quiz.id],
+      {
+        encoding: 'utf8',
+        timeout: 10000,
+      },
+    )
+    assert.equal(retry.status, 0, String(retry.stderr))
+    repository.close()
+    repository = new LibraryRepository(path)
+    assert.deepEqual(
+      repository.quizStore().studyHistory(),
+      masteryHistory(repository.quizStore().completed()),
+    )
+    assert.equal(
+      new QuizService(repository, () => Date.parse('2026-03-09T17:00:00Z')).due(options).total,
+      19,
+    )
+  } finally {
+    repository.close()
+    rmSync(directory, { recursive: true })
+  }
+})
+
+test('annotation lock and later-row failures leave all snapshots and evidence unchanged', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'provenance-atomic-'))
+  const path = join(directory, 'synthetic.sqlite3')
+  const repository = new LibraryRepository(path)
+  const sql = new DatabaseSync(path)
+  try {
+    populate(repository)
+    const quiz = completed(repository)
+    repository.quizStore().save({ ...structuredClone(quiz), id: 'second-attempt' })
+    const source = repository.sources()[0]!
+
+    const annotate = () => repository.annotateDeletedBanks([{ ...source, sourceId: source.id }])
+
+    const rows = () => ({
+      snapshots: sql.prepare('SELECT * FROM quiz_sessions ORDER BY id').all(),
+      evidence: sql.prepare('SELECT * FROM quiz_evidence ORDER BY id').all(),
+      revision: repository.revision(),
+    })
+
+    const before = rows()
+    sql.exec('BEGIN IMMEDIATE')
+    try {
+      assert.throws(annotate, /database is locked/)
+      assert.deepEqual(rows(), before)
+    } finally {
+      sql.exec('ROLLBACK')
+    }
+    sql.exec(`
+      CREATE TRIGGER fail_second_annotation BEFORE INSERT ON quiz_evidence
+      WHEN NEW.id = 'second-attempt'
+      BEGIN SELECT RAISE(ABORT, 'second annotation failure'); END
+    `)
+    assert.throws(annotate, /second annotation failure/)
+    assert.deepEqual(rows(), before)
+    // A caught nested failure rolls back the whole annotation, preserving the outer transaction.
+    repository.transaction(() => {
+      assert.throws(annotate, /second annotation failure/)
+      assert.deepEqual(rows(), before)
+      repository.saveSharedDeletionCursor(7)
+    })
+    assert.equal(repository.sharedDeletionCursor(), 7)
+    assert.deepEqual(rows().snapshots, before.snapshots)
+    assert.deepEqual(rows().evidence, before.evidence)
+    assert.throws(() => repository.quizStore().transaction(annotate), /second annotation failure/)
+    assert.deepEqual(rows().snapshots, before.snapshots)
+    assert.deepEqual(rows().evidence, before.evidence)
+    sql.exec('DROP TRIGGER fail_second_annotation')
+    repository.quizStore().transaction(annotate)
+    assert.ok(
+      repository
+        .quizStore()
+        .completed()
+        .every((q) => q.deletedBankNames?.includes(source.name)),
+    )
+    assert.deepEqual(
+      repository.quizStore().studyHistory(),
+      masteryHistory(repository.quizStore().completed()),
+    )
   } finally {
     sql.close()
     repository.close()

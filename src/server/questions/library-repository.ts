@@ -170,30 +170,42 @@ export class LibraryView {
 
   /** Generic callbacks always rebuild; only the repository-owned provenance mutation can retain. */
   private updateSnapshots(annotate: (quiz: StoredQuiz) => boolean, provenanceOnly: boolean): void {
-    const records = this.db.prepare('SELECT account_id, id, status, data FROM quiz_sessions').all()
-    const update = this.db.prepare(
-      'UPDATE quiz_sessions SET data = ? WHERE account_id = ? AND id = ?',
-    )
-    for (const record of records) {
-      const quiz: StoredQuiz = JSON.parse(String(record.data))
-      if (annotate(quiz)) {
-        const data = JSON.stringify(quiz)
-        evidenceSavepoint(this.db, () => {
-          const restore =
-            provenanceOnly && record.status === 'completed'
-              ? retainStudyEvidence(this.db, String(record.account_id), String(record.id))
-              : undefined
-          update.run(data, record.account_id!, record.id!)
-          if (record.status === 'completed' && !restore?.()) {
-            saveStudyEvidence(
-              this.db,
-              String(record.account_id),
-              JSON.parse(data),
-              String(record.id),
-            )
-          }
-        })
+    // Own the write lock before reading snapshots so retained evidence shares the same view.
+    // QuizRepository callers also own transactions outside the library depth counter.
+    const annotateRecords = () => {
+      const records = this.db
+        .prepare('SELECT account_id, id, status, data FROM quiz_sessions')
+        .all()
+      const update = this.db.prepare(
+        'UPDATE quiz_sessions SET data = ? WHERE account_id = ? AND id = ?',
+      )
+      for (const record of records) {
+        const quiz: StoredQuiz = JSON.parse(String(record.data))
+        if (annotate(quiz)) {
+          const data = JSON.stringify(quiz)
+          evidenceSavepoint(this.db, () => {
+            const restore =
+              provenanceOnly && record.status === 'completed'
+                ? retainStudyEvidence(this.db, String(record.account_id), String(record.id))
+                : undefined
+            update.run(data, record.account_id!, record.id!)
+            if (record.status === 'completed' && !restore?.()) {
+              saveStudyEvidence(
+                this.db,
+                String(record.account_id),
+                JSON.parse(data),
+                String(record.id),
+              )
+            }
+          })
+        }
       }
+    }
+
+    if (this.db.isTransaction) {
+      evidenceSavepoint(this.db, annotateRecords)
+    } else {
+      this.transaction(annotateRecords)
     }
   }
 
