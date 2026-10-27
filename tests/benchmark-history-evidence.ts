@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { completedEvidence } from '../src/server/quizzes/mastery-history.ts'
 import type { StoredQuiz } from '../src/server/quizzes/quiz-repository.ts'
 import type { LibraryItemId } from '../src/shared/contracts.ts'
 
@@ -41,5 +42,22 @@ export function assertHistoryEvidence(
       [...expected].sort(),
       'Deletion indicators must match exactly the deleted sources in this snapshot',
     )
+  }
+}
+
+/**
+ * Require ordinary benchmark histories to exercise accepted scoring, with coherent timer metadata.
+ * @throws {AssertionError} When a seeded or recovered attempt is malformed or has unknown scoring.
+ */
+export function assertCompletedBenchmarkEvidence(histories: StoredQuiz[]) {
+  for (const quiz of histories) {
+    assert.equal(quiz.status, 'completed')
+    for (let index = 0; index < quiz.questions.length; index++) {
+      assert.ok(completedEvidence(quiz, index), 'Benchmark scoring evidence must be valid')
+    }
+    assert.ok(quiz.startedAt <= quiz.finishedAt! && quiz.finishedAt! <= quiz.deadline)
+    assert.ok(quiz.serverNow >= quiz.startedAt && quiz.serverNow <= quiz.finishedAt!)
+    assert.equal(quiz.pausedAt ?? null, null)
+    assert.deepEqual(quiz.pauseHistory, { complete: true, intervals: [] })
   }
 }
