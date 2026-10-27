@@ -8,6 +8,8 @@ import type { LoginTransaction } from './oidc-login.ts'
 import { AccountRepository } from './account-repository.ts'
 import { checkLocalRequest } from '../http-controller.ts'
 import { ApplicationError } from '../errors.ts'
+import { requestUrl } from '../request-url.ts'
+import type { RequestUrl } from '../request-url.ts'
 import type { SessionUser } from '../../shared/auth-contracts.ts'
 
 export type AuthenticationOptions = OidcSettings & {
@@ -16,7 +18,9 @@ export type AuthenticationOptions = OidcSettings & {
 }
 
 export type AuthenticationResult =
-  { route: 'handled' } | { route: 'public' } | { route: 'study'; user: SessionUser }
+  | { route: 'handled' }
+  | { route: 'public'; url: RequestUrl }
+  | { route: 'study'; user: SessionUser; url: RequestUrl }
 
 /** Establish verified identities and bind each admitted request to its own account and session role. */
 export class ApplicationAuthentication {
@@ -58,7 +62,7 @@ export class ApplicationAuthentication {
         return { route: 'handled' }
       }
       if (!url.pathname.startsWith('/api/')) {
-        return { route: 'public' }
+        return { route: 'public', url: requestUrl(url) }
       }
       return this.authorizeStudyRequest(request, response, url)
     } catch (error) {
@@ -120,7 +124,7 @@ export class ApplicationAuthentication {
       })
       return { route: 'handled' }
     }
-    return { route: 'study', user }
+    return { route: 'study', user, url: requestUrl(url) }
   }
 
   /** Map each authentication route to its workflow; each flow owns its cookies and failure rules. */

@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { studyReportMarkdown } from '../src/shared/report-export.ts'
 import { quizTiming } from '../src/shared/quiz-timing.ts'
 import { populate } from './quiz-fixtures.ts'
@@ -25,7 +25,7 @@ for (const mode of ['quiz', 'exam'] as const) {
     service.save(quiz.id, { answers })
     now += 1234
     service.pause(quiz.id, { cause: 'navigation' })
-    const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+    const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const address = server.address()
     assert.ok(address && typeof address !== 'string')

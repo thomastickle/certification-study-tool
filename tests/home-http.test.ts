@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { HomeService } from '../src/server/home/home-service.ts'
@@ -19,7 +19,7 @@ test('HTTP home and earned settings preserve readiness, enforce scope and surviv
   input.certification = { provider: 'AWS', code: 'CLF-C02', name: 'Cloud Practitioner' }
   importer.confirm(input, importer.preview(input).token, false)
   const revision = repository.revision()
-  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

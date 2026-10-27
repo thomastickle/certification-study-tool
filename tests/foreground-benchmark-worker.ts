@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { apiController } from '../src/server/http-controller.ts'
+import { requestUrl } from '../src/server/request-url.ts'
 import { ImportPreviews } from '../src/server/importer/import-previews.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -155,6 +156,8 @@ const server = createServer(async (request, response) => {
   assert.ok(actor)
   const personal = libraries.open(actor)
   try {
+    const url = new URL(request.url ?? '/', `http://127.0.0.1:${request.socket.localPort}`)
+    const context = requestUrl(url)
     const controller = apiController(
       shared,
       { id: actor, role: 'admin' },
@@ -162,7 +165,7 @@ const server = createServer(async (request, response) => {
       previews,
       personal,
     )
-    await controller(request, response)
+    await controller(request, response, context)
   } finally {
     housekeeping.observeRequest(request.method, actor, personal)
     personal.close()

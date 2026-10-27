@@ -32,8 +32,11 @@ opens `PrivateLibraries` per request, and runs `observeRequest` and connection
 cleanup as `main.ts` does. It bypasses OIDC, sessions, static assets, Vite, TLS,
 reverse proxies and network distance. A fixture-only header selects one of its
 precreated actors; this is not an authentication implementation or a deployable
-server. The positional `apiController(repository, actor, origin, previews,
-privateLibrary)` call is the HTTP integration seam to update if #62 changes it.
+server. The `apiController` factory is unchanged; its returned handler now takes
+`(request, response, RequestUrl)` after #62 / PR #79. At this synthetic admitted
+request boundary, the harness parses the incoming target against its loopback
+origin and uses the real `requestUrl` helper to pass an immutable routing snapshot.
+Parsing remains inside the measured request-service interval.
 Fixture construction uses stable service/repository boundaries.
 
 ## Workload and measurement boundaries
@@ -138,6 +141,11 @@ A larger diverse pool can cost more. Profile differences change multiple workloa
 axes and do not isolate a causal scaling coefficient for each axis.
 
 ## Captured baseline (2026-10-27)
+
+These nine measurements were captured before integration with PR #79's normalized
+URL context. They retain their original provenance and are not measurements of
+the combined code. Post-integration smoke runs check operation and correctness;
+they do not replace this repeated baseline or establish a performance comparison.
 
 Three sequential repetitions per profile used Node 24.17.0 on Linux 7.0.0-38-generic,
 an Intel Core i5-8265U (advertised 1.60 GHz), eight logical CPUs, 31.1 GiB RAM,
