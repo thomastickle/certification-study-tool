@@ -11,9 +11,12 @@ result before committing: passing these tools does not establish readability.
   use explicit branches or name the meaningful values involved.
 - Give compound conditions names that explain the rule being checked. Avoid
   introducing variables that merely work around the formatter's width target.
+- Keep multi-step algorithms and transactions in meaningful phases. Extract a
+  phase when it has a clear responsibility or resource boundary; avoid wrappers
+  that only forward arguments or shorten a long method. In JSX, group markup by
+  meaning instead of adding elements only to manage line length.
 - Format substantial SQL in template literals, with clauses on separate lines
   and one column definition per line. Keep bound parameters separate from SQL.
-- Extract helpers around coherent responsibilities and resource ownership.
   Method length alone is not a reason to introduce another level of indirection.
 
 Keep the configured 100-column formatting target. Do not add formatter-ignore

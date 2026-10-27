@@ -173,6 +173,8 @@ screen tests remain in `tests/`. `npm test` discovers both trees recursively.
 
 ## Code hygiene
 
+See the [readability guide](docs/code-style.md) for the project's conventions.
+
 Use the project-local tools so editors and command-line checks follow the same
 rules: two spaces, single quotes, a 100-column print width, and no trailing
 statement semicolons. Prettier retains leading semicolons where needed to avoid
@@ -197,6 +199,53 @@ npm run check         # Formatting, lint, tests, typecheck, and production build
 
 `npm run build` includes typechecking. Private banks/databases, editor settings,
 and generated output are excluded from formatting; linting is scoped to code.
+
+### Toolchain upgrades
+
+The ranges in `package.json` describe supported dependency versions; the
+`package-lock.json` records the versions a clean install currently resolves.
+Review both when planning an upgrade. The current declarations and selections
+are:
+
+| Toolchain component        | Declared support or selection                        | Lockfile resolution or Docker pin        |
+| -------------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| Node.js                    | `>=24.14.0 <25` (`engines`)                          | Docker uses `node:24.17.0-bookworm-slim` |
+| Native TypeScript compiler | `@typescript/native` aliases `typescript@7.0.2`      | 7.0.2                                    |
+| TypeScript JavaScript API  | `typescript` aliases `@typescript/typescript6@6.0.2` | 6.0.2                                    |
+| ESLint                     | `10.13.0`                                            | 10.13.0                                  |
+| typescript-eslint          | `8.71.2`                                             | 8.71.2                                   |
+| Vite                       | `^7.3.0`                                             | 7.3.7                                    |
+
+The package declarations are the supported selections; the last column gives
+the current lockfile versions, except for Node, where it records the Docker
+base image pin. These are snapshots, not a promise that later installs will
+resolve to the same versions when a range permits newer releases. CI selects
+Node from `package.json` and checks for the latest matching patch release. The
+two TypeScript packages serve different purposes: the native TypeScript 7
+compiler handles typechecking, while the TypeScript 6 package supplies the
+JavaScript API used by ESLint and tests. Keep both unless the code and tests are
+deliberately migrated to a replacement API.
+
+For an upgrade, review the affected tools' compatibility notes and peer
+requirements, then update the intended package declarations and lockfile
+together. If changing Node, update and validate both the package engine range
+and Docker base image. Check the compiler selected by the project script and
+run the regression coverage and full project checks:
+
+```sh
+npm ci
+node --version
+npm run typecheck -- --version
+npm test
+npm run check
+```
+
+`npm test` includes checks that the default compiler is TypeScript 7, detects a
+TypeScript error, and that ESLint can use the TypeScript 6 API and enforce its
+TypeScript rules. CI runs `npm ci` and `npm run check`; its Docker job builds the
+image and runs container health, web-app, and Keycloak-backed smoke checks. Run
+that Docker path when changing the image's Node version or other dependencies
+used in the image.
 
 ## Appearance
 
