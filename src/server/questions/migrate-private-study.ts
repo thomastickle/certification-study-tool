@@ -23,65 +23,99 @@ export function migratePrivateStudy(
   const secureDelete = Number(db.prepare('PRAGMA main.secure_delete').get()?.secure_delete)
   db.prepare('ATTACH DATABASE ? AS private_study').run(destination)
   try {
-    db.exec('BEGIN IMMEDIATE')
-    try {
-      // Lock both files before checking modes; another connection may have changed a cached mode.
-      for (const database of ['main', 'private_study']) {
-        const mode = db.prepare(`PRAGMA ${database}.journal_mode`).get()?.journal_mode
-        if (mode !== 'delete') {
-          throw new Error('Study migration requires DELETE journal mode in both stopped databases.')
-        }
-      }
-      const owner = db
-        .prepare('SELECT account_id FROM private_study.private_library_owner WHERE singleton = 1')
-        .get()
-      const version = db.prepare('PRAGMA private_study.user_version').get()?.user_version
-      const appId = db.prepare('PRAGMA private_study.application_id').get()?.application_id
-      if (owner?.account_id !== accountId || version !== 4 || appId !== 1096242004) {
-        throw new Error('The destination is not the selected account’s private study database.')
-      }
-      let incoming = 0
-      let existing = 0
-      for (const table of Object.keys(studyTables)) {
-        incoming += Number(
-          db
-            .prepare(`SELECT count(*) AS total FROM main.${table} WHERE account_id = ?`)
-            .get(accountId)?.total,
-        )
-        existing += Number(
-          db.prepare(`SELECT count(*) AS total FROM private_study.${table}`).get()?.total,
-        )
-      }
-      if (incoming && existing) {
-        throw new Error(
-          'The private database already contains study evidence. Restore a consistent backup instead of combining histories.',
-        )
-      }
-      if (incoming) {
-        requireStudyCleanup(db)
-        // Clear removed study records from reusable pages, not just from SQL query results.
-        db.exec('PRAGMA main.secure_delete = ON')
-        for (const [table, columns] of Object.entries(studyTables)) {
-          db.prepare(
-            `
-            INSERT INTO private_study.${table} (${columns})
-            SELECT ${columns} FROM main.${table} WHERE account_id = ?
-          `,
-          ).run(accountId)
-        }
-        pinMigratedSources(db, accountId)
-        for (const table of Object.keys(studyTables)) {
-          db.prepare(`DELETE FROM main.${table} WHERE account_id = ?`).run(accountId)
-        }
-      }
-      db.exec('COMMIT')
-    } catch (error) {
-      db.exec('ROLLBACK')
-      throw error
-    }
+    transferStudyInTransaction(db, accountId)
   } finally {
-    db.exec('DETACH DATABASE private_study')
-    db.exec(`PRAGMA main.secure_delete = ${secureDelete}`)
+    try {
+      db.exec('DETACH DATABASE private_study')
+    } finally {
+      db.exec(`PRAGMA main.secure_delete = ${secureDelete === 2 ? 'FAST' : secureDelete}`)
+    }
+  }
+}
+
+/** Own the single transaction across both attached files, including rollback on any failed phase. */
+function transferStudyInTransaction(db: DatabaseSync, accountId: string): void {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    verifyMigrationPreconditions(db, accountId)
+    const incoming = rejectConflictingEvidence(db, accountId)
+    if (incoming) {
+      requireStudyCleanup(db)
+      // Clear removed study records from reusable pages, not just from SQL query results.
+      db.exec('PRAGMA main.secure_delete = ON')
+      transferOwnedRows(db, accountId)
+      pinMigratedSources(db, accountId)
+      deleteTransferredRows(db, accountId)
+    }
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+}
+
+/**
+ * Check journal modes and destination identity under write locks on both files.
+ * @throws {Error} For unsupported journaling or a destination with the wrong owner/schema markers.
+ */
+function verifyMigrationPreconditions(db: DatabaseSync, accountId: string): void {
+  // Lock both files before checking modes; another connection may have changed a cached mode.
+  for (const database of ['main', 'private_study']) {
+    const mode = db.prepare(`PRAGMA ${database}.journal_mode`).get()?.journal_mode
+    if (mode !== 'delete') {
+      throw new Error('Study migration requires DELETE journal mode in both stopped databases.')
+    }
+  }
+  const owner = db
+    .prepare('SELECT account_id FROM private_study.private_library_owner WHERE singleton = 1')
+    .get()
+  const version = db.prepare('PRAGMA private_study.user_version').get()?.user_version
+  const appId = db.prepare('PRAGMA private_study.application_id').get()?.application_id
+  if (owner?.account_id !== accountId || version !== 4 || appId !== 1096242004) {
+    throw new Error('The destination is not the selected account’s private study database.')
+  }
+}
+
+/**
+ * Return the pending row count, allowing retries only when there is no history to combine.
+ * @throws {Error} If source and destination both contain evidence, or a study table is missing.
+ */
+function rejectConflictingEvidence(db: DatabaseSync, accountId: string): number {
+  let incoming = 0
+  let existing = 0
+  for (const table of Object.keys(studyTables)) {
+    incoming += Number(
+      db.prepare(`SELECT count(*) AS total FROM main.${table} WHERE account_id = ?`).get(accountId)
+        ?.total,
+    )
+    existing += Number(
+      db.prepare(`SELECT count(*) AS total FROM private_study.${table}`).get()?.total,
+    )
+  }
+  if (incoming && existing) {
+    throw new Error(
+      'The private database already contains study evidence. Restore a consistent backup instead of combining histories.',
+    )
+  }
+  return incoming
+}
+
+/** Copy all evidence unchanged before provenance pinning or any source deletion can begin. */
+function transferOwnedRows(db: DatabaseSync, accountId: string): void {
+  for (const [table, columns] of Object.entries(studyTables)) {
+    db.prepare(
+      `
+      INSERT INTO private_study.${table} (${columns})
+      SELECT ${columns} FROM main.${table} WHERE account_id = ?
+    `,
+    ).run(accountId)
+  }
+}
+
+/** Remove only the transferred owner's evidence after every copy and provenance update succeeds. */
+function deleteTransferredRows(db: DatabaseSync, accountId: string): void {
+  for (const table of Object.keys(studyTables)) {
+    db.prepare(`DELETE FROM main.${table} WHERE account_id = ?`).run(accountId)
   }
 }
 

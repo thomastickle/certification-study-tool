@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { DatabaseSync } from 'node:sqlite'
+import { constants, DatabaseSync } from 'node:sqlite'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
@@ -12,6 +13,298 @@ import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { bank } from './fixtures.ts'
 import { legacyStudySchema } from './legacy-study-schema.ts'
 import { migrateStudyOwnership } from '../src/server/questions/study-schema.ts'
+import { migratePrivateStudy } from '../src/server/questions/migrate-private-study.ts'
+import { populate } from './quiz-fixtures.ts'
+
+test('secure-delete is restored even when SQLite refuses to detach the destination', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'private-study-detach-'))
+  const sourcePath = join(directory, 'shared.sqlite3')
+  const shared = new LibraryRepository(sourcePath)
+  const accountId = randomUUID()
+  const libraries = new PrivateLibraries(join(directory, 'users'))
+  const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
+  libraries.open(accountId).close()
+  shared.forAccount(accountId).quizStore().record('restore-settings', false)
+  const db = new DatabaseSync(sourcePath)
+  try {
+    db.exec('PRAGMA secure_delete = OFF')
+    db.setAuthorizer((action) =>
+      action === constants.SQLITE_DETACH ? constants.SQLITE_DENY : constants.SQLITE_OK,
+    )
+    assert.throws(() => migratePrivateStudy(db, destinationPath, accountId), /not authorized/)
+    assert.equal(db.prepare('PRAGMA main.secure_delete').get()?.secure_delete, 0)
+  } finally {
+    db.setAuthorizer(null)
+    db.close()
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('an interrupted source deletion recovers both files and retries without losing evidence', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'private-study-interruption-'))
+  const sourcePath = join(directory, 'shared.sqlite3')
+  let shared = new LibraryRepository(sourcePath)
+  const accountId = randomUUID()
+  const libraries = new PrivateLibraries(join(directory, 'users'))
+  const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
+  try {
+    populate(shared)
+    const owner = shared.forAccount(accountId)
+    const quizzes = new QuizService(owner, () => 1000)
+    const quiz = quizzes.start({ sourceFilter: 'mixed', questionType: 'mixed' })
+    const saved = owner.quizStore().find(quiz.id)!
+    saved.questions[0]!.selected = [saved.questions[0]!.answers[0]!.id]
+    saved.questions[0]!.confidence = 'Confident'
+    saved.questions[0]!.flagged = true
+    owner.quizStore().save(saved)
+    owner.quizStore().record('exact-mastery', true)
+    owner.quizStore().record('exact-mastery', false)
+    owner.certificationStore().setEarned({ provider: 'AWS', code: 'CLF-C02', name: 'Cloud' }, true)
+    libraries.open(accountId).close()
+    shared.close()
+    const source = new DatabaseSync(sourcePath)
+    const tables = ['quiz_sessions', 'quiz_mastery', 'earned_certifications']
+    const before = tables.map((table) => source.prepare(`SELECT * FROM ${table}`).all())
+    source.exec(`
+      CREATE TABLE private_study_separation (
+        singleton INTEGER PRIMARY KEY,
+        complete INTEGER NOT NULL
+      );
+      INSERT INTO private_study_separation VALUES (1, 1);
+      CREATE TRIGGER interrupt_deletion BEFORE DELETE ON earned_certifications
+      BEGIN SELECT interrupt_transfer(); END;
+    `)
+    source.close()
+    const migrationUrl = new URL(
+      '../src/server/questions/migrate-private-study.ts',
+      import.meta.url,
+    )
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { DatabaseSync } from 'node:sqlite'
+         import { migratePrivateStudy } from ${JSON.stringify(migrationUrl.href)}
+         const db = new DatabaseSync(process.argv[1])
+         db.function('interrupt_transfer', () => process.exit(23))
+         migratePrivateStudy(db, process.argv[2], process.argv[3])`,
+        sourcePath,
+        destinationPath,
+        accountId,
+      ],
+      { encoding: 'utf8', timeout: 10000 },
+    )
+    assert.equal(child.error, undefined)
+    assert.equal(child.status, 23, child.stderr)
+    const recovered = new DatabaseSync(sourcePath)
+    const destination = new DatabaseSync(destinationPath)
+    try {
+      assert.deepEqual(
+        tables.map((table) => recovered.prepare(`SELECT * FROM ${table}`).all()),
+        before,
+      )
+      for (const table of tables) {
+        assert.equal(destination.prepare(`SELECT count(*) AS total FROM ${table}`).get()?.total, 0)
+      }
+      assert.equal(
+        recovered.prepare('SELECT complete FROM private_study_separation').get()?.complete,
+        1,
+      )
+      recovered.exec('DROP TRIGGER interrupt_deletion')
+    } finally {
+      destination.close()
+      recovered.close()
+    }
+    shared = new LibraryRepository(sourcePath)
+    shared.moveStudyTo(destinationPath, accountId)
+    const migrated = new DatabaseSync(destinationPath)
+    try {
+      assert.deepEqual(
+        tables.map((table) => migrated.prepare(`SELECT * FROM ${table}`).all()),
+        before,
+      )
+      assert.equal(
+        migrated.prepare('SELECT account_id FROM private_library_owner').get()?.account_id,
+        accountId,
+      )
+    } finally {
+      migrated.close()
+    }
+    assert.deepEqual(shared.studyAccounts(), [])
+    shared.moveStudyTo(destinationPath, accountId)
+  } finally {
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('a failed source deletion restores connection state and permits a retry on the same connection', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'private-study-cleanup-'))
+  const sourcePath = join(directory, 'shared.sqlite3')
+  const shared = new LibraryRepository(sourcePath)
+  const accountId = randomUUID()
+  const libraries = new PrivateLibraries(join(directory, 'users'))
+  const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
+  libraries.open(accountId).close()
+  shared.forAccount(accountId).quizStore().record('retry-mastery', false)
+  const db = new DatabaseSync(sourcePath)
+  try {
+    db.exec(`
+      PRAGMA secure_delete = FAST;
+      CREATE TRIGGER reject_deletion BEFORE DELETE ON quiz_mastery
+      BEGIN SELECT RAISE(ABORT, 'synthetic deletion failure'); END;
+    `)
+    assert.throws(
+      () => migratePrivateStudy(db, destinationPath, accountId),
+      /synthetic deletion failure/,
+    )
+    assert.equal(db.prepare('PRAGMA main.secure_delete').get()?.secure_delete, 2)
+    assert.deepEqual(
+      db
+        .prepare('PRAGMA database_list')
+        .all()
+        .map((row) => row.name),
+      ['main'],
+    )
+    assert.equal(db.prepare('SELECT count(*) AS total FROM quiz_mastery').get()?.total, 1)
+    db.exec('DROP TRIGGER reject_deletion')
+    migratePrivateStudy(db, destinationPath, accountId)
+    assert.equal(db.prepare('SELECT count(*) AS total FROM quiz_mastery').get()?.total, 0)
+    assert.equal(db.prepare('PRAGMA main.secure_delete').get()?.secure_delete, 2)
+    assert.deepEqual(
+      db
+        .prepare('PRAGMA database_list')
+        .all()
+        .map((row) => row.name),
+      ['main'],
+    )
+  } finally {
+    db.close()
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+for (const ambiguous of [false, true]) {
+  test(`migration pins ${ambiguous ? 'ambiguous' : 'unique'} legacy provenance before source context is lost`, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'private-study-provenance-'))
+    const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
+    const accountId = randomUUID()
+    const libraries = new PrivateLibraries(join(directory, 'users'))
+    try {
+      const input = populate(shared)
+      const owner = shared.forAccount(accountId)
+      const quiz = new QuizService(owner, () => 1000).start({
+        sourceFilter: 'mixed',
+        questionType: 'mixed',
+      })
+      const saved = owner.quizStore().find(quiz.id)!
+      for (const question of saved.questions) {
+        delete question.sourceId
+      }
+      owner.quizStore().save(saved)
+      if (ambiguous) {
+        input.source.key = 'another-bank-with-the-same-name'
+        const importer = new ImportService(shared)
+        importer.confirm(input, importer.preview(input).token, false)
+      }
+      const expected = structuredClone(saved)
+      for (const question of expected.questions) {
+        question.sourceId = ambiguous ? null : shared.sources()[0]!.id
+      }
+      libraries.migrateFrom(shared)
+      const migrated = libraries.open(accountId)
+      try {
+        assert.deepEqual(migrated.quizStore().find(quiz.id), expected)
+        assert.deepEqual(migrated.sources(), [])
+      } finally {
+        migrated.close()
+      }
+    } finally {
+      shared.close()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const invalidDestination of [
+  { name: 'WAL journaling', sql: 'PRAGMA journal_mode = WAL', error: /DELETE journal mode/ },
+  { name: 'schema version', sql: 'PRAGMA user_version = 3', error: /selected account/ },
+  { name: 'application ID', sql: 'PRAGMA application_id = 0', error: /selected account/ },
+  { name: 'missing study table', sql: 'DROP TABLE quiz_mastery', error: /no such table/ },
+]) {
+  test(`migration rejects destination ${invalidDestination.name} without changing source evidence`, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'private-study-preconditions-'))
+    const sourcePath = join(directory, 'shared.sqlite3')
+    const shared = new LibraryRepository(sourcePath)
+    const accountId = randomUUID()
+    const libraries = new PrivateLibraries(join(directory, 'users'))
+    const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
+    try {
+      shared.forAccount(accountId).quizStore().record('preserve-invalid-destination', false)
+      libraries.open(accountId).close()
+      const destination = new DatabaseSync(destinationPath)
+      destination.exec(invalidDestination.sql)
+      destination.close()
+      const db = new DatabaseSync(sourcePath)
+      try {
+        const before = db.prepare('SELECT * FROM quiz_mastery').all()
+        assert.throws(
+          () => migratePrivateStudy(db, destinationPath, accountId),
+          invalidDestination.error,
+        )
+        assert.deepEqual(db.prepare('SELECT * FROM quiz_mastery').all(), before)
+        assert.deepEqual(
+          db
+            .prepare('PRAGMA database_list')
+            .all()
+            .map((row) => row.name),
+          ['main'],
+        )
+      } finally {
+        db.close()
+      }
+    } finally {
+      shared.close()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+test('a locked destination fails closed and can be retried after the other writer releases it', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'private-study-lock-'))
+  const sourcePath = join(directory, 'shared.sqlite3')
+  const shared = new LibraryRepository(sourcePath)
+  const accountId = randomUUID()
+  const libraries = new PrivateLibraries(join(directory, 'users'))
+  const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
+  libraries.open(accountId).close()
+  shared.forAccount(accountId).quizStore().record('preserve-locked-destination', false)
+  const otherWriter = new DatabaseSync(destinationPath)
+  const db = new DatabaseSync(sourcePath)
+  try {
+    otherWriter.exec('BEGIN IMMEDIATE')
+    assert.throws(() => migratePrivateStudy(db, destinationPath, accountId), /database is locked/)
+    assert.equal(db.prepare('SELECT count(*) AS total FROM quiz_mastery').get()?.total, 1)
+    assert.deepEqual(
+      db
+        .prepare('PRAGMA database_list')
+        .all()
+        .map((row) => row.name),
+      ['main'],
+    )
+    otherWriter.exec('ROLLBACK')
+    migratePrivateStudy(db, destinationPath, accountId)
+    assert.equal(db.prepare('SELECT count(*) AS total FROM quiz_mastery').get()?.total, 0)
+  } finally {
+    db.close()
+    otherWriter.close()
+    shared.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('existing study evidence moves to its owner file without copying shared content or other accounts', () => {
   const directory = mkdtempSync(join(tmpdir(), 'private-study-migration-'))
