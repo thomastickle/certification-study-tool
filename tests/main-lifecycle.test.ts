@@ -280,3 +280,55 @@ test('shutdown closes watchers added by finishing Vite hooks', { timeout: 20000 
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+for (const phase of ['configureServer', 'buildStart']) {
+  test(
+    `compiled main explicitly disposes Vite after post-allocation ${phase} failure`,
+    { timeout: 20000 },
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'study-main-partial-vite-'))
+      const observation = join(directory, 'vite-ownership.json')
+      writeFileSync(
+        join(directory, 'vite.config.mts'),
+        `
+      import { writeFileSync } from 'node:fs'
+      export default { plugins: [{
+        name: 'first-user-pre-failure', enforce: 'pre',
+        configureServer: { order: 'pre', async handler(server) {
+          await new Promise(resolve => server.watcher.once('ready', resolve))
+          process.on('exit', () => writeFileSync(${JSON.stringify(observation)}, JSON.stringify({
+            closed: server.watcher.closed,
+            watched: Object.keys(server.watcher.getWatched()).length,
+            fsWatchers: process.getActiveResourcesInfo().filter(name => name === 'FSEventWrap').length,
+          }), { mode: 0o600 }))
+          ${phase === 'configureServer' ? "throw new Error('post-allocation configureServer failure')" : ''}
+        } },
+        ${phase === 'buildStart' ? "buildStart: { order: 'pre', handler() { throw new Error('post-allocation buildStart failure') } }," : ''}
+      }] }
+    `,
+        { mode: 0o600 },
+      )
+      const { server, port } = await reservation()
+      await new Promise<void>((done) => server.close(() => done()))
+      const fixture = launch(directory, port, false)
+      try {
+        const [code, signal] = await fixture.exit
+        assert.equal(signal, null)
+        assert.equal(code, 1)
+        assert.match(fixture.output(), new RegExp(`post-allocation ${phase} failure`))
+        assertSqliteClosed(directory)
+        assert.deepEqual(JSON.parse(readFileSync(observation, 'utf8')), {
+          closed: true,
+          watched: 0,
+          fsWatchers: 0,
+        })
+      } finally {
+        if (fixture.child.exitCode === null && fixture.child.signalCode === null) {
+          fixture.child.kill('SIGKILL')
+          await fixture.exit
+        }
+        rmSync(directory, { recursive: true, force: true })
+      }
+    },
+  )
+}

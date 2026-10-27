@@ -47,8 +47,24 @@ Only after readiness does the unreferenced one-second upkeep interval run.
 roots open because Nest runs this phase before disposing its HTTP transport.
 `beforeApplicationShutdown` drains the attached intermediate transport: Vite and
 upgraded HMR sockets first, then HTTP sockets and every active handler promise.
+Development Vite has an owner before its factory is awaited. `DevelopmentVite`
+resolves configuration once and uses Vite's exported plugin-patching point to put
+its pre-ordered capture hook before file-config hooks, including other pre hooks.
+It records environment initialization resources for failures that precede
+`configureServer`. A rejected environment factory defers its original error to
+Vite's `init` boundary solely to capture the already allocated watcher; that
+failure carrier never enters a ready graph. Parallel initialization drains before
+partial environments, HMR and watchers close. If public-file scanning fails before
+those handles are exposed, the owner removes HMR listeners from its unbound HTTP
+server. Factory rejection disposes immediately and retains the startup error;
+subsequent Nest transport shutdown shares the same disposal promise.
+
 After Vite's hooks drain, close its watcher once more: Vite closes watchers in
 parallel with those hooks, and a late watch registration can reopen Chokidar.
+Disposal also crosses Node's native watcher close phase before rethrowing a startup
+error, so fatal exit cannot hide pending `FSEventWrap` cleanup. These adapters are
+covered against the installed Vite 7.3.7 public environment/init and plugin hooks;
+keep those regression tests when upgrading Vite.
 `onApplicationShutdown` closes shared/accounts roots after transport disposal.
 These methods are idempotent; aliases have no competing disposal responsibility.
 Nest 12 reports hook exceptions and continues its remaining shutdown phases.

@@ -2,6 +2,7 @@ import type { SessionUser } from '../shared/auth-contracts.ts'
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { resolve } from 'node:path'
+import { DevelopmentVite } from './development-vite.ts'
 import { apiController } from './http-controller.ts'
 import { applicationRequestHandler } from './request-handler.ts'
 import type { RoutedHttpHandler } from './request-handler.ts'
@@ -83,19 +84,9 @@ export async function startLegacyTransport(
     }
     webHandler = staticWebHandler(configuration.staticRoot)
   } else {
-    const { createServer: createViteServer } = await import('vite')
-    const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: { server } },
-      appType: 'spa',
-    })
-    closeWeb = async () => {
-      try {
-        await vite.close()
-      } finally {
-        // Vite closes its watcher in parallel with hooks; a finishing hook can add/reopen it.
-        await vite.watcher.close()
-      }
-    }
+    const development = new DevelopmentVite()
+    closeWeb = () => development.close()
+    const vite = await development.initialize(server)
     webHandler = developmentWebHandler((request, response) => vite.middlewares(request, response))
   }
   await new Promise<void>((done, reject) => {
