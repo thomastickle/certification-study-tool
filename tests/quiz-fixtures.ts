@@ -2,8 +2,12 @@ import { LibraryRepository } from '../src/server/questions/library-repository.ts
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { bank } from './fixtures.ts'
 
-export function populate(repository: LibraryRepository, questionsPerDomain = 12) {
-  const input = bank('quiz-synthetic')
+export function populate(
+  repository: LibraryRepository,
+  questionsPerDomain = 12,
+  sourceKey = 'quiz-synthetic',
+) {
+  const input = bank(sourceKey)
   input.certification = { provider: 'AWS', code: 'CLF-C02', name: 'Synthetic CLF-C02' }
   input.questions = []
   for (let domain = 1; domain <= 4; domain++)
