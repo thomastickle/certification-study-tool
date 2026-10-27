@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { fork } from 'node:child_process'
-import { once } from 'node:events'
 import { availableParallelism, cpus, freemem, loadavg, platform, release, totalmem } from 'node:os'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 import type { Bank } from '../src/shared/contracts.ts'
-import type { QuizView } from '../src/shared/quiz-contracts.ts'
+import type { QuizSummary, QuizView } from '../src/shared/quiz-contracts.ts'
 import type { FixtureInfo, Workload } from './foreground-benchmark-worker.ts'
 import { summarize } from './performance-metrics.ts'
+import { benchmarkWorkerLifetime } from './benchmark-worker-lifetime.ts'
 
 const profiles: Record<string, Workload> = {
   small: { owners: 10, histories: 10, questions: 48, backlog: 1 },
@@ -48,11 +48,17 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
       stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
     },
   )
-  const timeout = setTimeout(() => worker.kill(), 180_000)
+  const lifetime = benchmarkWorkerLifetime(worker)
+  let failed = true
 
   /** Fail promptly when the fixture exits instead of waiting forever for IPC. */
   function receive(): Promise<unknown[]> {
     return new Promise((resolve, reject) => {
+      if (worker.exitCode !== null || worker.signalCode !== null) {
+        reject(new Error('Benchmark worker already exited'))
+        return
+      }
+
       const cleanup = () => {
         worker.off('message', message)
         worker.off('exit', exited)
@@ -86,9 +92,10 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
     const fixture = message.ready
 
     /** IPC commands execute sequentially and are never part of HTTP latency samples. */
-    async function command<T = unknown>(name: string): Promise<T> {
+    async function command<T = unknown>(name: string, completedId?: string): Promise<T> {
+      assert.ok(worker.connected, 'Benchmark worker IPC must remain connected')
       const response = receive()
-      worker.send(name)
+      worker.send({ name, completedId })
       const [reply] = (await response) as [{ result: T; error?: string }]
       assert.equal(reply.error, undefined)
       return reply.result
@@ -98,6 +105,7 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
     async function call<T>(path: string, data?: unknown, method = 'POST', actor = 0): Promise<T> {
       const response = await fetch(fixture.origin + path, {
         method,
+        signal: lifetime.signal,
         headers: { 'Content-Type': 'application/json', 'x-synthetic-actor': String(actor) },
         ...(data === undefined ? {} : { body: JSON.stringify(data) }),
       })
@@ -210,16 +218,27 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
         selected,
         repetition,
         phase: 'correctness',
-        result: await command('verify'),
+        result: await command('verify', submitted.id),
       }),
     )
-  } finally {
-    clearTimeout(timeout)
-    if (worker.connected) {
-      worker.disconnect()
+    // Verification requests are outside every measured phase and are not timing samples.
+    const records = await command<{ id: string; deletedBankNames: string[] }[][]>('records')
+    for (const [actor, expected] of records.entries()) {
+      const returned = await call<QuizSummary[]>('/api/quizzes', undefined, 'GET', actor)
+      const actual = returned.map((record) => ({
+        id: record.id,
+        deletedBankNames: [...(record.deletedBankNames ?? [])].sort(),
+      }))
+      assert.deepEqual(
+        actual.sort((a, b) => a.id.localeCompare(b.id)),
+        expected.sort((a, b) => a.id.localeCompare(b.id)),
+      )
     }
-    if (worker.exitCode === null && worker.signalCode === null) {
-      await once(worker, 'exit')
+    failed = false
+  } finally {
+    const exit = await lifetime.stop(failed)
+    if (!failed) {
+      assert.deepEqual(exit, { code: 0, signal: null }, 'Worker must shut down cleanly')
     }
   }
 }

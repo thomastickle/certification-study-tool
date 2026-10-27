@@ -23,9 +23,19 @@ It does not load `.env`, run `main.ts`, contact Keycloak, start Docker, or use t
 application's configured data directory. Files are removed on worker exit and
 connections close after requests and upkeep slices. SIGKILL or a machine crash
 can leave disposable `study-foreground-benchmark-*` directories for manual cleanup.
-The client enforces a three-minute worker limit per repetition; profiles and
-repetition counts are bounded. Do not run timing profiles concurrently with one
-another or intentionally add load to a production host.
+The client starts a 180,000 ms watchdog when each worker launches and retains it
+through setup, HTTP/IPC work, verification and shutdown. At expiry it aborts pending
+client HTTP work and sends SIGTERM, then sends SIGKILL after a 1,000 ms grace if
+the child has not exited. Failure cleanup and parent SIGINT/SIGTERM use the same
+termination escalation immediately. Normal completion disconnects IPC and awaits
+exit with the watchdog still armed. The intended termination-request bound is
+181,000 ms per repetition, plus parent timer scheduling and OS signal/exit latency;
+this is not a hard realtime wall-clock guarantee. Synchronous worker code cannot
+block the independent parent's escalation, but OS stalls or a stalled/killed parent
+can delay or prevent it. Forced kill bypasses exit hooks and may leave synthetic
+files or partially completed cleanup; killing the parent forcibly may also leave
+a worker requiring manual termination. Profiles and repetition counts are bounded.
+Do not run timing profiles concurrently with one another or intentionally add load to a production host.
 
 The server calls the real `apiController` with synthetic pre-established actors,
 opens `PrivateLibraries` per request, and runs `observeRequest` and connection
@@ -49,8 +59,10 @@ Fixture construction uses stable service/repository boundaries.
 
 Other owners each start with ten histories. Each history contains 20 question
 snapshots. Half reference the deleted shared bank and half reference that owner's
-48-question private bank, with distinct namespaced source IDs. Questions use short
-synthetic text and repeated templates, not real question-bank payload sizes or
+48-question private bank, with distinct namespaced source IDs. The current fixture
+uses `shared-original`, `shared-live`, `foreground-import` and actor-specific
+`private-owner-N` source markers so incorrect source attribution is observable.
+Questions use short synthetic text and repeated templates, not real question-bank payload sizes or
 arbitrary large attachments. Each owner also has an overdue active attempt and an
 expired retained deletion. Only one backlog event matches the old shared
 snapshots; the remainder exercise irrelevant-event filtering. The live shared
@@ -123,13 +135,21 @@ No exclusive host, pinned CPU, cold-disk or cache-independent claim is made.
 The fixture asserts every startup owner's cursor, completed/active/deleted counts,
 then checks final account isolation, zero shared histories, private bank ownership,
 new-event cursor progress, deletion indicators and snapshot question/key/options/
-score digests. The original completed evidence survives deletion and replay.
+score digests. Exact original identity sets are checked across startup recovery
+(including the expected expired attempt), deletion and replay, so equal-count
+substitution fails. Every history's deletion-name set must match exactly its
+deleted namespaced sources, including absence of private annotations on the other
+actor. Two additional unmeasured HTTP history reads compare each actor's full
+returned identity/annotation set with its verified private records. The original
+completed evidence survives deletion and replay.
 Every foreground phase asserts a successful status and counts one owned open per
 request with zero connections left active. Submission is checked for its completed
 state and expected score. Automated tests cover these stable result/count
 invariants and deterministic clock-based probe draining; they impose no machine
-latency thresholds. Existing application tests remain the authority for legacy
-ambiguity, authorization and rollback semantics; the benchmark does not replace
+latency thresholds. Real-child lifecycle tests assert SIGKILL escalation for
+synchronous work and shutdown stalls, normal IPC exit, failure cleanup and spawn
+failure; they assert outcomes rather than machine latency. Existing application
+tests remain the authority for legacy ambiguity, authorization and rollback semantics; the benchmark does not replace
 those contracts.
 
 The completed templates are graded through `QuizService` with empty answers
@@ -144,8 +164,14 @@ axes and do not isolate a causal scaling coefficient for each axis.
 
 These nine measurements were captured before integration with PR #79's normalized
 URL context. They retain their original provenance and are not measurements of
-the combined code. Post-integration smoke runs check operation and correctness;
-they do not replace this repeated baseline or establish a performance comparison.
+the combined code. They also used the historical fixture, where both original
+shared/private banks had the common `quiz-synthetic` name. The current fixture's
+distinct source markers and stronger identity/HTTP checks change fixture content
+and verification work. None of the tables below are final-fixture measurements.
+Post-integration and review-correction single-run profile validations check operation
+and correctness; they do not replace this repeated historical baseline or establish
+a performance comparison. Rerun all nine repetitions to publish current-fixture
+performance numbers.
 
 Three sequential repetitions per profile used Node 24.17.0 on Linux 7.0.0-38-generic,
 an Intel Core i5-8265U (advertised 1.60 GHz), eight logical CPUs, 31.1 GiB RAM,
@@ -212,8 +238,8 @@ outside this timing series.
 
 ## Decision and deployment assumptions
 
-Keep the current storage and scheduler architecture in this PR. The measured
-foreground stalls justify a focused optimization follow-up, rather than treating
+Keep the current storage and scheduler architecture in this PR. The historical
+measurements of foreground stalls justify a focused optimization follow-up, rather than treating
 #70's owner yielding as proof of interactive responsiveness. Start with profiling
 and reducing work in quiz creation and due reads: those paths load completed
 snapshots and construct mastery/selection state synchronously. Narrow by the
@@ -224,8 +250,8 @@ boundary, retaining exact namespaced provenance and the explicit legacy ambiguit
 fallback. These are recommendations, not an attribution of all elapsed time to a
 particular SQL query. No query-count or CPU profiler data were collected here.
 
-At the measured 100-history/1,000-question profile, quiz creation already approaches
-or exceeds a **proposed** 500 ms interactive-response budget. At 2,000 histories,
+In the historical fixture, at the measured 100-history/1,000-question profile, quiz
+creation already approaches or exceeds a **proposed** 500 ms interactive-response budget. At 2,000 histories,
 multiple foreground operations and an individual recovery slice exceed a
 **proposed** 100 ms event-loop-gap budget by substantial margins. These are useful
 investigation triggers, not new application SLOs, supported account limits or

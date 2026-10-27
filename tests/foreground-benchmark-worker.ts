@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -13,6 +13,8 @@ import { LibraryRepository } from '../src/server/questions/library-repository.ts
 import { LibraryService } from '../src/server/questions/library-service.ts'
 import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import { StudyHousekeeping } from '../src/server/questions/study-housekeeping.ts'
+import type { LibraryItemId } from '../src/shared/contracts.ts'
+import { assertHistoryEvidence, snapshotDigest } from './benchmark-history-evidence.ts'
 import type { QuizView } from '../src/shared/quiz-contracts.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { populate } from './quiz-fixtures.ts'
@@ -82,17 +84,19 @@ function emptyAnswers(quiz: QuizView) {
 }
 
 // Reuse the scheduler benchmark's real 20-question snapshot and per-owner files.
-populate(shared, config.questions / 4)
+populate(shared, config.questions / 4, 'shared-original')
 const sharedService = new QuizService(shared, Date.now, () => 0.5)
 const sharedQuiz = sharedService.start({ sourceFilter: 'mixed', questionType: 'mixed' })
 const activeTemplate = shared.quizStore().find(sharedQuiz.id)!
 sharedService.submit(sharedQuiz.id, { answers: emptyAnswers(sharedQuiz) })
 const sharedTemplate = shared.quizStore().find(sharedQuiz.id)!
 shared.quizStore().remove(sharedQuiz.id)
+const seededSnapshots = new Map<string, Map<string, string>>()
+const overdueIds = new Map<string, string>()
 for (const [index, id] of owners.entries()) {
   const personal = libraries.open(id)
   try {
-    populate(personal)
+    populate(personal, 12, `private-owner-${index}`)
     const study = shared.forAccount(id, personal)
     const personalService = new QuizService(study, Date.now, () => 0.5)
     const ownQuiz = personalService.start({
@@ -133,6 +137,16 @@ for (const [index, id] of owners.entries()) {
     })
     assert.equal(personal.quizStore().active().length, 1)
     assert.equal(personal.quizStore().deleted().length, 1)
+    seededSnapshots.set(
+      id,
+      new Map(
+        personal
+          .quizStore()
+          .completed()
+          .map((quiz) => [quiz.id, snapshotDigest(quiz)]),
+      ),
+    )
+    overdueIds.set(id, personal.quizStore().active()[0]!.id)
   } finally {
     personal.close()
   }
@@ -145,7 +159,7 @@ for (let index = 1; index < config.backlog; index++) {
   new LibraryService(shared).deleteSource(shared.sources()[0]!.id)
 }
 // Restore a live bank for foreground quiz creation and shared deletion.
-const liveBank = populate(shared, config.questions / 4)
+const liveBank = populate(shared, config.questions / 4, 'shared-live')
 const sharedSource = shared.sources()[0]!.id as number
 
 /** Match the request-owned connection/cleanup boundary used by main, bypassing OIDC only. */
@@ -185,6 +199,7 @@ async function maintenance() {
   return { elapsedMs, opens: opens - before, timerDelay, activeConnections }
 }
 
+const originalSnapshots = new Map<string, Map<string, string>>()
 const startup = await maintenance()
 assert.equal(startup.opens, config.owners)
 for (const [index, id] of owners.entries()) {
@@ -194,32 +209,16 @@ for (const [index, id] of owners.entries()) {
     assert.equal(personal.quizStore().active().length, 0)
     assert.equal(personal.quizStore().deleted().length, 0)
     assert.equal(personal.quizStore().completed().length, (index === 0 ? config.histories : 10) + 1)
-    assert.ok(
-      personal
-        .quizStore()
-        .completed()
-        .some((quiz) => quiz.deletedBankNames?.includes('quiz-synthetic')),
-    )
+    const histories = personal.quizStore().completed()
+    const originals = new Map(histories.map((quiz) => [quiz.id, snapshotDigest(quiz)]))
+    assertHistoryEvidence(histories, seededSnapshots.get(id)!, new Map([[1, 'shared-original']]), [
+      overdueIds.get(id)!,
+    ])
+    originalSnapshots.set(id, originals)
   } finally {
     personal.close()
   }
 }
-const originalSnapshots = new Map<string, string>()
-const targetLibrary = libraries.open(target)
-for (const quiz of targetLibrary.quizStore().completed()) {
-  originalSnapshots.set(quiz.id, snapshotDigest(quiz))
-}
-targetLibrary.close()
-
-/** Compare saved evidence independently of deletion indicators. */
-function snapshotDigest(
-  quiz: import('../src/server/quizzes/quiz-repository.ts').StoredQuiz,
-): string {
-  return createHash('sha256')
-    .update(JSON.stringify([quiz.questions, quiz.keys, quiz.options, quiz.correctCount]))
-    .digest('hex')
-}
-
 await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
 const address = server.address()
 assert.ok(address && typeof address !== 'string')
@@ -228,7 +227,7 @@ process.send!({
 })
 
 /** Keep control/setup outside the regions sampled by the independent HTTP client. */
-async function command(name: string) {
+async function command(name: string, completedId?: string) {
   if (name === 'begin') {
     durations = []
     observedOpens = opens
@@ -274,6 +273,22 @@ async function command(name: string) {
     monotonic += 5000
     return maintenance()
   }
+  if (name === 'records') {
+    return owners.slice(0, 2).map((id) => {
+      const personal = libraries.open(id)
+      try {
+        return personal
+          .quizStore()
+          .completed()
+          .map((quiz) => ({
+            id: quiz.id,
+            deletedBankNames: [...(quiz.deletedBankNames ?? [])].sort(),
+          }))
+      } finally {
+        personal.close()
+      }
+    })
+  }
   if (name === 'verify') {
     const personal = libraries.open(target)
     const other = libraries.open(owners[1]!)
@@ -281,26 +296,26 @@ async function command(name: string) {
       const histories = personal.quizStore().completed()
       assert.equal(personal.sharedDeletionCursor(), config.backlog + 1)
       assert.equal(histories.length, config.histories + 2)
-      assert.ok(histories.some((quiz) => quiz.deletedBankNames?.includes('quiz-synthetic')))
-      assert.ok(
-        histories.some((quiz) => quiz.deletedBankNames?.includes('foreground-import')) === false,
+      assert.ok(completedId)
+      const deleted = new Map<LibraryItemId, string>([
+        [1, 'shared-original'],
+        [sharedSource, 'shared-live'],
+        ['private:1', 'private-owner-0'],
+      ])
+      assertHistoryEvidence(histories, originalSnapshots.get(target)!, deleted, [completedId])
+      assertHistoryEvidence(
+        other.quizStore().completed(),
+        originalSnapshots.get(owners[1]!)!,
+        new Map([
+          [1, 'shared-original'],
+          [sharedSource, 'shared-live'],
+        ]),
       )
       assert.equal(other.sources().length, 1)
-      assert.equal(other.quizStore().completed().length, 11)
+      assert.equal(other.sources()[0]!.name, 'private-owner-1')
       assert.equal(shared.quizStore().completed().length, 0)
-      // Snapshot questions, keys and scores survive deletion/reconciliation.
       assert.ok(histories.every((quiz) => quiz.questions.length === 20 && quiz.keys.length === 20))
       assert.ok(histories.every((quiz) => quiz.correctCount !== null))
-      for (const quiz of histories) {
-        if (originalSnapshots.has(quiz.id)) {
-          assert.equal(snapshotDigest(quiz), originalSnapshots.get(quiz.id))
-        }
-      }
-      assert.ok(
-        histories
-          .filter((quiz) => quiz.questions.some((question) => question.sourceId === 'private:1'))
-          .every((quiz) => quiz.deletedBankNames?.includes('quiz-synthetic')),
-      )
       return {
         histories: histories.length,
         otherHistories: 11,
@@ -315,8 +330,8 @@ async function command(name: string) {
   throw new Error('Unknown benchmark command')
 }
 
-process.on('message', (name: string) => {
-  command(name)
+process.on('message', (message: { name: string; completedId?: string }) => {
+  command(message.name, message.completedId)
     .then((result) => process.send!({ result }))
     .catch((error: unknown) => {
       process.send!({ error: String(error) })
