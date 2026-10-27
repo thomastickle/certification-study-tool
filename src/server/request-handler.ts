@@ -1,13 +1,20 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ApplicationAuthentication } from './auth/application-authentication.ts'
+import type { RequestUrl } from './request-url.ts'
 import type { SessionUser } from '../shared/auth-contracts.ts'
 
 type HttpHandler = (request: IncomingMessage, response: ServerResponse) => void | Promise<void>
 
+export type RoutedHttpHandler = (
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: RequestUrl,
+) => void | Promise<void>
+
 export type ApplicationHandlers = {
   authentication: Pick<ApplicationAuthentication, 'handle'>
-  study: (user: SessionUser) => HttpHandler
-  web: HttpHandler
+  study: (user: SessionUser) => RoutedHttpHandler
+  web: RoutedHttpHandler
 }
 
 /** Use the authenticated route/actor and contain failures before Node discards the handler promise. */
@@ -20,10 +27,10 @@ export function applicationRequestHandler(handlers: ApplicationHandlers): HttpHa
       }
       if (context.route === 'study') {
         const api = handlers.study(context.user)
-        await api(request, response)
+        await api(request, response, context.url)
         return
       }
-      await handlers.web(request, response)
+      await handlers.web(request, response, context.url)
     } catch {
       console.error('An HTTP request could not be completed.')
       if (response.destroyed || response.writableEnded) {

@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { bank } from './fixtures.ts'
 
 test('HTTP supports preview, confirm, browse and scoped deletion while denying cross-site writes', async () => {
   const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')
@@ -79,7 +79,7 @@ for (const mode of ['quiz', 'exam'] as const) {
     const { populate } = await import('./quiz-fixtures.ts')
     const repository = new LibraryRepository(':memory:')
     populate(repository, 24)
-    const server = createServer(apiController(repository, { id: 'local', role: 'admin' }))
+    const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const address = server.address()
     assert.ok(address && typeof address !== 'string')

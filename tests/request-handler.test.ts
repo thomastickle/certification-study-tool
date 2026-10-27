@@ -4,6 +4,7 @@ import { setImmediate } from 'node:timers/promises'
 import { test } from 'node:test'
 import { applicationRequestHandler } from '../src/server/request-handler.ts'
 import type { ApplicationHandlers } from '../src/server/request-handler.ts'
+import { requestUrl } from '../src/server/request-url.ts'
 import { closeServer } from './oidc-fixture.ts'
 
 for (const failure of ['authentication', 'controller construction', 'study', 'web'] as const) {
@@ -12,15 +13,19 @@ for (const failure of ['authentication', 'controller construction', 'study', 'we
       authentication: {
         handle: async (request) => {
           if (request.url === '/healthy') {
-            return { route: 'public' }
+            return { route: 'public', url: requestUrl(new URL(request.url!, 'http://localhost')) }
           }
           if (failure === 'authentication') {
             throw new Error('Sensitive authentication failure detail')
           }
           if (failure === 'web') {
-            return { route: 'public' }
+            return { route: 'public', url: requestUrl(new URL(request.url!, 'http://localhost')) }
           }
-          return { route: 'study', user: { id: 'alice', name: 'Alice', role: 'student' } }
+          return {
+            route: 'study',
+            user: { id: 'alice', name: 'Alice', role: 'student' },
+            url: requestUrl(new URL(request.url!, 'http://localhost')),
+          }
         },
       },
       study: () => {
@@ -63,7 +68,12 @@ for (const failure of ['authentication', 'controller construction', 'study', 'we
 for (const state of ['partial', 'ended'] as const) {
   test(`a late failure preserves a ${state} response without breaking later requests`, async () => {
     const handlers: ApplicationHandlers = {
-      authentication: { handle: async () => ({ route: 'public' }) },
+      authentication: {
+        handle: async (request) => ({
+          route: 'public',
+          url: requestUrl(new URL(request.url!, 'http://localhost')),
+        }),
+      },
       study: () => {
         throw new Error('Public requests must never construct a study controller')
       },

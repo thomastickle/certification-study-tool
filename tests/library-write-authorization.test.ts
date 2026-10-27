@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { apiController } from '../src/server/http-controller.ts'
+import { apiTestHandler } from './support/api-test-handler.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { ConceptService } from '../src/server/concepts/concept-service.ts'
@@ -27,7 +27,7 @@ async function fixture(role: 'admin' | 'student', prefix: string) {
   const candidate = concepts.suggestions()[0]!
   const group = concepts.save({ ...candidate, name: 'Existing review' })
   const server = createServer(
-    apiController(shared, { id: 'alice', role }, undefined, undefined, privateLibrary),
+    apiTestHandler(shared, { id: 'alice', role }, undefined, undefined, privateLibrary),
   )
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()

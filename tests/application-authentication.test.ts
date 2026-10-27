@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
-import { createServer } from 'node:http'
+import { createServer, request as httpRequest } from 'node:http'
+import type { IncomingMessage } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import type { AuthenticationResult } from '../src/server/auth/application-authentication.ts'
 import { ApplicationAuthentication } from '../src/server/auth/application-authentication.ts'
 import { apiController } from '../src/server/http-controller.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -18,7 +20,10 @@ import type { ApplicationHandlers } from '../src/server/request-handler.ts'
 import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 
 /** Exercise verified identities and role checks in front of the shared-content/private-study API. */
-async function fixture(issuerPath = '/realms/test') {
+async function fixture(
+  issuerPath = '/realms/test',
+  afterAuthentication?: (request: IncomingMessage, context: AuthenticationResult) => void,
+) {
   const administrators = new Set(['alice', 'charlie'])
   const provider = await oidcFixture(issuerPath, (subject) => ({
     study_roles: administrators.has(subject) ? ['admin'] : [],
@@ -38,11 +43,17 @@ async function fixture(issuerPath = '/realms/test') {
   let now = Date.now()
   const previews = new ImportPreviews(() => now)
   const handlers: ApplicationHandlers = {
-    authentication: { handle: (request, response) => authentication.handle(request, response) },
-    study: (user) => async (request, response) => {
+    authentication: {
+      handle: async (request, response) => {
+        const context = await authentication.handle(request, response)
+        afterAuthentication?.(request, context)
+        return context
+      },
+    },
+    study: (user) => async (request, response, url) => {
       const privateLibrary = privateLibraries.open(user.id)
       try {
-        await apiController(library, user, origin, previews, privateLibrary)(request, response)
+        await apiController(library, user, origin, previews, privateLibrary)(request, response, url)
       } finally {
         privateLibrary.close()
       }
@@ -112,6 +123,26 @@ async function fixture(issuerPath = '/realms/test') {
 
   return {
     call,
+    rawCall: (path: string, cookie = '', account = accounts.get(cookie) ?? '') =>
+      new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const request = httpRequest(
+          origin,
+          {
+            path,
+            headers: { Cookie: cookie, 'X-Study-Account': account },
+          },
+          (response) => {
+            let body = ''
+            response.setEncoding('utf8')
+            response.on('data', (chunk) => {
+              body += chunk
+            })
+            response.on('end', () => resolve({ status: response.statusCode!, body }))
+          },
+        )
+        request.on('error', reject)
+        request.end()
+      }),
     json,
     login,
     authorize,
@@ -486,6 +517,63 @@ test('provider validation failure clears transaction cookies and exposes no toke
         (cookie) => cookie.includes('Path=/auth/callback;') && cookie.includes('Max-Age=0'),
       ),
     )
+  } finally {
+    await app.close()
+  }
+})
+
+test('validated context preserves query and namespace while downstream ignores a changed raw target', async () => {
+  const admitted: AuthenticationResult[] = []
+  const app = await fixture('/realms/test', (request, context) => {
+    if (context.route === 'study') {
+      admitted.push(context)
+      request.url = '/public-shell?provider=wrong'
+    }
+  })
+  try {
+    const alice = await app.login('alice')
+    for (const prefix of ['', '/shared', '/private']) {
+      const target = `/api${prefix}/questions?search=Synthetic+owner&page=1&search=missing`
+      const response = await app.rawCall(target, alice.cookie)
+      assert.equal(response.status, 200)
+      assert.equal(JSON.parse(response.body).total, prefix === '/private' ? 0 : 20)
+      const context = admitted.at(-1)!
+      assert.ok(context.route === 'study')
+      assert.deepEqual(context.url, {
+        pathname: `/api${prefix}/questions`,
+        search: '?search=Synthetic+owner&page=1&search=missing',
+      })
+      assert.equal(Object.isFrozen(context.url), true)
+    }
+  } finally {
+    await app.close()
+  }
+})
+
+test('raw normalized request targets retain authentication, workspace and query outcomes', async () => {
+  const app = await fixture()
+  try {
+    const alice = await app.login('alice')
+    for (const target of [
+      '/public/../api/shared/questions?search=missing',
+      '/public/%2e%2e/api/shared/questions?search=missing',
+      '/api/private/%2e%2e/shared/questions?search=missing',
+      `${app.origin.origin}/api/shared/questions?search=missing`,
+    ]) {
+      assert.equal((await app.rawCall(target)).status, 401)
+      assert.equal((await app.rawCall(target, alice.cookie, 'stale')).status, 409)
+      const response = await app.rawCall(target, alice.cookie)
+      assert.equal(response.status, 200)
+      assert.equal(JSON.parse(response.body).total, 0)
+    }
+    assert.equal(
+      (await app.rawCall('http://foreign.example/api/questions', alice.cookie)).status,
+      403,
+    )
+    assert.equal((await app.rawCall('http://[malformed')).status, 500)
+    assert.equal((await app.rawCall('/api/health')).status, 200)
+    app.advance(8 * 60 * 60_000)
+    assert.equal((await app.rawCall('/public/%2e%2e/api/questions', alice.cookie)).status, 401)
   } finally {
     await app.close()
   }

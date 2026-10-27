@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { RequestUrl } from './request-url.ts'
 import { ConceptService } from './concepts/concept-service.ts'
 import { conceptRoute } from './concepts/concept-routes.ts'
 import { ReportService } from './reports/report-service.ts'
@@ -94,15 +95,22 @@ export function apiController(
   const quizzes = new QuizService(personal)
   const reports = new ReportService(personal)
   const home = new HomeService(personal)
-  return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+  return async (
+    request: IncomingMessage,
+    response: ServerResponse,
+    context: RequestUrl,
+  ): Promise<void> => {
     try {
       checkLocalRequest(request, origin)
       combined?.synchronizeDeletions()
-      const url = new URL(request.url ?? '/', 'http://localhost')
-      const prefix = url.pathname.match(/^\/api\/(shared|private)\//)
+      const prefix = context.pathname.match(/^\/api\/(shared|private)\//)
+      // Prefix routing and query parsing belong to this consumer, never the admitted snapshot.
+      const url = {
+        pathname: prefix ? '/api/' + context.pathname.slice(prefix[0].length) : context.pathname,
+        searchParams: new URLSearchParams(context.search),
+      }
       const visibility = prefix?.[1] === 'private' ? 'private' : 'shared'
       if (prefix) {
-        url.pathname = '/api/' + url.pathname.slice(prefix[0].length)
         if (
           !/^\/api\/(imports|questions|sources|concepts|concept-suggestions)(\/|$)/.test(
             url.pathname,

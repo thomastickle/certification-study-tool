@@ -1,13 +1,15 @@
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { mkdirSync, chmodSync, existsSync, statSync, createReadStream } from 'node:fs'
-import { resolve, dirname, extname, sep } from 'node:path'
+import { mkdirSync, chmodSync, existsSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
 import { apiController } from './http-controller.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import { ApplicationAuthentication } from './auth/application-authentication.ts'
 import { ImportPreviews } from './importer/import-previews.ts'
 import { applicationRequestHandler } from './request-handler.ts'
-import type { ApplicationHandlers } from './request-handler.ts'
+import { staticWebHandler, developmentWebHandler } from './web-handler.ts'
+import type { RequestUrl } from './request-url.ts'
+import type { RoutedHttpHandler, ApplicationHandlers } from './request-handler.ts'
 import type { SessionUser } from '../shared/auth-contracts.ts'
 import { PrivateLibraries } from './questions/private-libraries.ts'
 import { StudyHousekeeping } from './questions/study-housekeeping.ts'
@@ -59,24 +61,26 @@ try {
 const expiryTimer = setInterval(() => housekeeping.tick(), 1000)
 expiryTimer.unref()
 const production = process.env.NODE_ENV === 'production'
-let webHandler: (
-  request: import('node:http').IncomingMessage,
-  response: import('node:http').ServerResponse,
-) => void
+let webHandler: RoutedHttpHandler
 const handlers: ApplicationHandlers = {
   authentication,
-  study: (user) => (request, response) => serveStudy(user, request, response),
-  web: (request, response) => webHandler(request, response),
+  study: (user) => (request, response, url) => serveStudy(user, request, response, url),
+  web: (request, response, url) => webHandler(request, response, url),
 }
 
 const server = createServer(applicationRequestHandler(handlers))
 
 /** Keep a private connection alive through its request, including body reads and failure cleanup. */
-async function serveStudy(user: SessionUser, request: IncomingMessage, response: ServerResponse) {
+async function serveStudy(
+  user: SessionUser,
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: RequestUrl,
+) {
   const privateLibrary = privateLibraries.open(user.id)
   try {
     const api = apiController(repository, user, origin, previews, privateLibrary)
-    await api(request, response)
+    await api(request, response, url)
   } finally {
     housekeeping.observeRequest(request.method, user.id, privateLibrary)
     privateLibrary.close()
@@ -91,44 +95,13 @@ if (!production) {
     server: { middlewareMode: true, hmr: { server } },
     appType: 'spa',
   })
-  webHandler = (request, response) => vite.middlewares(request, response)
+  webHandler = developmentWebHandler((request, response) => vite.middlewares(request, response))
   closeWeb = () => vite.close()
 } else {
   const root = resolve('dist')
   if (!existsSync(resolve(root, 'index.html')))
     throw new Error('Run npm run build before starting production mode.')
-  webHandler = (request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      response.writeHead(405)
-      response.end()
-      return
-    }
-    try {
-      const pathname = decodeURIComponent(new URL(request.url ?? '/', 'http://localhost').pathname)
-      let file = resolve(root, '.' + pathname)
-      if (!file.startsWith(root + sep) && file !== root) throw new Error()
-      if (file === root) file = resolve(root, 'index.html')
-      if (!existsSync(file) && !extname(file)) file = resolve(root, 'index.html')
-      if (!statSync(file).isFile()) throw new Error()
-      const types: Record<string, string> = {
-        '.html': 'text/html',
-        '.js': 'text/javascript',
-        '.css': 'text/css',
-        '.svg': 'image/svg+xml',
-        '.ico': 'image/x-icon',
-      }
-      response.writeHead(200, {
-        'Content-Type': types[extname(file)] ?? 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': 'no-cache',
-      })
-      if (request.method === 'HEAD') response.end()
-      else createReadStream(file).pipe(response)
-    } catch {
-      response.writeHead(404)
-      response.end('Not found.')
-    }
-  }
+  webHandler = staticWebHandler(root)
 }
 server.listen(port, host, () => console.log(`Certification Study Tool: ${origin.origin}`))
 
