@@ -43,7 +43,7 @@ docker compose up --build -d --wait
 
 The image contains no seeded users or passwords. Keep the Keycloak volume:
 recreating users can change their subjects. Native development can use
-`node --env-file=.env --watch src/server/main.ts` with Keycloak running.
+`npm run dev` with Keycloak running.
 The development client permits exact callbacks at ports 3000 and 3100; a native
 server on port 3100 needs matching `STUDY_PORT` and `STUDY_ORIGIN` settings.
 

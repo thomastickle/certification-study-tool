@@ -79,7 +79,7 @@ for (const damage of ['corrupt', 'foreign-owner'] as const) {
       STUDY_PRIVATE_LIBRARIES_DIR: usersPath,
       STUDY_LEGACY_OWNER_SUBJECT: '',
     }
-    const child = spawn(process.execPath, ['src/server/main.ts'], {
+    const child = spawn(process.execPath, ['build/src/server/main.js'], {
       env: environment,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -196,7 +196,7 @@ test('actual startup still refuses a damaged destination with pending shared stu
   libraries.open(account.id).close()
   const damagedPath = join(usersPath, `${account.id}.sqlite3`)
   writeFileSync(damagedPath, 'Synthetic corrupt destination')
-  const child = spawn(process.execPath, ['src/server/main.ts'], {
+  const child = spawn(process.execPath, ['build/src/server/main.js'], {
     env: {
       ...process.env,
       NODE_ENV: 'development',

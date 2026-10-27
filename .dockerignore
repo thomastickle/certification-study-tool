@@ -3,7 +3,10 @@
 !package.json
 !package-lock.json
 !tsconfig.json
+!tsconfig.server.json
 !vite.config.ts
+!scripts/
+!scripts/build-server.ts
 !src/
 !src/**
 !docs/

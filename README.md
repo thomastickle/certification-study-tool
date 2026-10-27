@@ -24,13 +24,13 @@ Each user has a separate database for private banks and study history.
 
 ```sh
 npm ci
-node --env-file=.env --watch src/server/main.ts
+npm run dev
 ```
 
 Open **http://127.0.0.1:3000**. Frontend changes reload through Vite; changes to
 backend code, shared types, or the schema restart the local server.
 
-For a built frontend without the development server:
+For a compiled server and built frontend without the development server:
 
 ```sh
 npm run build
@@ -139,12 +139,36 @@ scripts. npm installs the platform binary; no Go SDK is needed. Following
 [Microsoft's side-by-side setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0),
 `@typescript/native` aliases `typescript@7.0.2` and supplies `tsc`, while
 `typescript` aliases `@typescript/typescript6@6.0.2` for ESLint's JavaScript API
-(its separate compiler is `tsc6`). The typecheck script explicitly selects the
+and decorator-capable server emit (its separate compiler is `tsc6`). The typecheck script explicitly selects the
 native launcher to avoid competing transitive `tsc` binaries. Keep both aliases:
 TypeScript 7 has no JavaScript API. `npm run typecheck -- --version` verifies the
 default compiler, and `npm test`
 checks compiler error detection and ESLint's TypeScript rules. Vite's client types
 declare frontend asset imports in `src/web/vite-env.d.ts`.
+
+`npm run build:server` uses TypeScript 6 with `tsconfig.server.json` to emit ESM
+into `build/`, rewriting relative `.ts` imports to `.js` and copying the validation
+schema to `build/docs/`. Vite still writes only to `dist/`. `npm start` runs
+`build/src/server/main.js`; build first, and set `NODE_ENV=production` for static
+frontend delivery. Docker packages the compiled code, schema, frontend, and
+production dependencies without requiring a compiler at runtime. Existing CLI
+commands continue to run native TypeScript without decorators.
+
+`npm run dev` rebuilds the server before starting it and restarts on backend,
+shared, schema, build-script, or TypeScript configuration changes. Vite handles
+frontend HMR. `npm test` builds first, retains native TypeScript/Node tests and the
+SVG loader, then runs `tests/compiled/**/*.spec.ts` from emitted JavaScript. Put
+tests that import decorated application modules in that compiled suite; use
+relative `.ts` imports throughout it so both tests and providers share one emitted
+module graph. Do not import decorated modules into native TypeScript tests.
+
+The Nest conversion is intermediate: `ApplicationModule` and `createApplication`
+provide an Express application with an injected health controller, exercised over
+real loopback HTTP. Global body parsing is disabled so future authorization can
+precede streaming reads. Production still uses the complete existing router;
+resource ownership, authentication/guards, feature controllers, and atomic routing
+cutover remain for later stages of the [conversion plan](docs/nest-conversion-plan.md).
+The foundation health endpoint alone is not a production replacement.
 
 ## Curated CLF-C02 batch import
 
