@@ -10,7 +10,7 @@ export function completedEvidence(quiz: StoredQuiz, index: number): MasteryEvide
 }
 
 /** Keep scoring validation separate so a history pass can reuse the validated identity. */
-function evidenceWithIdentity(
+export function evidenceWithIdentity(
   quiz: StoredQuiz,
   index: number,
   identity: string | null,

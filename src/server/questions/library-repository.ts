@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { ConceptRepository } from '../concepts/concept-repository.ts'
 import { QuizRepository } from '../quizzes/quiz-repository.ts'
+import { evidenceSavepoint, saveStudyEvidence } from '../quizzes/study-evidence.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 import { CertificationRepository } from '../home/certification-repository.ts'
 import type {
@@ -127,14 +128,25 @@ export class LibraryView {
 
   /** Annotate shared-bank provenance across accounts without returning personal snapshots to callers. */
   annotateSnapshots(annotate: (quiz: StoredQuiz) => boolean): void {
-    const records = this.db.prepare('SELECT account_id, id, data FROM quiz_sessions').all()
+    const records = this.db.prepare('SELECT account_id, id, status, data FROM quiz_sessions').all()
     const update = this.db.prepare(
       'UPDATE quiz_sessions SET data = ? WHERE account_id = ? AND id = ?',
     )
     for (const record of records) {
       const quiz: StoredQuiz = JSON.parse(String(record.data))
       if (annotate(quiz)) {
-        update.run(JSON.stringify(quiz), record.account_id!, record.id!)
+        const data = JSON.stringify(quiz)
+        evidenceSavepoint(this.db, () => {
+          update.run(data, record.account_id!, record.id!)
+          if (record.status === 'completed') {
+            saveStudyEvidence(
+              this.db,
+              String(record.account_id),
+              JSON.parse(data),
+              String(record.id),
+            )
+          }
+        })
       }
     }
   }

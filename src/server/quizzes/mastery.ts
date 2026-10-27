@@ -24,14 +24,16 @@ export type MasteryState = {
   retentionPassed: number
 }
 
-/** Calendar date in the learner's agreed study timezone. */
+const studyDateFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/New_York',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+/** Calendar date in the learner's agreed study timezone, using the fixed immutable formatter. */
 export function studyDay(at: number): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at)
+  return studyDateFormat.format(at)
 }
 
 /** Add calendar days without treating a DST study day as 24 elapsed hours. */
@@ -45,6 +47,7 @@ function later(day: string, days: number): string {
 export function replayMastery(events: MasteryEvidence[]): Map<string, MasteryState> {
   const states = new Map<string, MasteryState>()
   const seen = new Set<string>()
+  const days = new Map<number, string>()
   for (const event of [...events].sort(
     (a, b) => a.at - b.at || a.attemptId.localeCompare(b.attemptId),
   )) {
@@ -71,7 +74,11 @@ export function replayMastery(events: MasteryEvidence[]): Map<string, MasterySta
     if (event.unknown || !event.answered) {
       continue
     }
-    const day = studyDay(event.at)
+    let day = days.get(event.at)
+    if (day === undefined) {
+      day = studyDay(event.at)
+      days.set(event.at, day)
+    }
     if (!event.correct) {
       let required = 3
       if (event.confidence === 'Unsure') {

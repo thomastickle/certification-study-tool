@@ -83,7 +83,7 @@ test('one saved-content validation supplies mastery and recency, including incom
   }
 })
 
-test('quiz and review starts load each library and history once per request', () => {
+test('quiz and review starts load each library once and use persisted history', () => {
   const repository = new LibraryRepository(':memory:')
   try {
     populate(repository)
@@ -128,7 +128,7 @@ test('quiz and review starts load each library and history once per request', ()
       assert.equal(service.start({ ...options, mode }).questions.length, 20)
       assert.deepEqual(
         { histories, questions, sources },
-        { histories: 1, questions: 1, sources: 1 },
+        { histories: 0, questions: 1, sources: 1 },
       )
     }
   } finally {
