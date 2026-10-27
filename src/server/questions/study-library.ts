@@ -1,7 +1,6 @@
 import type { LibraryView, QuestionRecord } from './library-repository.ts'
 import type { Source } from '../../shared/contracts.ts'
 import { privateItemId } from '../../shared/library-identity.ts'
-import { sameCertification } from '../quizzes/certification-scope.ts'
 
 export type StudyRepository = Pick<
   LibraryView,
@@ -67,20 +66,7 @@ export class StudyLibrary implements StudyRepository {
       if (!events.length) {
         return
       }
-      this.personal.annotateSnapshots((quiz) => {
-        const names = events
-          .filter(
-            (event) =>
-              sameCertification(quiz.options, event) &&
-              quiz.questions.some((question) => question.sourceId === event.sourceId),
-          )
-          .map((event) => event.name)
-        if (!names.length) {
-          return false
-        }
-        quiz.deletedBankNames = [...new Set([...(quiz.deletedBankNames ?? []), ...names])]
-        return true
-      })
+      this.personal.annotateDeletedBanks(events)
       this.personal.saveSharedDeletionCursor(events.at(-1)!.sequence)
     })
   }

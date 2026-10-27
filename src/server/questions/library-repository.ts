@@ -1,7 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite'
 import { ConceptRepository } from '../concepts/concept-repository.ts'
 import { QuizRepository } from '../quizzes/quiz-repository.ts'
-import { evidenceSavepoint, saveStudyEvidence } from '../quizzes/study-evidence.ts'
+import {
+  evidenceSavepoint,
+  saveStudyEvidence,
+  retainStudyEvidence,
+} from '../quizzes/study-evidence.ts'
+import { pinLegacySources } from './bank-provenance.ts'
+import { sameCertification } from '../quizzes/certification-scope.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 import { CertificationRepository } from '../home/certification-repository.ts'
 import type {
@@ -32,6 +38,16 @@ export type QuestionRecord = Omit<StoredQuestion, 'id' | 'sourceId'> & {
 type LocalQuestionRecord = QuestionRecord & { id: number; sourceId: number }
 
 type LocalSource = Source & { id: number }
+
+type DeletedBank = Pick<Source, 'name' | 'provider' | 'certification'> & {
+  sourceId: LibraryItemId
+}
+
+type LegacyBankDeletion = {
+  sources: LocalSource[]
+  questions: LocalQuestionRecord[]
+  source: LocalSource
+}
 
 type LibraryConnection = { db: DatabaseSync; transactionDepth: number; privateOwnerId?: string }
 
@@ -128,6 +144,32 @@ export class LibraryView {
 
   /** Annotate shared-bank provenance across accounts without returning personal snapshots to callers. */
   annotateSnapshots(annotate: (quiz: StoredQuiz) => boolean): void {
+    this.updateSnapshots(annotate, false)
+  }
+
+  /** Only this owned mutation may reuse evidence: source IDs and labels are not extraction inputs. */
+  annotateDeletedBanks(events: DeletedBank[], legacy?: LegacyBankDeletion): void {
+    this.updateSnapshots((quiz) => {
+      const resolvedLegacy =
+        legacy && sameCertification(quiz.options, legacy.source)
+          ? pinLegacySources(quiz, legacy.sources, legacy.questions, legacy.source)
+          : false
+      const names = events
+        .filter(
+          (event) =>
+            sameCertification(quiz.options, event) &&
+            quiz.questions.some((question) => question.sourceId === event.sourceId),
+        )
+        .map((event) => event.name)
+      if (names.length) {
+        quiz.deletedBankNames = [...new Set([...(quiz.deletedBankNames ?? []), ...names])]
+      }
+      return resolvedLegacy || names.length > 0
+    }, true)
+  }
+
+  /** Generic callbacks always rebuild; only the repository-owned provenance mutation can retain. */
+  private updateSnapshots(annotate: (quiz: StoredQuiz) => boolean, provenanceOnly: boolean): void {
     const records = this.db.prepare('SELECT account_id, id, status, data FROM quiz_sessions').all()
     const update = this.db.prepare(
       'UPDATE quiz_sessions SET data = ? WHERE account_id = ? AND id = ?',
@@ -137,8 +179,12 @@ export class LibraryView {
       if (annotate(quiz)) {
         const data = JSON.stringify(quiz)
         evidenceSavepoint(this.db, () => {
+          const restore =
+            provenanceOnly && record.status === 'completed'
+              ? retainStudyEvidence(this.db, String(record.account_id), String(record.id))
+              : undefined
           update.run(data, record.account_id!, record.id!)
-          if (record.status === 'completed') {
+          if (record.status === 'completed' && !restore?.()) {
             saveStudyEvidence(
               this.db,
               String(record.account_id),

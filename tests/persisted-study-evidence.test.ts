@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { LibraryService } from '../src/server/questions/library-service.ts'
 import { test } from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -443,5 +445,263 @@ test('answered diverse fixture preserves large due sets and unavailable obligati
     assert.deepEqual(service.due(options), { ...due, eligible: 0, unavailable: due.total })
   } finally {
     repository.close()
+  }
+})
+
+test('production provenance annotation retains valid evidence without hashing saved content', (t) => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    populate(repository)
+    const quiz = completed(repository)
+    const history = repository.quizStore().studyHistory()
+    const hashUpdates = t.mock.method(
+      Object.getPrototypeOf(createHash('sha256')) as Pick<ReturnType<typeof createHash>, 'update'>,
+      'update',
+    )
+    new LibraryService(repository).deleteSource(repository.sources()[0]!.id)
+    const contentHashes = hashUpdates.mock.calls.filter((call) =>
+      String(call.arguments[0]).includes('synthetic domain'),
+    )
+    assert.equal(contentHashes.length, 0, 'Provenance must not revalidate/hash saved questions')
+    assert.deepEqual(repository.quizStore().find(quiz.id)!.deletedBankNames, ['quiz-synthetic'])
+    assert.deepEqual(repository.quizStore().studyHistory(), history)
+  } finally {
+    repository.close()
+  }
+})
+
+test('provenance annotation repairs invalid rows immediately and preserves row/account bindings', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'provenance-evidence-'))
+  const path = join(directory, 'synthetic.sqlite3')
+  const repository = new LibraryRepository(path)
+  const sql = new DatabaseSync(path)
+  try {
+    populate(repository)
+    const template = completed(repository)
+    const source = repository.sources()[0]!
+
+    const rows = () => sql.prepare('SELECT * FROM quiz_evidence ORDER BY account_id, id').all()
+
+    const mutations = [
+      'DELETE FROM quiz_evidence',
+      'UPDATE quiz_evidence SET version = -1',
+      "UPDATE quiz_evidence SET payload = 'corrupt'",
+      "UPDATE quiz_evidence SET checksum = 'corrupt'",
+      "UPDATE quiz_evidence SET provider = 'Other'",
+      "UPDATE quiz_evidence SET certification = 'Other'",
+      "UPDATE quiz_evidence SET account_id = 'other'",
+      "UPDATE quiz_evidence SET id = 'other-row'",
+    ]
+    for (const mutation of mutations) {
+      sql.exec('DELETE FROM quiz_evidence')
+      repository.quizStore().save(template)
+      const expected = rows()[0]
+      sql.exec(mutation)
+      repository.annotateDeletedBanks([{ ...source, sourceId: source.id }])
+      assert.deepEqual(
+        sql
+          .prepare("SELECT * FROM quiz_evidence WHERE account_id = 'local' AND id = ?")
+          .get(template.id),
+        expected,
+        `Rebuild before the next read: ${mutation}`,
+      )
+      assert.deepEqual(
+        repository.quizStore().studyHistory(),
+        masteryHistory(repository.quizStore().completed()),
+      )
+    }
+    // A raw writer changes both row identity and owner independently of the embedded attempt ID.
+    sql.exec("UPDATE quiz_sessions SET id = 'row-id', account_id = 'alice'")
+    const alice = repository.forAccount('alice').quizStore()
+    assert.deepEqual(alice.studyHistory(), masteryHistory(alice.completed()))
+    const before = rows()
+    repository.annotateDeletedBanks([{ ...source, sourceId: source.id }])
+    assert.deepEqual(rows(), before)
+    assert.equal(alice.find('row-id')!.id, template.id)
+    assert.equal(repository.quizStore().studyHistory().states.size, 0)
+    assert.deepEqual(alice.studyHistory(), masteryHistory(alice.completed()))
+  } finally {
+    sql.close()
+    repository.close()
+    rmSync(directory, { recursive: true })
+  }
+})
+
+test('generic annotation callbacks cannot bless changed extraction inputs', () => {
+  const repository = new LibraryRepository(':memory:')
+  try {
+    populate(repository)
+    const template = completed(repository)
+    const mutations: ((quiz: StoredQuiz) => void)[] = [
+      (q) => {
+        q.questions[0]!.selected = []
+        q.questions[0]!.correct = false
+      },
+      (q) => {
+        q.questions[0]!.confidence = 'Unsure'
+      },
+      (q) => {
+        q.questions[0]!.question = 'Changed content'
+      },
+      (q) => {
+        q.questions[0]!.answers[0]!.text = 'Changed answer'
+      },
+      (q) => {
+        q.keys[0]!.correct = [999]
+      },
+      (q) => {
+        q.questions[0]!.correctAnswerIds = [999]
+      },
+      (q) => {
+        q.startedAt = q.finishedAt! + 1
+      },
+      (q) => {
+        q.finishedAt! += 86400000
+      },
+      (q) => {
+        q.status = 'active'
+      },
+      (q) => {
+        q.id = 'changed-embedded-id'
+      },
+      (q) => {
+        q.options.provider = 'Other'
+      },
+      (q) => {
+        q.options.certification = 'Other'
+      },
+      (q) => {
+        delete q.questions[0]!.correct
+      },
+    ]
+    for (const mutate of mutations) {
+      repository.quizStore().save(template)
+      repository.annotateSnapshots((quiz) => {
+        mutate(quiz)
+        return true
+      })
+      for (const scope of [options, { provider: 'Other' }, { certification: 'Other' }]) {
+        const snapshots = repository
+          .quizStore()
+          .completed()
+          .filter((q) => sameCertification(q.options, scope))
+        assert.deepEqual(repository.quizStore().studyHistory(scope), masteryHistory(snapshots))
+      }
+    }
+  } finally {
+    repository.close()
+  }
+})
+
+test('retained and rebuilt annotation writes roll back standalone and enclosing transactions', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'provenance-rollback-'))
+  const path = join(directory, 'synthetic.sqlite3')
+  const repository = new LibraryRepository(path)
+  const sql = new DatabaseSync(path)
+  try {
+    populate(repository)
+    const quiz = completed(repository)
+    const source = repository.sources()[0]!
+
+    const annotate = () => repository.annotateDeletedBanks([{ ...source, sourceId: source.id }])
+
+    const snapshot = repository.quizStore().find(quiz.id)
+
+    const rows = () => sql.prepare('SELECT * FROM quiz_evidence').all()
+
+    for (const missing of [false, true]) {
+      if (missing) {
+        sql.exec('DELETE FROM quiz_evidence')
+      }
+      const before = rows()
+      sql.exec(
+        "CREATE TRIGGER fail_annotation BEFORE INSERT ON quiz_evidence BEGIN SELECT RAISE(ABORT, 'annotation failure'); END",
+      )
+      assert.throws(annotate, /annotation failure/)
+      assert.deepEqual(repository.quizStore().find(quiz.id), snapshot)
+      assert.deepEqual(rows(), before)
+      assert.throws(
+        () => new LibraryService(repository).deleteSource(source.id),
+        /annotation failure/,
+      )
+      assert.equal(repository.sources().length, 1)
+      assert.deepEqual(repository.quizStore().find(quiz.id), snapshot)
+      assert.deepEqual(rows(), before)
+      sql.exec('DROP TRIGGER fail_annotation')
+      assert.throws(
+        () =>
+          repository.transaction(() => {
+            annotate()
+            throw new Error('outer rollback')
+          }),
+        /outer rollback/,
+      )
+      assert.deepEqual(repository.quizStore().find(quiz.id), snapshot)
+      assert.deepEqual(rows(), before)
+    }
+    annotate()
+    assert.equal(
+      rows().length,
+      1,
+      'Successful standalone annotation eagerly repairs missing evidence',
+    )
+  } finally {
+    sql.close()
+    repository.close()
+    rmSync(directory, { recursive: true })
+  }
+})
+
+test('legacy source pinning preserves unknown scoring, sentinels and historical scope errors', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'provenance-legacy-'))
+  const path = join(directory, 'synthetic.sqlite3')
+  const repository = new LibraryRepository(path)
+  const sql = new DatabaseSync(path)
+  try {
+    populate(repository)
+    const quiz = completed(repository)
+    delete quiz.questions[0]!.correct
+    for (const question of quiz.questions) {
+      delete question.sourceId
+    }
+    repository.quizStore().save(quiz)
+    const source = repository.sources()[0]!
+    const before = sql.prepare('SELECT * FROM quiz_evidence').all()
+    const history = repository.quizStore().studyHistory()
+    const hashUpdates = t.mock.method(
+      Object.getPrototypeOf(createHash('sha256')) as Pick<ReturnType<typeof createHash>, 'update'>,
+      'update',
+    )
+    new LibraryService(repository).deleteSource(source.id)
+    assert.equal(
+      hashUpdates.mock.calls.filter((call) =>
+        String(call.arguments[0]).includes('synthetic domain'),
+      ).length,
+      0,
+    )
+    assert.deepEqual(sql.prepare('SELECT * FROM quiz_evidence').all(), before)
+    assert.ok(
+      repository
+        .quizStore()
+        .find(quiz.id)!
+        .questions.every((q) => q.sourceId === source.id),
+    )
+    assert.deepEqual(repository.quizStore().studyHistory(), history)
+    // A SQL/embedded-status mismatch must remain unknown, rather than upgrading to scored evidence.
+    sql.exec("UPDATE quiz_sessions SET data = json_set(data, '$.status', 'active')")
+    const unknown = repository.quizStore().studyHistory()
+    repository.annotateDeletedBanks([{ ...source, sourceId: source.id }])
+    assert.deepEqual(repository.quizStore().studyHistory(), unknown)
+    // Existing invalid-scope errors still escape annotation before any snapshot is written.
+    sql.exec("UPDATE quiz_sessions SET data = json_set(data, '$.options.provider', '')")
+    assert.throws(
+      () => repository.annotateDeletedBanks([{ ...source, sourceId: source.id }]),
+      /non-empty/,
+    )
+    assert.throws(() => repository.quizStore().studyHistory(), /non-empty/)
+  } finally {
+    sql.close()
+    repository.close()
+    rmSync(directory, { recursive: true })
   }
 })

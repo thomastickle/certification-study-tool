@@ -156,6 +156,43 @@ function decode(accountId: string, row: EvidenceRow): AttemptEvidence | null | u
 }
 
 /**
+ * Capture a checksum/version-validated row for reinsertion after an owned provenance-only write.
+ * The caller must prove extraction inputs unchanged and enclose capture/write/restore in a savepoint.
+ * Invalid or missing rows return no restorer so the caller rebuilds immediately from the snapshot.
+ */
+export function retainStudyEvidence(db: DatabaseSync, accountId: string, id: string) {
+  const row = db
+    .prepare(
+      `
+      SELECT id, version, provider, certification, payload, checksum
+      FROM quiz_evidence WHERE account_id = ? AND id = ?
+    `,
+    )
+    .get(accountId, id) as EvidenceRow | undefined
+  if (!row || decode(accountId, row) === undefined) {
+    return undefined
+  }
+  return () => {
+    db.prepare(
+      `
+      INSERT INTO quiz_evidence
+        (account_id, id, version, provider, certification, payload, checksum)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+    ).run(
+      accountId,
+      row.id,
+      row.version,
+      row.provider,
+      row.certification,
+      row.payload,
+      row.checksum,
+    )
+    return true
+  }
+}
+
+/**
  * Rebuild only missing/stale rows, then replay compact evidence in the selected exact namespace.
  * Returns null for legacy evidence that must use the original snapshot replay/error boundary.
  * @throws {Error} On SQLite or authoritative JSON failures; the rebuild rolls back atomically.
