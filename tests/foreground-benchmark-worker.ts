@@ -52,6 +52,9 @@ const housekeeping = new StudyHousekeeping(shared, libraries, () => monotonic)
 const previews = new ImportPreviews()
 let probe: TimerProbe | undefined
 let durations: number[] = []
+let actorDurations: number[][] = []
+let memoryStart = process.memoryUsage()
+let peakRss = 0
 let opens = 0
 let activeConnections = 0
 let peakConnections = 0
@@ -183,7 +186,11 @@ const server = createServer(async (request, response) => {
   } finally {
     housekeeping.observeRequest(request.method, actor, personal)
     personal.close()
-    durations.push(performance.now() - start)
+    const elapsed = performance.now() - start
+    durations.push(elapsed)
+    const actorIndex = owners.indexOf(actor)
+    actorDurations[actorIndex] ??= []
+    actorDurations[actorIndex]!.push(elapsed)
   }
 })
 
@@ -230,9 +237,14 @@ process.send!({
 async function command(name: string, completedId?: string) {
   if (name === 'begin') {
     durations = []
+    actorDurations = []
+    memoryStart = process.memoryUsage()
+    peakRss = memoryStart.rss
     observedOpens = opens
     peakConnections = 0
-    probe = new TimerProbe()
+    probe = new TimerProbe(() => {
+      peakRss = Math.max(peakRss, process.memoryUsage().rss)
+    })
     return null
   }
   if (name === 'end') {
@@ -241,6 +253,8 @@ async function command(name: string, completedId?: string) {
     assert.equal(activeConnections, 0)
     return {
       requestServiceMs: summarize(durations),
+      actorServiceMs: actorDurations.map(summarize),
+      memory: { start: memoryStart, end: process.memoryUsage(), sampledPeakRss: peakRss },
       opens: opens - observedOpens,
       timerDelay,
       activeConnections,
