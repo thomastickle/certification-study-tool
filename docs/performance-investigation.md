@@ -4,6 +4,24 @@ This is a bounded synthetic investigation of the current per-user architecture,
 not a capacity guarantee. No runtime behavior, scheduler, storage layout or
 transaction boundary changes in this investigation.
 
+## Historical fixture correction (PR #82 review)
+
+All historical timings below used impossible chronology: the epoch was captured
+before graded templates started, then substituted for their later completion.
+Thus `finishedAt < startedAt` and every cloned ordinary history had rejected
+scoring evidence, interpreted as unknown. The overdue clone likewise finished at
+a deadline before its start. Grading before cloning and snapshot-preservation
+checks did not establish valid completed evidence. These numbers are retained
+only as historical flawed-workload observations; they are not a valid
+completed-history baseline or evidence for a valid-history due-read speedup.
+The subsequent issue #81 CPU profile inherited the same limitation.
+
+PR #82 corrects start/finish/deadline/server timestamps, preserves empty answers
+and repeated histories, and checks accepted scoring plus unpaused timer metadata
+before sampling (including recovered attempts). The comparable corrected results
+and remaining limits are in [the request-local report](study-history-optimization.md).
+No production scoring or legacy validation was changed for this correction.
+
 ## Reproduction and safety
 
 Use the supported Node 24 executable and existing project dependencies. From an
@@ -141,7 +159,8 @@ substitution fails. Every history's deletion-name set must match exactly its
 deleted namespaced sources, including absence of private annotations on the other
 actor. Two additional unmeasured HTTP history reads compare each actor's full
 returned identity/annotation set with its verified private records. The original
-completed evidence survives deletion and replay.
+snapshot content survives deletion and replay; the historical checks did not
+prove that scoring evidence was accepted (see the correction above).
 Every foreground phase asserts a successful status and counts one owned open per
 request with zero connections left active. Submission is checked for its completed
 state and expected score. Automated tests cover these stable result/count
@@ -152,7 +171,7 @@ failure; they assert outcomes rather than machine latency. Existing application
 tests remain the authority for legacy ambiguity, authorization and rollback semantics; the benchmark does not replace
 those contracts.
 
-The completed templates are graded through `QuizService` with empty answers
+The corrected completed templates are graded through `QuizService` with empty answers
 (score zero) before cloning; the overdue attempt starts from an ungraded template.
 Histories share synthetic timestamps and a small repeated question pool. This
 exercises large JSON/history traversal but not years of diverse mastery states,
@@ -238,8 +257,8 @@ outside this timing series.
 
 ## Decision and deployment assumptions
 
-Keep the current storage and scheduler architecture in this PR. The historical
-measurements of foreground stalls justify a focused optimization follow-up, rather than treating
+Keep the current storage and scheduler architecture in this PR. The historical malformed-workload
+measurements of foreground stalls motivated a focused optimization follow-up, rather than treating
 #70's owner yielding as proof of interactive responsiveness. Start with profiling
 and reducing work in quiz creation and due reads: those paths load completed
 snapshots and construct mastery/selection state synchronously. Narrow by the

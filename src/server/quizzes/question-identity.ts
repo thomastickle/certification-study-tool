@@ -13,6 +13,17 @@ export function currentQuestionIdentity(record: QuestionRecord, source: Source):
   return identity(question, source.provider, source.certification)
 }
 
+/** Index exact library occurrences for one immutable request, never by legacy fingerprint or ID. */
+export function currentQuestionIdentities(records: QuestionRecord[], sources: Source[]) {
+  const sourceMap = new Map(sources.map((source) => [source.id, source]))
+  return new Map(
+    records.map((record) => {
+      const source = sourceMap.get(record.sourceId)
+      return [record, source ? currentQuestionIdentity(record, source) : null] as const
+    }),
+  )
+}
+
 /** Compose importer semantics with the exact bank certification namespace. */
 function identity(question: Question, provider: string, certification: string): string {
   return `mastery:v1:${digest([provider, certification, fingerprint(question), answerKey(question)])}`

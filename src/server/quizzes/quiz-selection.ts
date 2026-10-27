@@ -24,6 +24,7 @@ export function selectQuestions(
   boosted: Set<string>,
   random = Math.random,
   concepts?: { groups: ReviewedConcept[]; recency: Map<string, number> },
+  identities?: ReadonlyMap<QuestionRecord, string | null>,
 ): { record: QuestionRecord; domain: number }[] {
   const groups = eligibleQuestions(questions, sources, options)
   const sourceMap = new Map(sources.map((source) => [source.id, source]))
@@ -57,7 +58,10 @@ export function selectQuestions(
         const candidates = pool.map((picked) => ({
           ...picked,
           identity:
-            currentQuestionIdentity(picked.record, sourceMap.get(picked.record.sourceId)!) ?? '',
+            (identities
+              ? identities.get(picked.record)
+              : currentQuestionIdentity(picked.record, sourceMap.get(picked.record.sourceId)!)) ??
+            '',
           tier: boosted.has(picked.record.fingerprint) ? 3 : 1,
         }))
         const preferred = preferVariation(

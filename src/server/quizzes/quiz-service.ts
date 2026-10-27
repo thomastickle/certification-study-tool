@@ -17,8 +17,7 @@ import { isLibraryItemId } from '../../shared/library-identity.ts'
 import type { StoredQuiz } from './quiz-repository.ts'
 import { eligibleQuestions, selectQuestions, shuffled } from './quiz-selection.ts'
 import { masteryHistory } from './mastery-history.ts'
-import { currentQuestionIdentity } from './question-identity.ts'
-import { completedRecency } from '../concepts/concept-variations.ts'
+import { currentQuestionIdentities } from './question-identity.ts'
 import { studyDay } from './mastery.ts'
 
 export class QuizService {
@@ -62,27 +61,26 @@ export class QuizService {
         if (old.deadline <= this.now()) this.finish(old)
         else store.remove(old.id)
       }
-      const completed = store.completed().filter((quiz) => sameCertification(quiz.options, options))
-      const states = masteryHistory(completed).states
+      const context = this.studyContext(options)
+      const { states, recency, records, sources, identities } = context
       const concepts = this.repository.reviewedConcepts()
-      const sources = this.repository.sources()
       const boosted = new Set(
-        this.repository.allQuestions().flatMap((record) => {
-          const source = sources.find((source) => source.id === record.sourceId)
-          const identity = source && currentQuestionIdentity(record, source)
+        records.flatMap((record) => {
+          const identity = identities.get(record)
           return identity && states.get(identity)?.boosted ? [record.fingerprint] : []
         }),
       )
       const picked =
         options.mode === 'review'
-          ? this.dueQuestions(options).picked
+          ? this.dueQuestions(options, context).picked
           : selectQuestions(
-              this.repository.allQuestions(),
-              this.repository.sources(),
+              records,
+              sources,
               options,
               boosted,
               this.random,
-              { groups: concepts, recency: completedRecency(completed) },
+              { groups: concepts, recency },
+              identities,
             )
       if (!picked.length) {
         throw new ApplicationError(
@@ -105,19 +103,16 @@ export class QuizService {
         questions: [],
         keys: [],
       }
-      const eligible = [
-        ...eligibleQuestions(this.repository.allQuestions(), sources, options).values(),
-      ]
+      const eligible = [...eligibleQuestions(records, sources, options).values()]
       for (const { record, domain } of picked) {
         const source = sources.find((value) => value.id === record.sourceId)!
-        const identity = currentQuestionIdentity(record, source)
+        const identity = identities.get(record)
         const membership = concepts.filter(
           (group) => identity && group.identities.includes(identity),
         )
         const direct = new Set(membership.flatMap((group) => group.identities))
         const alternate = eligible.some((candidate) => {
-          const candidateSource = sources.find((value) => value.id === candidate.record.sourceId)!
-          const candidateIdentity = currentQuestionIdentity(candidate.record, candidateSource)
+          const candidateIdentity = identities.get(candidate.record)
           return (
             candidateIdentity &&
             candidateIdentity !== identity &&
@@ -140,7 +135,7 @@ export class QuizService {
           answers: answers.map((a, i) => ({ id: i, text: a.text })),
           domain,
           sourceName: record.sourceName,
-          sourceKind: this.repository.sources().find((s) => s.id === record.sourceId)!.kind,
+          sourceKind: source.kind,
           reference: record.reference,
           area: record.data.classification?.area ?? null,
           topic: record.data.classification?.topic ?? null,
@@ -173,31 +168,30 @@ export class QuizService {
     return this.dueQuestions(options).summary
   }
 
+  /** Load authoritative evidence and library occurrences once, after any expiry changes. */
+  private studyContext(options: QuizOptions) {
+    const completed = this.repository
+      .quizStore()
+      .completed()
+      .filter((quiz) => sameCertification(quiz.options, options))
+    const history = masteryHistory(completed)
+    const sources = this.repository.sources()
+    const records = this.repository.allQuestions()
+    const identities = currentQuestionIdentities(records, sources)
+    return { ...history, sources, records, identities }
+  }
+
   /** Resolve lifetime obligations against both the whole library and requested pool. */
-  private dueQuestions(options: QuizOptions) {
+  private dueQuestions(options: QuizOptions, context = this.studyContext(options)) {
     const day = studyDay(this.now())
-    const states = masteryHistory(
-      this.repository
-        .quizStore()
-        .completed()
-        .filter((quiz) => sameCertification(quiz.options, options)),
-    ).states
+    const { states, sources, records, identities } = context
     const due = [...states]
       .filter(([, state]) => state.dueDay !== null && state.dueDay <= day)
       .sort(([a, x], [b, y]) => x.dueDay!.localeCompare(y.dueDay!) || a.localeCompare(b))
-    const sources = this.repository.sources()
-    const records = this.repository.allQuestions()
-    const all = new Set(
-      records.flatMap((record) => {
-        const source = sources.find((source) => source.id === record.sourceId)
-        const identity = source && currentQuestionIdentity(record, source)
-        return identity ? [identity] : []
-      }),
-    )
+    const all = new Set([...identities.values()].filter((identity) => identity !== null))
     const eligible = new Map(
       [...eligibleQuestions(records, sources, options).values()].flatMap((picked) => {
-        const source = sources.find((source) => source.id === picked.record.sourceId)!
-        const identity = currentQuestionIdentity(picked.record, source)
+        const identity = identities.get(picked.record)
         return identity ? [[identity, picked] as const] : []
       }),
     )

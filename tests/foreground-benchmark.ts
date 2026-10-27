@@ -183,6 +183,7 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
     )
     assert.equal(submitted.status, 'completed')
     assert.equal(submitted.correctCount, 0)
+    await phase('due-read', (sample) => sample(() => call('/api/quizzes/due', undefined, 'GET')))
     await command('replay')
     await phase('foreground-reconcile-backlog', (sample) =>
       sample(() => call('/api/sources', undefined, 'GET')),
@@ -196,15 +197,30 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
     await phase('foreground-reconcile-new-event', (sample) =>
       sample(() => call('/api/sources', undefined, 'GET')),
     )
+    const actorLatencies: number[][] = [[], []]
     await phase('busy-account-reads', async (sample) => {
       for (let batch = 0; batch < 5; batch++) {
         await Promise.all(
           Array.from({ length: 4 }, (_, index) =>
-            sample(() => call('/api/quizzes/due', undefined, 'GET', index % 2)),
+            sample(async () => {
+              const actor = index % 2
+              const start = performance.now()
+              const result = await call('/api/quizzes/due', undefined, 'GET', actor)
+              actorLatencies[actor]!.push(performance.now() - start)
+              return result
+            }),
           ),
         )
       }
     })
+    console.log(
+      JSON.stringify({
+        selected,
+        repetition,
+        phase: 'contention-by-actor',
+        httpLatencyMs: actorLatencies.map(summarize),
+      }),
+    )
     console.log(
       JSON.stringify({
         selected,

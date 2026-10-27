@@ -4,6 +4,7 @@ import test from 'node:test'
 import { answerKey, fingerprint } from '../src/server/importer/bank-tools.ts'
 import {
   currentQuestionIdentity,
+  currentQuestionIdentities,
   completedQuestionIdentity,
 } from '../src/server/quizzes/question-identity.ts'
 import type { Source } from '../src/shared/contracts.ts'
@@ -186,4 +187,41 @@ test('incomplete, invalid, contradictory or unsupported historical evidence rema
   }
   assert.equal(completedQuestionIdentity(snapshot(), -1), null)
   assert.equal(completedQuestionIdentity(snapshot(), 1), null)
+})
+
+test('request identity index validates each occurrence once without collapsing conflicting content', () => {
+  const original = record()
+  const changedKey = record({
+    ...original.data,
+    answers: original.data.answers.map((answer) => ({ ...answer, correct: !answer.correct })),
+  })
+  const otherScope = { ...original, sourceId: 2 }
+  const invalid = record({ ...original.data, select_count: 999 })
+  const records = [original, changedKey, otherScope, invalid]
+  const sources = [source, { ...source, id: 2, provider: 'Other' }]
+  const expected = records.map((item) => currentQuestionIdentity(item, sources[item.sourceId - 1]!))
+  const reads = records.map(() => 0)
+  records.forEach((item, index) => {
+    const data = item.data
+    Object.defineProperty(item, 'data', {
+      get: () => {
+        reads[index]!++
+        return data
+      },
+    })
+  })
+  const identities = currentQuestionIdentities(records, sources)
+  for (let repeat = 0; repeat < 3; repeat++) {
+    assert.deepEqual(
+      records.map((item) => identities.get(item)),
+      expected,
+    )
+  }
+  assert.deepEqual(reads, [1, 1, 1, 1])
+  assert.notEqual(identities.get(original), identities.get(changedKey))
+  assert.notEqual(identities.get(original), identities.get(otherScope))
+  assert.equal(identities.get(invalid), null)
+  original.data.question = 'Changed between requests'
+  const refreshed = currentQuestionIdentities(records, sources)
+  assert.notEqual(refreshed.get(original), identities.get(original))
 })

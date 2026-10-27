@@ -14,7 +14,11 @@ import { LibraryService } from '../src/server/questions/library-service.ts'
 import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import { StudyHousekeeping } from '../src/server/questions/study-housekeeping.ts'
 import type { LibraryItemId } from '../src/shared/contracts.ts'
-import { assertHistoryEvidence, snapshotDigest } from './benchmark-history-evidence.ts'
+import {
+  assertCompletedBenchmarkEvidence,
+  assertHistoryEvidence,
+  snapshotDigest,
+} from './benchmark-history-evidence.ts'
 import type { QuizView } from '../src/shared/quiz-contracts.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { populate } from './quiz-fixtures.ts'
@@ -52,6 +56,9 @@ const housekeeping = new StudyHousekeeping(shared, libraries, () => monotonic)
 const previews = new ImportPreviews()
 let probe: TimerProbe | undefined
 let durations: number[] = []
+let actorDurations: number[][] = []
+let memoryStart = process.memoryUsage()
+let peakRss = 0
 let opens = 0
 let activeConnections = 0
 let peakConnections = 0
@@ -85,9 +92,16 @@ function emptyAnswers(quiz: QuizView) {
 
 // Reuse the scheduler benchmark's real 20-question snapshot and per-owner files.
 populate(shared, config.questions / 4, 'shared-original')
-const sharedService = new QuizService(shared, Date.now, () => 0.5)
+// A fixed past clock keeps start, deadline and completion coherent without changing answers.
+let templateTime = epoch - 60_000
+const sharedService = new QuizService(
+  shared,
+  () => templateTime,
+  () => 0.5,
+)
 const sharedQuiz = sharedService.start({ sourceFilter: 'mixed', questionType: 'mixed' })
 const activeTemplate = shared.quizStore().find(sharedQuiz.id)!
+templateTime = epoch
 sharedService.submit(sharedQuiz.id, { answers: emptyAnswers(sharedQuiz) })
 const sharedTemplate = shared.quizStore().find(sharedQuiz.id)!
 shared.quizStore().remove(sharedQuiz.id)
@@ -98,12 +112,18 @@ for (const [index, id] of owners.entries()) {
   try {
     populate(personal, 12, `private-owner-${index}`)
     const study = shared.forAccount(id, personal)
-    const personalService = new QuizService(study, Date.now, () => 0.5)
+    templateTime = epoch - 60_000
+    const personalService = new QuizService(
+      study,
+      () => templateTime,
+      () => 0.5,
+    )
     const ownQuiz = personalService.start({
       sourceFilter: 'mixed',
       questionType: 'mixed',
       sourceIds: ['private:1'],
     })
+    templateTime = epoch
     personalService.submit(ownQuiz.id, { answers: emptyAnswers(ownQuiz) })
     const privateTemplate = personal.quizStore().find(ownQuiz.id)!
     personal.quizStore().remove(ownQuiz.id)
@@ -115,7 +135,6 @@ for (const [index, id] of owners.entries()) {
           ...structuredClone(template),
           id: randomUUID(),
           status: 'completed',
-          finishedAt: epoch,
           correctCount: 0,
         })
       }
@@ -125,18 +144,25 @@ for (const [index, id] of owners.entries()) {
         status: 'active',
         finishedAt: null,
         correctCount: null,
+        startedAt: epoch - 20 * 60_000 - 1,
+        serverNow: epoch - 20 * 60_000 - 1,
         deadline: epoch - 1,
       })
       personal.quizStore().save({
         ...structuredClone(sharedTemplate),
         id: randomUUID(),
         status: 'deleted',
-        deletedAt: epoch - 49 * 60 * 60_000,
+        startedAt: sharedTemplate.startedAt - 50 * 60 * 60_000,
+        finishedAt: sharedTemplate.finishedAt! - 50 * 60 * 60_000,
+        deadline: sharedTemplate.deadline - 50 * 60 * 60_000,
+        serverNow: sharedTemplate.serverNow - 50 * 60 * 60_000,
+        deletedAt: epoch - 48 * 60 * 60_000 - 1,
         purgeAt: epoch - 1,
       })
     })
     assert.equal(personal.quizStore().active().length, 1)
     assert.equal(personal.quizStore().deleted().length, 1)
+    assertCompletedBenchmarkEvidence(personal.quizStore().completed())
     seededSnapshots.set(
       id,
       new Map(
@@ -183,7 +209,11 @@ const server = createServer(async (request, response) => {
   } finally {
     housekeeping.observeRequest(request.method, actor, personal)
     personal.close()
-    durations.push(performance.now() - start)
+    const elapsed = performance.now() - start
+    durations.push(elapsed)
+    const actorIndex = owners.indexOf(actor)
+    actorDurations[actorIndex] ??= []
+    actorDurations[actorIndex]!.push(elapsed)
   }
 })
 
@@ -210,6 +240,7 @@ for (const [index, id] of owners.entries()) {
     assert.equal(personal.quizStore().deleted().length, 0)
     assert.equal(personal.quizStore().completed().length, (index === 0 ? config.histories : 10) + 1)
     const histories = personal.quizStore().completed()
+    assertCompletedBenchmarkEvidence(histories)
     const originals = new Map(histories.map((quiz) => [quiz.id, snapshotDigest(quiz)]))
     assertHistoryEvidence(histories, seededSnapshots.get(id)!, new Map([[1, 'shared-original']]), [
       overdueIds.get(id)!,
@@ -230,9 +261,14 @@ process.send!({
 async function command(name: string, completedId?: string) {
   if (name === 'begin') {
     durations = []
+    actorDurations = []
+    memoryStart = process.memoryUsage()
+    peakRss = memoryStart.rss
     observedOpens = opens
     peakConnections = 0
-    probe = new TimerProbe()
+    probe = new TimerProbe(() => {
+      peakRss = Math.max(peakRss, process.memoryUsage().rss)
+    })
     return null
   }
   if (name === 'end') {
@@ -241,6 +277,8 @@ async function command(name: string, completedId?: string) {
     assert.equal(activeConnections, 0)
     return {
       requestServiceMs: summarize(durations),
+      actorServiceMs: actorDurations.map(summarize),
+      memory: { start: memoryStart, end: process.memoryUsage(), sampledPeakRss: peakRss },
       opens: opens - observedOpens,
       timerDelay,
       activeConnections,

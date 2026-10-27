@@ -6,6 +6,15 @@ import type { MasteryEvidence } from './mastery.ts'
 /** Missing or contradictory legacy scoring/confidence/time evidence stays unknown. */
 export function completedEvidence(quiz: StoredQuiz, index: number): MasteryEvidence | null {
   const identity = completedQuestionIdentity(quiz, index)
+  return evidenceWithIdentity(quiz, index, identity)
+}
+
+/** Keep scoring validation separate so a history pass can reuse the validated identity. */
+function evidenceWithIdentity(
+  quiz: StoredQuiz,
+  index: number,
+  identity: string | null,
+): MasteryEvidence | null {
   const q = quiz.questions[index]
   if (
     !identity ||
@@ -37,21 +46,23 @@ export function completedEvidence(quiz: StoredQuiz, index: number): MasteryEvide
   }
 }
 
-/** Completed evidence is the sole source of the scheduler's lifetime state. */
+/** Replay lifetime mastery and variation recency with one validation per saved question. */
 export function masteryHistory(completed: StoredQuiz[]) {
-  const events = completed.flatMap((quiz) =>
-    quiz.questions.flatMap((_, index) => {
-      const event = completedEvidence(quiz, index)
-      if (event) {
-        return [event]
-      }
-      // An incomplete earlier encounter cannot make a later success first-ever.
+  const events: MasteryEvidence[] = []
+  const recency = new Map<string, number>()
+  for (const quiz of completed) {
+    quiz.questions.forEach((_, index) => {
       const identity = completedQuestionIdentity(quiz, index)
       if (!identity) {
-        return []
+        return
       }
-      return [
-        {
+      if (Number.isFinite(quiz.finishedAt)) {
+        recency.set(identity, Math.max(recency.get(identity) ?? -Infinity, quiz.finishedAt!))
+      }
+      const event = evidenceWithIdentity(quiz, index, identity)
+      // An incomplete earlier encounter cannot make a later success first-ever.
+      events.push(
+        event ?? {
           identity,
           attemptId: quiz.id,
           at: Number.isFinite(quiz.finishedAt) ? quiz.finishedAt! : -Infinity,
@@ -60,8 +71,8 @@ export function masteryHistory(completed: StoredQuiz[]) {
           confidence: null,
           unknown: true,
         },
-      ]
-    }),
-  )
-  return { states: replayMastery(events) }
+      )
+    })
+  }
+  return { states: replayMastery(events), recency }
 }
