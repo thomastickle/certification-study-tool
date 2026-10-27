@@ -156,11 +156,13 @@ commands continue to run native TypeScript without decorators.
 
 `npm run dev` rebuilds the server before starting it and restarts on backend,
 shared, schema, build-script, or TypeScript configuration changes. Vite handles
-frontend HMR. `npm test` builds first, retains native TypeScript/Node tests and the
-SVG loader, then runs `tests/compiled/**/*.spec.ts` from emitted JavaScript. Put
-tests that import decorated application modules in that compiled suite; use
-relative `.ts` imports throughout it so both tests and providers share one emitted
-module graph. Do not import decorated modules into native TypeScript tests.
+frontend HMR. After a build or server startup failure, the watcher stays alive and
+waits for a source change before trying again. `npm test` builds first, retains
+native TypeScript/Node tests and the SVG loader, then runs
+`tests/compiled/**/*.spec.ts` from emitted JavaScript. Put tests that import
+decorated application modules in that compiled suite; use relative `.ts` imports
+throughout it so both tests and providers share one emitted module graph. Do not
+import decorated modules into native TypeScript tests.
 
 The Nest conversion is intermediate: `ApplicationModule` and `createApplication`
 provide an Express application with an injected health controller, exercised over

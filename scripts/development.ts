@@ -4,93 +4,127 @@ import { once } from 'node:events'
 
 const watchedDirectories = ['src/server', 'src/shared', 'docs', 'scripts']
 const watchedRootFiles = new Set(['package.json', 'tsconfig.json', 'tsconfig.server.json'])
-const npmCli = process.env.npm_execpath
 
-if (!npmCli) {
-  throw new Error('Run development through npm run dev.')
-}
+type ChildRole = 'build' | 'server'
 
-const buildCommand = [npmCli, 'run', 'build:server']
 let stopping = false
-let restartRequested = false
-let debounceTimer: NodeJS.Timeout | undefined
-let finishRestartDebounce: (() => void) | undefined
+let changeVersion = 0
 let activeChild: ReturnType<typeof spawn> | undefined
+let activeChildRole: ChildRole | undefined
+let debounceTimer: NodeJS.Timeout | undefined
+const changeWaiters = new Set<() => void>()
+const debounceWaiters = new Set<() => void>()
 const watchers: FSWatcher[] = []
 const rootFileWatchers = new Map<string, FSWatcher>()
 
-/** Start one server generation, rebuilding first and restarting after source changes. */
+/** Build serially and run one server generation at a time. */
 async function runDevelopment(): Promise<void> {
   while (!stopping) {
-    restartRequested = false
-    const buildStatus = await runChild(process.execPath, buildCommand)
+    const buildVersion = changeVersion
+    const build = await runChild(process.execPath, ['scripts/build-server.ts'], 'build')
     if (stopping) {
       return
     }
-    if (restartRequested) {
-      await waitForRestart()
+    if (changeVersion !== buildVersion) {
+      await waitForDebounce()
       continue
     }
-    if (buildStatus !== 0) {
-      console.error(`Server build exited with status ${buildStatus}. Waiting for a source change.`)
-      await waitForRestart()
+    if (build.code !== 0 || build.signal) {
+      console.error(`Server build exited with status ${build.code ?? build.signal}.`)
+      console.error('Waiting for a source change.')
+      await waitForChange(changeVersion)
+      await waitForDebounce()
       continue
     }
 
-    const server = spawn(process.execPath, ['build/src/server/main.js'], { stdio: 'inherit' })
-    activeChild = server
-    const [code, signal] = await once(server, 'exit')
-    activeChild = undefined
+    const serverVersion = changeVersion
+    const server = await runChild(process.execPath, ['build/src/server/main.js'], 'server')
     if (stopping) {
       return
     }
-    if (restartRequested) {
-      await waitForRestart()
+    if (changeVersion !== serverVersion) {
+      await waitForDebounce()
       continue
     }
 
-    console.error(`Development server exited (${signal ?? code}).`)
-    stopping = true
+    console.error(`Development server exited (${server.signal ?? server.code}).`)
+    console.error('Waiting for a source change.')
+    await waitForChange(changeVersion)
+    await waitForDebounce()
   }
 }
 
-/** Run a build child and return its exit status, treating signals as failures. */
-async function runChild(command: string, args: string[]): Promise<number> {
+/** Spawn an owned phase and wait for its exit before changing generations. */
+async function runChild(
+  command: string,
+  args: string[],
+  role: ChildRole,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   const child = spawn(command, args, { stdio: 'inherit' })
   activeChild = child
-  const [code, signal] = await once(child, 'exit')
-  activeChild = undefined
-  return code ?? (signal ? 1 : 0)
+  activeChildRole = role
+  try {
+    const [code, signal] = await once(child, 'exit')
+    return {
+      code: code as number | null,
+      signal: signal as NodeJS.Signals | null,
+    }
+  } catch (error) {
+    console.error(`${role === 'build' ? 'Server build' : 'Development server'} could not start.`)
+    console.error(error instanceof Error ? error.message : 'Unknown child-process error.')
+    return { code: 1, signal: null }
+  } finally {
+    if (activeChild === child) {
+      activeChild = undefined
+      activeChildRole = undefined
+    }
+  }
 }
 
-/** Wait until the source-change debounce has stopped the previous generation. */
-function waitForRestart(): Promise<void> {
+/** Wait until a new source event occurs, or shutdown releases the waiter. */
+function waitForChange(afterVersion: number): Promise<void> {
+  if (stopping || changeVersion !== afterVersion) {
+    return Promise.resolve()
+  }
+
   return new Promise((resolve) => {
-    if (!debounceTimer) {
-      resolve()
-      return
-    }
-    const finish = finishRestartDebounce
-    finishRestartDebounce = () => {
-      finish?.()
-      resolve()
-    }
+    changeWaiters.add(resolve)
   })
 }
 
-/** Debounce noisy editor writes and stop a running generation before rebuilding. */
+/** Wait for the trailing edge of the source-event debounce. */
+function waitForDebounce(): Promise<void> {
+  if (!debounceTimer) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    debounceWaiters.add(resolve)
+  })
+}
+
+/** Debounce edits and stop only a running server; active builds finish before rebuilding. */
 function requestRestart(): void {
   if (stopping) {
     return
   }
 
-  restartRequested = true
+  changeVersion += 1
+  for (const resolve of changeWaiters) {
+    resolve()
+  }
+  changeWaiters.clear()
+
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     debounceTimer = undefined
-    activeChild?.kill('SIGTERM')
-    finishRestartDebounce?.()
-    finishRestartDebounce = undefined
+    if (activeChildRole === 'server') {
+      activeChild?.kill('SIGTERM')
+    }
+    for (const resolve of debounceWaiters) {
+      resolve()
+    }
+    debounceWaiters.clear()
   }, 100)
 }
 
@@ -123,7 +157,7 @@ for (const fileName of watchedRootFiles) {
   watchRootFile(fileName)
 }
 
-/** Relay termination to the active build or server, then close every watcher. */
+/** Close every watcher and stop the server; allow an active compiler to finish. */
 function stop(signal: NodeJS.Signals): void {
   if (stopping) {
     return
@@ -132,15 +166,25 @@ function stop(signal: NodeJS.Signals): void {
   stopping = true
   clearTimeout(debounceTimer)
   debounceTimer = undefined
-  finishRestartDebounce?.()
-  finishRestartDebounce = undefined
+  for (const resolve of changeWaiters) {
+    resolve()
+  }
+  changeWaiters.clear()
+  for (const resolve of debounceWaiters) {
+    resolve()
+  }
+  debounceWaiters.clear()
+
   for (const watcher of watchers) {
     watcher.close()
   }
   for (const watcher of rootFileWatchers.values()) {
     watcher.close()
   }
-  activeChild?.kill(signal)
+
+  if (activeChildRole === 'server') {
+    activeChild?.kill(signal)
+  }
 }
 
 process.once('SIGINT', stop)

@@ -110,7 +110,7 @@ cookies. Keycloak `start-dev` and the loopback Compose setup are for development
   revoke that account's application sessions. With the standard volume:
 
   ```sh
-  docker compose exec study node src/server/auth/revoke-sessions.ts --accounts /data/accounts.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
+  docker compose exec study node build/src/server/auth/revoke-sessions.js --accounts /data/accounts.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
   ```
 
   Native runs can use `npm run auth:revoke --` with the same arguments. Issuer and
