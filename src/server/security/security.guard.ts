@@ -6,7 +6,7 @@ import { ApplicationAuthentication } from '../auth/application-authentication.ts
 import { SecurityRequestLifetime } from './security-lifetime.ts'
 import { ApplicationError } from '../http/errors.ts'
 import type { AdmittedRequest, LibraryVisibility } from './security-context.ts'
-import { LIBRARY_WRITE, PUBLIC_METHOD } from './security-context.ts'
+import { LIBRARY_WRITE, ORIGINAL_PATH, PUBLIC_METHOD } from './security-context.ts'
 
 /** Own actor/workspace and content-write authorization before any body parameter is evaluated. */
 @Injectable()
@@ -30,6 +30,10 @@ export class SecurityGuard implements CanActivate {
     }
     this.authorize(request)
     if (!supported) {
+      throw new ApplicationError('Not found.', 404)
+    }
+    const originalPath = this.reflector.get<RegExp>(ORIGINAL_PATH, handler)
+    if (originalPath && !originalPath.test(request.admission.url.pathname)) {
       throw new ApplicationError('Not found.', 404)
     }
     const visibility = this.reflector.getAllAndOverride<LibraryVisibility>(LIBRARY_WRITE, [

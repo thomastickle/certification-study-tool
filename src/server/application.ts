@@ -1,3 +1,4 @@
+import { ownApplicationLifecycle } from './runtime/application-lifecycle.ts'
 import 'reflect-metadata'
 import { DiscoveryService, NestFactory } from '@nestjs/core'
 import { SecurityExpressAdapter } from './security/security-express-adapter.ts'
@@ -35,7 +36,7 @@ export async function createApplication(
     throw error
   })
   try {
-    registerStudyInputs(app.get(DiscoveryService))
+    const joinedStudyInputs = registerStudyInputs(app.get(DiscoveryService))
     const authentication = app.get(ApplicationAuthentication)
     const lifetime = app.get(SecurityRequestLifetime)
     app.get(ApplicationRuntime).attachTransport(async () => {
@@ -81,104 +82,9 @@ export async function createApplication(
       }
     })
     await publicWeb?.initialize(app.getHttpServer() as Server, configuration)
-    const initialize = app.init.bind(app)
-    const listen = app.listen.bind(app)
-    const close = app.close.bind(app)
-    let closing: Promise<void> | undefined
-    const starting = new Set<Promise<unknown>>()
-
-    /** Share disposal between init/listen failure and later callers; Nest closes HTTP once. */
-    const closeApplication = (): Promise<void> => {
-      lifetime.stop()
-      closing ??= (async () => {
-        await Promise.allSettled([...starting])
-        await close()
-      })()
-      return closing
-    }
-
-    const initializeApplication = async () => {
-      if (closing) {
-        throw new Error('The application is closing.')
-      }
-      if (starting.size) {
-        throw new Error(
-          'Application startup is already in progress. Await init/listen sequentially.',
-        )
-      }
-      const operation = initialize()
-      starting.add(operation)
-      try {
-        await operation
-        return application
-      } catch (error) {
-        await closeApplication()
-        throw error
-      } finally {
-        starting.delete(operation)
-      }
-    }
-
-    const listenApplication = async (
-      port: number | string,
-      hostnameOrCallback?: string | (() => void),
-      callback?: () => void,
-    ) => {
-      if (closing) {
-        throw new Error('The application is closing.')
-      }
-      if (starting.size) {
-        throw new Error(
-          'Application startup is already in progress. Await init/listen sequentially.',
-        )
-      }
-      const operation =
-        typeof hostnameOrCallback === 'string'
-          ? listen(port, hostnameOrCallback, callback)
-          : listen(port, hostnameOrCallback)
-      starting.add(operation)
-      try {
-        return await operation
-      } catch (error) {
-        await closeApplication()
-        throw error
-      } finally {
-        starting.delete(operation)
-      }
-    }
-
-    // NestFactory returns its own proxy; assigning methods on it does not replace the target.
-    // Keep failure ownership at this public factory boundary without changing Nest internals.
-    const application = new Proxy(app, {
-      get(target, property) {
-        if (property === 'useGlobalPipes') {
-          return () => {
-            throw new Error(
-              'Use parameter-local pipe instances on study inputs; global pipes are not supported.',
-            )
-          }
-        }
-        if (property === 'init') {
-          return initializeApplication
-        }
-        if (property === 'listen') {
-          return listenApplication
-        }
-        if (property === 'close') {
-          return closeApplication
-        }
-        const value = Reflect.get(target, property)
-        if (typeof value !== 'function') {
-          return value
-        }
-        return (...args: unknown[]) => {
-          const result = value(...args)
-          return result === app ? application : result
-        }
-      },
-    })
-    return application
+    return ownApplicationLifecycle(app, lifetime, joinedStudyInputs)
   } catch (error) {
+    // A cleanup failure must not replace the setup error that caused this unwind.
     try {
       await app.close()
     } catch {

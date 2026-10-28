@@ -183,3 +183,8 @@ Its inert legacy fixture supports pinned pre-Nest comparisons only. See
 [measurement boundaries](nest-benchmark-migration.md). Existing reports remain
 historical; the [pinned Nest comparison](nest-performance.md) records the new
 measurements. Final integrated review remains a separate gate. Issue #81 stays open.
+
+The [infrastructure review](nest-infrastructure-review.md) records standard-framework
+replacements, deleted transition code and the tested compatibility exceptions.
+Normal product controllers use guarded body interception with standard Nest Body
+parameters; asynchronous resource inputs use a separate explicit compatibility opt-in.

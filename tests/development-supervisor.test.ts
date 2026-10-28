@@ -63,7 +63,7 @@ test(
 
 /** Make a disposable project with the real build and dev scripts. */
 async function createFixture(
-  options: { invalidTypeScript?: boolean; runtimeFailure?: boolean } = {},
+  options: { invalidTypeScript?: boolean; runtimeFailure?: boolean; heldCompiler?: boolean } = {},
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'study-dev-supervisor-'))
   for (const file of [
@@ -78,6 +78,20 @@ async function createFixture(
     cpSync(file, join(directory, file), { recursive: true })
   }
   symlinkSync(resolve('node_modules'), join(directory, 'node_modules'), 'dir')
+  if (options.heldCompiler) {
+    const build = join(directory, 'scripts/build-server.ts')
+    writeFileSync(
+      build,
+      readFileSync(build, 'utf8').replace(
+        "'node_modules/typescript/bin/tsc6'",
+        "'scripts/held-compiler.ts'",
+      ),
+    )
+    writeFileSync(
+      join(directory, 'scripts/held-compiler.ts'),
+      "process.once('SIGTERM', () => process.exit(0))\nconsole.log('Synthetic compiler waiting')\nsetInterval(() => {}, 1000)\n",
+    )
+  }
 
   if (options.invalidTypeScript) {
     writeFileSync(join(directory, 'src/server/review-probe.ts'), 'const invalid: string = 123\n')
@@ -301,10 +315,13 @@ test(
     const fixture = await createFixture()
     const groupId = fixture.child.pid!
     let maximumCompilers = 0
+    const compilerPids = new Set<number>()
     const sampleCompilers = setInterval(() => {
-      const activeCompilers = processGroupMembers(groupId).filter((member) =>
+      const compilers = processGroupMembers(groupId).filter((member) =>
         member.command.includes('typescript/bin/tsc6'),
-      ).length
+      )
+      compilers.forEach((compiler) => compilerPids.add(compiler.pid))
+      const activeCompilers = compilers.length
       maximumCompilers = Math.max(maximumCompilers, activeCompilers)
     }, 10)
 
@@ -330,6 +347,7 @@ test(
         'Server start',
       )
       assert.equal(maximumCompilers, 1, 'At most one TypeScript compiler may write build/')
+      assert.equal(compilerPids.size, 1, 'Byte-identical root replacements must not compile twice')
 
       writeFileSync(
         join(fixture.directory, 'src/server/shutdown-probe.ts'),
@@ -376,6 +394,57 @@ test(
       const result = await Promise.race([fixture.exit, delay(8000).then(() => undefined)])
       assert.deepEqual(result, { code: 0, signal: null })
       await waitForGroupToExit(groupId)
+    } finally {
+      await cleanup(fixture)
+    }
+  },
+)
+
+test(
+  'development survives a root config deletion gap and rebuilds after recreation',
+  { skip: !linuxOnly },
+  async () => {
+    const fixture = await createFixture()
+    try {
+      await waitFor(fixture, () => healthIsReady(fixture.port), 'Initial server')
+      const config = join(fixture.directory, 'tsconfig.server.json')
+      const original = readFileSync(config)
+      const starts = countMatches(fixture.output(), /Certification Study Tool:/g)
+      unlinkSync(config)
+      await waitFor(
+        fixture,
+        () => fixture.output().includes('Server build exited with status'),
+        'Missing config build',
+      )
+      assert.equal(fixture.child.exitCode, null)
+      writeFileSync(config, original)
+      await waitFor(
+        fixture,
+        () => countMatches(fixture.output(), /Certification Study Tool:/g) > starts,
+        'Recreated config restart',
+      )
+      assert.equal(await healthIsReady(fixture.port), true)
+    } finally {
+      await cleanup(fixture)
+    }
+  },
+)
+
+test(
+  'development forwards shutdown through an active build and reaps its compiler',
+  { skip: !linuxOnly },
+  async () => {
+    const fixture = await createFixture({ heldCompiler: true })
+    try {
+      await waitFor(
+        fixture,
+        () => fixture.output().includes('Synthetic compiler waiting'),
+        'Owned held compiler',
+      )
+      fixture.child.kill('SIGTERM')
+      const result = await Promise.race([fixture.exit, delay(2000).then(() => undefined)])
+      assert.deepEqual(result, { code: 0, signal: null })
+      await waitForGroupToExit(fixture.child.pid!)
     } finally {
       await cleanup(fixture)
     }
