@@ -80,13 +80,3 @@ export function staticWebHandler(root: string): RoutedHttpHandler {
     }
   }
 }
-
-/** Adapt the admitted route for middleware that reads Node's request target. */
-export function developmentWebHandler(
-  middleware: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>,
-): RoutedHttpHandler {
-  return (request, response, url) => {
-    request.url = url.pathname + url.search
-    return middleware(request, response)
-  }
-}

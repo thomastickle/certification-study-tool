@@ -9,6 +9,7 @@ import {
   renameSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   watch,
   writeFileSync,
   existsSync,
@@ -29,6 +30,7 @@ import type { AdmittedRequest } from '../../src/server/security/security-context
 import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 import { BrowserCookies } from '../support/browser-cookies.ts'
 import { oidcFixture, closeServer } from '../oidc-fixture.ts'
+import { bank } from '../fixtures.ts'
 
 /** Bound protocol event waits without polling application state. */
 function bounded<T>(operation: Promise<T>, label: string): Promise<T> {
@@ -65,7 +67,9 @@ async function fixture() {
   )
   symlinkSync(resolve('node_modules'), join(root, 'node_modules'))
   writeFileSync(join(root, 'package.json'), '{"type":"module"}')
-  const provider = await oidcFixture('/realms/test', () => ({ study_roles: ['admin'] }))
+  const provider = await oidcFixture('/realms/test', (subject) => ({
+    study_roles: subject === 'alice' ? ['admin'] : [],
+  }))
   const port = await freePort()
   const configuration = runtimeConfiguration({
     STUDY_PORT: String(port),
@@ -82,14 +86,14 @@ async function fixture() {
       headers: { Origin: origin, Cookie: jar.header(path.split('?')[0]!), ...init.headers },
     })
 
-  const login = async () => {
+  const login = async (subject = 'alice') => {
     const jar = new BrowserCookies()
     const start = await call('/auth/login', jar)
     assert.equal(start.status, 302)
     jar.accept(start)
     const auth = new URL(start.headers.get('location')!)
     assert.equal(auth.searchParams.get('redirect_uri'), origin + '/auth/callback')
-    auth.searchParams.set('user', 'alice')
+    auth.searchParams.set('user', subject)
     const authorized = await fetch(auth, { redirect: 'manual' })
     const callback = new URL(authorized.headers.get('location')!)
     assert.equal(callback.origin, origin)
@@ -167,6 +171,80 @@ test(
         f.call('/api/questions', actor.jar, { headers: { 'X-Study-Account': actor.user.id } })
 
       assert.equal((await api()).status, 200)
+      const bob = await f.login('bob')
+      assert.notEqual(bob.user.id, actor.user.id)
+      assert.equal(
+        (await f.call('/api/questions', actor.jar, { headers: { 'X-Study-Account': bob.user.id } }))
+          .status,
+        409,
+      )
+      for (const path of ['/api/imports/preview', '/api/imports/confirm']) {
+        assert.equal(
+          (
+            await f.call(path, bob.jar, {
+              method: 'POST',
+              headers: { 'X-Study-Account': bob.user.id, 'Content-Type': 'application/json' },
+              body: 'INVALID',
+            })
+          ).status,
+          403,
+        )
+      }
+      const input = bank()
+      input.questions = Array.from({ length: 20 }, (_, index) => ({
+        ...structuredClone(input.questions[0]!),
+        source_ref: String(index),
+        question: `Owned private question ${index}?`,
+      }))
+
+      const privateCall = (path: string, body: unknown, user = actor) =>
+        f.call(path, user.jar, {
+          method: 'POST',
+          headers: { 'X-Study-Account': user.user.id, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+      const preview = await privateCall('/api/private/imports/preview', { bank: input })
+      assert.equal(preview.status, 200)
+      const token = (await preview.json()).token
+      const confirmation = { bank: input, token, reviewed: true }
+      assert.equal(
+        (await privateCall('/api/private/imports/confirm', confirmation, bob)).status,
+        409,
+      )
+      assert.equal((await privateCall('/api/private/imports/confirm', confirmation)).status, 201)
+      assert.equal((await privateCall('/api/private/imports/confirm', confirmation)).status, 409)
+      const ownSources = await f.call('/api/private/sources', actor.jar, {
+        headers: { 'X-Study-Account': actor.user.id },
+      })
+      const otherSources = await f.call('/api/private/sources', bob.jar, {
+        headers: { 'X-Study-Account': bob.user.id },
+      })
+      assert.equal((await ownSources.json()).length, 1)
+      assert.equal((await otherSources.json()).length, 0)
+      const quizResponse = await privateCall('/api/quizzes', {
+        provider: 'Example',
+        certification: 'DEMO-1',
+        sourceFilter: 'mixed',
+        questionType: 'mixed',
+        sourceIds: ['private:1'],
+      })
+      assert.equal(quizResponse.status, 201)
+      const quiz = await quizResponse.json()
+      assert.equal(
+        (
+          await f.call(`/api/quizzes/${quiz.id}`, bob.jar, {
+            headers: { 'X-Study-Account': bob.user.id },
+          })
+        ).status,
+        404,
+      )
+      assert.equal((await f.call('/auth/logout', bob.jar, { method: 'POST' })).status, 303)
+      assert.equal(
+        (await f.call('/api/questions', bob.jar, { headers: { 'X-Study-Account': bob.user.id } }))
+          .status,
+        401,
+      )
       const source = await f.call('/main.tsx')
       assert.equal(source.status, 200)
       assert.match(await source.text(), /import/)
@@ -236,6 +314,85 @@ test(
       assert.equal((await raw(f.origin, '/', { Origin: 'https://foreign.example' })).status, 403)
     } finally {
       ws?.close()
+      await f.close()
+    }
+  },
+)
+
+test(
+  'stock invalid-config recovery, replacement gap and shutdown during restart retain process ownership',
+  { timeout: 45000 },
+  async () => {
+    const f = await fixture()
+    const config = join(f.root, 'vite.config.ts')
+    const original = readFileSync(config, 'utf8')
+    const failedMarker = join(f.root, 'restart-failed')
+    const recoveredMarker = join(f.root, 'recovered')
+    const pendingMarker = join(f.root, 'restart-pending')
+    const logger = `import { createLogger } from 'vite'; import { writeFileSync } from 'node:fs'; const logger = createLogger();
+`
+    const observed = `customLogger: { ...logger, error(message, options) { logger.error(message, options); if (message === 'server restart failed') writeFileSync(${JSON.stringify(failedMarker)}, 'failed') } },`
+    writeFileSync(config, logger + original.replace('defineConfig({', `defineConfig({ ${observed}`))
+    try {
+      await f.owner.start()
+      const actor = await f.login()
+
+      const api = () =>
+        f.call('/api/questions', actor.jar, { headers: { 'X-Study-Account': actor.user.id } })
+
+      const failed = changed(f.root, 'restart-failed', 'failed')
+      writeFileSync(
+        config + '.new',
+        "throw new Error('expected invalid config')\nexport default {}\n",
+      )
+      renameSync(config + '.new', config)
+      await failed
+      assert.equal((await api()).status, 200, 'stock failed config retains the serving generation')
+      const gap = bounded(
+        new Promise<void>((resolve) => {
+          const watcher = watch(f.root, (_event, name) => {
+            if (name === 'vite.config.ts' && !existsSync(config)) {
+              watcher.close()
+              resolve()
+            }
+          })
+        }),
+        'owned config unlink gap',
+      )
+      unlinkSync(config)
+      await gap
+      const recovered = changed(f.root, 'recovered', 'yes')
+      writeFileSync(
+        config + '.new',
+        logger +
+          original.replace(
+            'defineConfig({',
+            `defineConfig({ ${observed} plugins: [{ name: 'recovery-observer', configureServer(server) { return () => server.httpServer.once('listening', () => writeFileSync(${JSON.stringify(recoveredMarker)}, 'yes')) } }],`,
+          ),
+      )
+      renameSync(config + '.new', config)
+      await recovered
+      assert.equal((await api()).status, 200)
+      assert.equal((await raw(f.origin, '/', { Origin: 'https://foreign.example' })).status, 403)
+      const pending = changed(f.root, 'restart-pending', 'yes')
+      writeFileSync(
+        config + '.new',
+        logger +
+          original.replace(
+            'defineConfig({',
+            `defineConfig({ plugins: [{ name: 'pending-restart', async configureServer(server) { await new Promise(resolve => server.watcher.once('ready', resolve)); writeFileSync(${JSON.stringify(pendingMarker)}, 'yes'); await new Promise(() => {}) } }],`,
+          ),
+      )
+      renameSync(config + '.new', config)
+      await pending
+      const frontendPid = Number(
+        readFileSync(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8').trim(),
+      )
+      assert.ok(Number.isInteger(frontendPid) && frontendPid > 0)
+      await bounded(f.owner.close(), 'shutdown during stock restart')
+      assert.throws(() => process.kill(-frontendPid, 0), { code: 'ESRCH' })
+      await assert.rejects(fetch(f.origin + '/api/health'))
+    } finally {
       await f.close()
     }
   },

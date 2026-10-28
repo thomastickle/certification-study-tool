@@ -45,30 +45,32 @@ public port, pending readiness cancellation, incomplete authorized body, late
 request storage work and compiled-main crash/signals. These are HTTP/WebSocket and
 process tests, not proof of rendered-browser state preservation.
 
-## Transitional test seams
+## Assertion migration
 
-The actual development main no longer uses `PublicWeb` / `DevelopmentVite` /
-`DevelopmentViteGraph`. They remain temporarily because legacy factory tests still
-exercise in-process middleware/SSR handles and graph-specific resource assertions.
-This slice is not completion of the deletion-first conversion. The maintained
-assertion map must retire those handles explicitly and retain product-level
-security, lifecycle and recovery assertions before deleting the implementations.
-Production static serving is outside this change, including parallel PR95.
+Both old graph implementations and `developmentWebHandler` are deleted. The
+production factory now rejects development configuration, cleaning acquired roots
+and pointing callers to `DevelopmentApplication`. The latter is a concrete
+composition owner, not an application-shaped or Vite-shaped remote facade. It
+exposes the real private Nest backend promise for explicit composition/observation.
+PublicWeb remains the existing static response-work owner and disposal hook; the
+reviewed Express static implementation is unchanged.
 
-Private implementation evidence and commands are retained in
-`/tmp/nest-vite-implementation/HANDOFF.md` and restricted sibling logs. Historical
-performance reports are unchanged; no performance improvement is claimed. Issue
-#81 remains open.
+| Retired family                                                                          | Maintained product/resource assertion                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `production-dev.spec.ts` in-process SSR handle                                          | Same local plugin `ssrLoadModule` behavior through actual HTTP in the stock child, plus real Nest root closure. No SSR or Vite handle crosses IPC.                                                                                                                                                                                                                         |
+| `vite-lifecycle.spec.ts` configureServer/buildStart/options/factory/public-file failure | Native `main-lifecycle.test.ts` retains configureServer and buildStart failures after real watcher acquisition, diagnostic/failure status and SQLite closure. Acquired child process group must disappear. Process tests add occupied-port and pending-ready cancellation. Synthetic plugin environment factory identity is retired; it is not used by the product config. |
+| `vite-lifecycle.spec.ts` config watching and `vite-reload.spec.ts` graph rollback       | Actual config restart, invalid config retaining the stock live generation, repair after unlink/replacement gap, unchanged session/API/admission, then shutdown while another restart is pending. There is no custom rollback or replacement scheduler.                                                                                                                     |
+| `vite-activation.spec.ts` environment identity/init-close-listen ordering               | Stock Vite owns environment ordering. Public process tests prove bounded acquisition/endpoint cleanup, failed initialization and child crash failure. Arbitrary previous-environment object identity is explicitly retired.                                                                                                                                                |
+| `vite-watcher-disposal.spec.ts` delayed-stat controls                                   | OS process-group disappearance contains all child callbacks and native resources. Native main tests acquire actual watchers before failure and exercise late watch registration during shutdown. No watcher metadata sealing or Vite internals mutation remains.                                                                                                           |
+| Development middleware raw rewrite                                                      | Pure immutable admission snapshot tests and actual raw HTTP/upgrade hostile-target denial before Connect; actual client transform replaces a dummy middleware response. Static admitted-context assertions are unchanged.                                                                                                                                                  |
+| API/storage lifetime                                                                    | Real OIDC/session/workspace, student denial before malformed body, cross-actor private preview ticket rejection/replay, private bank/quiz isolation and revoked access through the public origin. Connected HMR, incomplete authorized JSON and a held real HTTP scope survive until drainage permits private/shared roots to close.                                       |
 
-| Existing assertion family                                                                     | Coverage in the process slice                                                                                                  | Remaining migration before graph deletion                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `production-dev.spec.ts` SSR plugin middleware / `ssrLoadModule` handle                       | Actual product `main.tsx` transform and signed API/session proxy                                                               | Explicitly retire the in-process factory handle seam; the product does not use SSR routes. Do not invent an IPC Vite API.                                                                                             |
-| `vite-lifecycle.spec.ts` configureServer/buildStart/options/factory/public-file failure       | Occupied listener and acquired-watcher configureServer rejection close real backend roots; pending initialization cancellation | Consolidate applicable early/partial startup resource assertions into child/process checks, including buildStart; remove native watcher identity assertions only when process-group/endpoint assertions replace them. |
-| `vite-lifecycle.spec.ts` successful config watching                                           | Atomic real config edit, stock restart, retained session/API and reinstalled raw admission                                     | Add invalid config/recovery and unlink/replacement-gap probes before claiming full restart parity.                                                                                                                    |
-| `vite-reload.spec.ts` retained old graph on failed replacement and successful custom handoff  | Successful stock config restart; unexpected child death fails the generation                                                   | Explicitly retire custom rollback/old-graph identity semantics. Test stock failed-config behavior and deliberate fresh-generation recovery; keep bounded shutdown overlap coverage.                                   |
-| `vite-activation.spec.ts` custom environment init/close/listen ordering and endpoint identity | Real public listener ownership, occupied-port cleanup, pending-ready shutdown, compiled main crash/signals                     | Arbitrary environment identity/handoff is no longer a remote API contract. Preserve resource disposal assertions at the process boundary before removing synthetic graph-extension fixtures.                          |
-| `vite-watcher-disposal.spec.ts` delayed-stat/native watcher controls                          | Child termination and compiled-main process-group disappearance                                                                | Retain a delayed filesystem completion during process shutdown or demonstrate that the OS process boundary contains it; never replace resource assertions solely with `close()` resolution.                           |
-| Transport/API storage lifetime                                                                | Connected HMR, incomplete authorized body, real held HTTP scope, observed drainage and post-close private/shared queries       | Existing transport/security/domain tests remain unchanged. Extend process isolation to two actors and the remaining security negatives for overall parity.                                                            |
+Session expiry/role refresh, signature/nonce/audience, duplicate-cookie and the
+unchanged domain/security negative matrices remain in their existing suites; they
+are not duplicated for each proxy route. Protocol tests do not prove rendered
+browser state or HTTPS cookie enforcement. Production static/packaging checks and
+parent independent review remain separate required verification. No performance
+improvement is claimed; issue #81 remains open.
 
-No existing assertion or graph test has been deleted in this working bootstrap
-slice. This table records remaining work, not completed migration approval.
+Private commands/results and source budgets are retained at
+`/tmp/nest-vite-implementation/HANDOFF.md` with restricted sibling logs.

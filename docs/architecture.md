@@ -56,7 +56,7 @@ flowchart LR
   guards, owned input parsing and the security filter preserve HTTP policy.
 - `src/server/main.ts` starts the compiled production composition. The configured
   `RuntimeModule` owns shared resources; `StudyLibraryScope` owns each verified
-  actor's request storage. `PublicWeb` serves static files or development Vite.
+  actor's request storage. `PublicWeb` serves built static files; [development process ownership](development-process.md) uses a stock Vite child.
 - `src/web/` owns React presentation, file selection, and confirmation dialogs.
 - `src/shared/` contains TypeScript request/result types used across boundaries.
 
@@ -167,13 +167,15 @@ Compiled `main.ts` uses `createProductionApplication`: one RuntimeModule supplie
 security, LibraryHttpModule and StudyHttpModule. Admission normalizes original
 request targets before Express selection. Guards precede body/parameter work;
 request-owned personal storage remains alive through the actual operation and
-housekeeping observation. Public static/Vite middleware owns public paths, while
+housekeeping observation. Public static serving owns production paths, while
 unknown `/api/*` and `/auth/*` retain JSON security/error handling.
 
-Main serializes initialization and listening, shares early/repeated signal shutdown,
-and lets the process drain naturally. One transport owner stops admission, disposes
-Vite/HMR, aborts HTTP to unblock pending bodies, joins API/public work, then lets Nest
-close HTTP and database roots. Overlapping factory startup is rejected.
+Main serializes initialization and listening and shares early/repeated signal shutdown.
+Production retains the Nest/static transport; development owns a public stock Vite
+child and private real Nest API. It stops public admission, drains backend work and
+SQLite roots in the existing lifetime order, then terminates/joins the frontend
+process group. See [process ownership and assertion migration](development-process.md).
+Overlapping backend factory startup is rejected.
 
 HTTP/security/lifecycle tests now exercise compiled Nest or maintained pure helpers;
 the legacy dispatchers and transport adapters are removed. The benchmark runs the

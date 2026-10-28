@@ -3,31 +3,25 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
 import { securityFailure } from '../security/security.filter.ts'
 import type { AdmittedRequest } from '../security/security-context.ts'
-import { DevelopmentVite } from './development-vite.ts'
 import type { RuntimeConfiguration } from '../runtime/runtime-configuration.ts'
 import type { RequestUrl } from '../http/request-url.ts'
-import { developmentWebHandler, staticWebHandler } from './web-handler.ts'
+import { staticWebHandler } from './web-handler.ts'
 
-/** Own public assets and Vite before any fallible initialization hook runs. */
+/** Own built public responses through their complete asynchronous work. */
 export class PublicWeb {
-  private development = new DevelopmentVite()
   private pending = new Set<Promise<void>>()
 
   constructor(private handler?: ReturnType<typeof staticWebHandler>) {}
 
   /** Allocate public serving on the actual Nest listener without opening another HTTP port. */
-  async initialize(server: Server, configuration: RuntimeConfiguration): Promise<void> {
-    if (configuration.production) {
-      if (!existsSync(resolve(configuration.staticRoot, 'index.html'))) {
-        throw new Error('Run npm run build before starting production mode.')
-      }
-      this.handler = staticWebHandler(configuration.staticRoot)
-    } else {
-      const vite = await this.development.initialize(server)
-      this.handler = developmentWebHandler((request, response) =>
-        vite.middlewares(request, response),
-      )
+  async initialize(_server: Server, configuration: RuntimeConfiguration): Promise<void> {
+    if (!configuration.production) {
+      throw new Error('Use DevelopmentApplication for process-isolated development serving.')
     }
+    if (!existsSync(resolve(configuration.staticRoot, 'index.html'))) {
+      throw new Error('Run npm run build before starting production mode.')
+    }
+    this.handler = staticWebHandler(configuration.staticRoot)
   }
 
   /** Retain both the response and returned handler work, including work after disconnect. */
@@ -62,9 +56,9 @@ export class PublicWeb {
     }
   }
 
-  /** Stop web allocation and HMR before HTTP connections are aborted. */
+  /** Retain the disposal hook for composed public handlers; static responses drain after HTTP abort. */
   close(): Promise<void> {
-    return this.development.close()
+    return Promise.resolve()
   }
 
   /** Join response and handler work after the owner has unblocked HTTP connections. */
