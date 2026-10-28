@@ -4,7 +4,6 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { applicationRequestHandler } from '../src/server/request-handler.ts'
 import { staticWebHandler, developmentWebHandler } from '../src/server/web-handler.ts'
 import { closeServer } from './oidc-fixture.ts'
 
@@ -19,15 +18,9 @@ for (const mode of ['static', 'development'] as const) {
         : developmentWebHandler((request, response) => {
             response.end(request.url)
           })
-    const server = createServer(
-      applicationRequestHandler({
-        authentication: { handle: async () => ({ route: 'public', url }) },
-        study: () => {
-          throw new Error('Public context must keep its classification')
-        },
-        web,
-      }),
-    )
+    const server = createServer((request, response) => {
+      void web(request, response, url)
+    })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const address = server.address()
     assert.ok(address && typeof address !== 'string')
@@ -60,23 +53,11 @@ test('static serving retains shell fallback, method, decoding and containment ru
     { pathname: '/..%2Foutside', method: 'GET', status: 404, body: 'Not found.' },
   ]
   const web = staticWebHandler(directory)
-  const server = createServer(
-    applicationRequestHandler({
-      authentication: {
-        handle: async (request) => {
-          const scenario = cases[Number(request.headers['x-scenario'])]!
-          return {
-            route: 'public',
-            url: Object.freeze({ pathname: scenario.pathname, search: '?v=1' }),
-          }
-        },
-      },
-      study: () => {
-        throw new Error('Public context must not select an actor')
-      },
-      web,
-    }),
-  )
+  const server = createServer((request, response) => {
+    const scenario = cases[Number(request.headers['x-scenario'])]!
+    const url = Object.freeze({ pathname: scenario.pathname, search: '?v=1' })
+    void web(request, response, url)
+  })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   assert.ok(address && typeof address !== 'string')

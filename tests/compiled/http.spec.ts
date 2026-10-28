@@ -1,17 +1,12 @@
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { bank } from './fixtures.ts'
+import { compatibilityFixture } from './compatibility-fixture.ts'
+import { bank } from '../fixtures.ts'
 
 test('HTTP supports preview, confirm, browse and scoped deletion while denying cross-site writes', async () => {
-  const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}`
+  const fixture = await compatibilityFixture()
+  const { fetch } = fixture
+  const base = fixture.base + ''
 
   const post = (path: string, data: unknown, origin = base) =>
     fetch(base + path, {
@@ -67,23 +62,17 @@ test('HTTP supports preview, confirm, browse and scoped deletion while denying c
       400,
     )
   } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    )
-    repository.close()
+    await fixture.close()
   }
 })
 
 for (const mode of ['quiz', 'exam'] as const) {
   test(`${mode} HTTP saves confidence, scores results and rejects cross-site mutations`, async () => {
-    const { populate } = await import('./quiz-fixtures.ts')
-    const repository = new LibraryRepository(':memory:')
-    populate(repository, 24)
-    const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const address = server.address()
-    assert.ok(address && typeof address !== 'string')
-    const base = `http://127.0.0.1:${address.port}`
+    const { populate } = await import('../quiz-fixtures.ts')
+    const fixture = await compatibilityFixture()
+    const { fetch } = fixture
+    populate(fixture.shared, 24)
+    const base = fixture.base + ''
 
     const post = (path: string, data: unknown, method = 'POST', origin = base) =>
       fetch(base + path, {
@@ -155,10 +144,7 @@ for (const mode of ['quiz', 'exam'] as const) {
       assert.equal(await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json(), null)
       assert.equal((await (await fetch(`${base}/api/quizzes`)).json()).length, 1)
     } finally {
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      )
-      repository.close()
+      await fixture.close()
     }
   })
 }

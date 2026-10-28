@@ -7,12 +7,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setImmediate as nextTurn, setTimeout as delay } from 'node:timers/promises'
 import { test } from 'node:test'
-import { NestFactory } from '@nestjs/core'
 import type { ViteDevServer } from 'vite'
 import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { startLegacyTransport } from '../../src/server/legacy-transport.ts'
+import { createProductionApplication } from '../../src/server/production-application.ts'
 import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
-import { RuntimeModule } from '../../src/server/runtime.module.ts'
 
 type StatTail = { path: string; deliver: () => void }
 
@@ -81,7 +79,7 @@ for (const mode of ['metadata control', 'reopening control', 'Nest disposal']) {
       .filter((name) => name === 'FSEventWrap').length
     const http = createServer()
     let vite: ViteDevServer | undefined
-    let app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>> | undefined
+    let app: Awaited<ReturnType<typeof createProductionApplication>> | undefined
     let runtime: ApplicationRuntime | undefined
     const globals = globalThis as unknown as { __statTailVite?: ViteDevServer }
     const events: string[] = []
@@ -98,12 +96,9 @@ for (const mode of ['metadata control', 'reopening control', 'Nest disposal']) {
           STUDY_DB_PATH: join(directory, 'library.sqlite3'),
         })
         configuration.port = 0
-        app = await NestFactory.createApplicationContext(RuntimeModule.register(configuration), {
-          logger: false,
-          abortOnError: false,
-        })
+        app = await createProductionApplication(configuration)
         runtime = app.get<ApplicationRuntime>(ApplicationRuntime)
-        await startLegacyTransport(runtime, configuration)
+        await app.listen(0, '127.0.0.1')
         vite = globals.__statTailVite
       } else {
         const { createServer: createVite } = await import('vite')

@@ -1,14 +1,13 @@
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { QuizService } from '../src/server/quizzes/quiz-service.ts'
-import { populate } from './quiz-fixtures.ts'
+import { compatibilityFixture } from './compatibility-fixture.ts'
+import { QuizService } from '../../src/server/quizzes/quiz-service.ts'
+import { populate } from '../quiz-fixtures.ts'
 
 test('HTTP deletes, lists, restores and permanently deletes results without allowing cross-site changes', async () => {
-  const repository = new LibraryRepository(':memory:')
-  populate(repository)
+  const fixture = await compatibilityFixture()
+  const { repository, fetch } = fixture
+  populate(fixture.shared)
   const service = new QuizService(repository)
   const quiz = service.start({ sourceFilter: 'mixed', questionType: 'mixed' })
   service.submit(quiz.id, {
@@ -19,11 +18,7 @@ test('HTTP deletes, lists, restores and permanently deletes results without allo
       flagged: false,
     })),
   })
-  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}/api/quizzes`
+  const base = fixture.base + '/api/quizzes'
   try {
     const denied = { Origin: 'https://untrusted.example' }
     assert.equal(
@@ -66,12 +61,11 @@ test('HTTP deletes, lists, restores and permanently deletes results without allo
     assert.deepEqual(await (await fetch(`${base}/deleted`)).json(), [])
     assert.equal((await fetch(`${base}/${quiz.id}/restore`, { method: 'POST' })).status, 404)
     assert.equal(
-      (await (await fetch('http://127.0.0.1:' + address.port + '/api/reports')).json()).counts
+      (await (await fetch('http://127.0.0.1:' + fixture.port + '/api/reports')).json()).counts
         .total,
       0,
     )
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()))
-    repository.close()
+    await fixture.close()
   }
 })

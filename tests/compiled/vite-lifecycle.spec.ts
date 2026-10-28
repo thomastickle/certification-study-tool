@@ -6,11 +6,9 @@ import { join } from 'node:path'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { test } from 'node:test'
 import type { ViteDevServer, FSWatcher } from 'vite'
-import { NestFactory } from '@nestjs/core'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { startLegacyTransport } from '../../src/server/legacy-transport.ts'
+import { createProductionApplication } from '../../src/server/production-application.ts'
+import { observeRuntime } from './runtime-observation.ts'
 import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
-import { RuntimeModule } from '../../src/server/runtime.module.ts'
 
 type CapturedVite = { server?: ViteDevServer; watcher?: FSWatcher & { closed: boolean } }
 
@@ -59,18 +57,14 @@ for (const phase of ['configureServer', 'buildStart', 'options'] as const) {
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
     })
     configuration.port = 0
-    const app = await NestFactory.createApplicationContext(RuntimeModule.register(configuration), {
-      logger: false,
-      abortOnError: false,
-    })
-    const runtime = app.get(ApplicationRuntime)
+    const captured = observeRuntime()
     try {
       process.chdir(directory)
       await assert.rejects(
-        startLegacyTransport(runtime, configuration),
+        createProductionApplication(configuration),
         new RegExp(`injected ${phase} failure`),
       )
-      await app.close()
+      captured.restore()
       const { watcher } = captures[key]!
       assert.ok(watcher, 'The failure occurs after actual watcher allocation and readiness')
       assert.equal(watcher.closed, true)
@@ -82,13 +76,19 @@ for (const phase of ['configureServer', 'buildStart', 'options'] as const) {
         process.getActiveResourcesInfo().filter((name) => name === 'FSEventWrap').length,
         watcherCount,
       )
-      assert.throws(() => runtime.sharedLibrary.quizStore().nextHousekeepingAt(), /closed|not open/)
-      assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+      assert.throws(
+        () => captured.runtime.sharedLibrary.quizStore().nextHousekeepingAt(),
+        /closed|not open/,
+      )
+      assert.throws(
+        () => captured.runtime.authentication.legacyOwnerId('closed'),
+        /closed|not open/,
+      )
     } finally {
       // Even a red regression must explicitly release captured external resources.
       await captures[key]?.server?.close()
       await captures[key]?.watcher?.close()
-      await app.close()
+      captured.restore()
       delete captures[key]
       process.chdir(previousDirectory)
       rmSync(directory, { recursive: true, force: true })
@@ -133,27 +133,26 @@ test('rejected environment factories release the watcher even before init can re
     { mode: 0o600 },
   )
   const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
-  const app = await NestFactory.createApplicationContext(RuntimeModule.register(configuration), {
-    logger: false,
-    abortOnError: false,
-  })
-  const runtime = app.get(ApplicationRuntime)
+  const captured = observeRuntime()
   const before = process.getActiveResourcesInfo().filter((name) => name === 'FSEventWrap').length
   try {
     process.chdir(directory)
     await assert.rejects(
-      startLegacyTransport(runtime, configuration),
+      createProductionApplication(configuration),
       /injected environment factory failure/,
     )
-    await app.close()
+    captured.restore()
     assert.ok(native.size > 0, 'The factories reject only after actual native watcher allocation')
     assert.equal(closed.size, native.size)
     assert.equal(
       process.getActiveResourcesInfo().filter((name) => name === 'FSEventWrap').length,
       before,
     )
-    assert.throws(() => runtime.sharedLibrary.quizStore().nextHousekeepingAt(), /closed|not open/)
-    assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+    assert.throws(
+      () => captured.runtime.sharedLibrary.quizStore().nextHousekeepingAt(),
+      /closed|not open/,
+    )
+    assert.throws(() => captured.runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
   } finally {
     ready()
     for (const watcher of native) {
@@ -162,7 +161,7 @@ test('rejected environment factories release the watcher even before init can re
     watch.mock.restore()
     syncBuiltinESMExports()
     delete captures.__studyNativeWatchReady
-    await app.close()
+    captured.restore()
     process.chdir(previousDirectory)
     rmSync(directory, { recursive: true, force: true })
   }

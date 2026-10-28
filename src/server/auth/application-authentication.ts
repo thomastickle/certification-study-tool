@@ -17,11 +17,6 @@ export type AuthenticationOptions = OidcSettings & {
   now?: () => number
 }
 
-export type AuthenticationResult =
-  | { route: 'handled' }
-  | { route: 'public'; url: RequestUrl }
-  | { route: 'study'; user: SessionUser; url: RequestUrl }
-
 /** Establish verified identities and bind each admitted request to its own account and session role. */
 export class ApplicationAuthentication {
   private accounts: AccountRepository
@@ -51,35 +46,6 @@ export class ApplicationAuthentication {
     this.loginName = secure ? '__Secure-study_login' : 'study_login'
   }
 
-  /** Validate the request before routing authentication, public assets, or private study APIs. */
-  async handle(request: IncomingMessage, response: ServerResponse): Promise<AuthenticationResult> {
-    try {
-      const url = this.admit(request)
-      response.setHeader('Referrer-Policy', 'same-origin')
-      if (url.pathname.startsWith('/auth/')) {
-        response.setHeader('Referrer-Policy', 'no-referrer')
-        await this.authRoute(request, response, url)
-        return { route: 'handled' }
-      }
-      if (!url.pathname.startsWith('/api/')) {
-        return { route: 'public', url }
-      }
-      return this.authorizeStudyRequest(request, response, url)
-    } catch (error) {
-      const expected = error instanceof ApplicationError
-      const status = expected ? error.status : 500
-      const message = expected ? error.message : 'The request could not be completed. Please retry.'
-      sendJson(
-        response,
-        status,
-        error instanceof WorkspaceChangedError
-          ? { code: 'workspace_changed', error: message }
-          : { error: message },
-      )
-      return { route: 'handled' }
-    }
-  }
-
   /** Map an operator-selected legacy owner without issuing a login or granting any role. */
   legacyOwnerId(subject: string): string {
     if (!subject.trim()) {
@@ -104,25 +70,6 @@ export class ApplicationAuthentication {
     return requestUrl(url)
   }
 
-  /** Reject expired/foreign-issuer sessions and stale workspaces before selecting personal storage. */
-  private authorizeStudyRequest(
-    request: IncomingMessage,
-    response: ServerResponse,
-    url: RequestUrl,
-  ): AuthenticationResult {
-    if (url.pathname === '/api/health' && request.method === 'GET') {
-      sendJson(response, 200, { status: 'ok' })
-      return { route: 'handled' }
-    }
-    const user = this.session(request)
-    if (url.pathname === '/api/session' && request.method === 'GET') {
-      sendJson(response, 200, { user: user ?? null })
-      return { route: 'handled' }
-    }
-    const actor = this.requireWorkspace(request, user)
-    return { route: 'study', user: actor, url }
-  }
-
   /** Resolve only the durable, issuer-verified session; headers never select an account. */
   session(request: IncomingMessage): SessionUser | undefined {
     const token = cookie(request, this.sessionName)
@@ -140,25 +87,6 @@ export class ApplicationAuthentication {
       throw new WorkspaceChangedError()
     }
     return user
-  }
-
-  /** Map each authentication route to its workflow; each flow owns its cookies and failure rules. */
-  private async authRoute(
-    request: IncomingMessage,
-    response: ServerResponse,
-    url: RequestUrl,
-  ): Promise<void> {
-    response.setHeader('Cache-Control', 'no-store')
-    if (url.pathname === '/auth/login' && request.method === 'GET') {
-      return this.startLogin(request, response)
-    }
-    if (url.pathname === '/auth/callback' && request.method === 'GET') {
-      return this.completeLogin(request, response, url)
-    }
-    if (url.pathname === '/auth/logout' && request.method === 'POST') {
-      return this.logout(request, response)
-    }
-    throw new ApplicationError('Not found.', 404)
   }
 
   /** Supersede the browser's old attempt and reserve capacity across asynchronous provider work. */
@@ -307,14 +235,4 @@ function cookie(request: IncomingMessage, name: string): string | undefined {
 function redirect(response: ServerResponse, location: string, status = 302): void {
   response.writeHead(status, { Location: location, 'Cache-Control': 'no-store' })
   response.end()
-}
-
-/** Return only application-level failures, never provider tokens or callback details. */
-function sendJson(response: ServerResponse, status: number, value: unknown): void {
-  response.writeHead(status, {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-  })
-  response.end(JSON.stringify(value))
 }

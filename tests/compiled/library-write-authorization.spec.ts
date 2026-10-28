@@ -1,17 +1,14 @@
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { ImportService } from '../src/server/importer/import-service.ts'
-import { ConceptService } from '../src/server/concepts/concept-service.ts'
-import { bank } from './fixtures.ts'
-import { closeServer } from './oidc-fixture.ts'
+import { compatibilityFixture } from './compatibility-fixture.ts'
+import { ImportService } from '../../src/server/importer/import-service.ts'
+import { ConceptService } from '../../src/server/concepts/concept-service.ts'
+import { bank } from '../fixtures.ts'
 
 /** Give each scenario fresh synthetic banks and a verified server-side actor. */
 async function fixture(role: 'admin' | 'student', prefix: string) {
-  const shared = new LibraryRepository(':memory:')
-  const privateLibrary = new LibraryRepository(':memory:')
+  const f = await compatibilityFixture(role)
+  const { shared, personal: privateLibrary, fetch } = f
   const input = bank()
   input.questions.push({
     ...structuredClone(input.questions[0]!),
@@ -26,16 +23,10 @@ async function fixture(role: 'admin' | 'student', prefix: string) {
   const concepts = new ConceptService(content)
   const candidate = concepts.suggestions()[0]!
   const group = concepts.save({ ...candidate, name: 'Existing review' })
-  const server = createServer(
-    apiTestHandler(shared, { id: 'alice', role }, undefined, undefined, privateLibrary),
-  )
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
 
   /** Forged browser identity must never override the actor or destination. */
   const call = (path: string, method: string, data: object = {}) =>
-    fetch(`http://127.0.0.1:${address.port}${prefix}${path}`, {
+    fetch(`${f.base}${prefix}${path}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -56,9 +47,7 @@ async function fixture(role: 'admin' | 'student', prefix: string) {
     group,
     call,
     close: async () => {
-      await closeServer(server)
-      privateLibrary.close()
-      shared.close()
+      await f.close()
     },
   }
 }

@@ -1,29 +1,18 @@
+import { compatibilityFixture } from './compatibility-fixture.ts'
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { test } from 'node:test'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { ImportService } from '../src/server/importer/import-service.ts'
-import { HomeService } from '../src/server/home/home-service.ts'
-import { bank } from './fixtures.ts'
+import { ImportService } from '../../src/server/importer/import-service.ts'
+import { HomeService } from '../../src/server/home/home-service.ts'
+import { bank } from '../fixtures.ts'
 
 test('HTTP home and earned settings preserve readiness, enforce scope and survive restart/deletion', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'study-home-'))
-  const database = join(directory, 'test.sqlite3')
-  const repository = new LibraryRepository(database)
+  const fixture = await compatibilityFixture()
+  const { shared: repository, fetch, base } = fixture
   const importer = new ImportService(repository)
   const input = bank()
   input.certification = { provider: 'AWS', code: 'CLF-C02', name: 'Cloud Practitioner' }
   importer.confirm(input, importer.preview(input).token, false)
   const revision = repository.revision()
-  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}`
 
   async function earned(data: unknown, origin = base) {
     return fetch(base + '/api/certifications/earned', {
@@ -54,11 +43,11 @@ test('HTTP home and earned settings preserve readiness, enforce scope and surviv
     assert.equal(repository.revision(), revision, 'earned settings do not invalidate bank previews')
     assert.equal((await earned(scope)).status, 200, 'setting earned is idempotent')
     repository.deleteSource(repository.sources()[0]!.id)
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()))
-    repository.close()
+  } catch (error) {
+    await fixture.close()
+    throw error
   }
-  const reopened = new LibraryRepository(database)
+  const reopened = await fixture.restart()
   try {
     const service = new HomeService(reopened)
     assert.equal(service.get().providers[0]!.certifications[0]!.earned, true)
@@ -69,7 +58,6 @@ test('HTTP home and earned settings preserve readiness, enforce scope and surviv
       'removing an earned-only track leaves no invented catalog entry',
     )
   } finally {
-    reopened.close()
-    rmSync(directory, { recursive: true })
+    await fixture.close()
   }
 })
