@@ -1,3 +1,4 @@
+import { StudyInputWork } from './study-input-work.ts'
 import { Inject, Injectable } from '@nestjs/common'
 import type { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
@@ -6,10 +7,8 @@ import { StudyLibraryScope } from '../runtime/study-library-scope.ts'
 import { SHARED_LIBRARY_REPOSITORY } from '../runtime/runtime.module.ts'
 import { LibraryRepository } from '../questions/library-repository.ts'
 import type { AdmittedRequest } from './security-context.ts'
-import { StudyInputWork } from './study-input-work.ts'
-import { STUDY_INPUTS_REGISTERED } from './study-input-registration.ts'
 import type { ServerResponse } from 'node:http'
-import { JOINED_STUDY_INPUTS, STUDY_REQUEST } from './security-context.ts'
+import { STUDY_REQUEST } from './security-context.ts'
 
 /** Retain personal storage through body parameters and the full asynchronous controller operation. */
 @Injectable()
@@ -37,13 +36,6 @@ export class StudyContextInterceptor implements NestInterceptor {
     const actor = request.admission.user
     if (!actor) {
       throw new Error('StudyRequest requires an authenticated actor.')
-    }
-    const joined = this.reflector.getAllAndOverride<boolean>(JOINED_STUDY_INPUTS, [
-      context.getHandler(),
-      context.getClass(),
-    ])
-    if (joined && !this.reflector.get<boolean>(STUDY_INPUTS_REGISTERED, context.getHandler())) {
-      throw new Error('StudyRequest input metadata must be registered by createApplication.')
     }
     request.securityWorkOwned = true
 

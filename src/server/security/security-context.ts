@@ -1,3 +1,4 @@
+import type { StudyInputWork } from './study-input-work.ts'
 import type { IncomingMessage } from 'node:http'
 import { createParamDecorator, SetMetadata } from '@nestjs/common'
 import type { ExecutionContext } from '@nestjs/common'
@@ -6,17 +7,10 @@ import type { RequestUrl } from '../http/request-url.ts'
 import type { LibraryView } from '../questions/library-repository.ts'
 import type { StudyLibrary } from '../questions/study-library.ts'
 import type { LibraryRepository } from '../questions/library-repository.ts'
-import type { StudyInputWork } from './study-input-work.ts'
-import { jsonObjectBody } from '../http/json-object-body.ts'
 
 export const PUBLIC_METHOD = Symbol('PublicMethod')
 
 export const STUDY_REQUEST = Symbol('StudyRequest')
-
-export const JOINED_STUDY_INPUTS = Symbol('JoinedStudyInputs')
-
-/** Opt resource-using asynchronous custom parameters into the Nest compatibility adapter. */
-export const JoinedStudyInputs = () => SetMetadata(JOINED_STUDY_INPUTS, true)
 
 export const ORIGINAL_PATH = Symbol('OriginalPath')
 
@@ -83,14 +77,3 @@ export const StudyContext = createParamDecorator((_data: unknown, context: Execu
   }
   return value
 })
-
-/** Parse after guards and scope acquisition; allowEmpty is reserved for the pause endpoint. */
-export const JsonObjectBody = createParamDecorator(
-  (allowEmpty: boolean | undefined, context: ExecutionContext) => {
-    const request = context.switchToHttp().getRequest<AdmittedRequest>()
-    if (!request.studyContext || !request.inputWork) {
-      throw new Error('JsonObjectBody requires @StudyRequest().')
-    }
-    return jsonObjectBody(request, allowEmpty, request.inputWork.signal)
-  },
-)

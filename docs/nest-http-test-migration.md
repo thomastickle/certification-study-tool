@@ -75,3 +75,36 @@ checks; watcher acquisition plus process-group disappearance replaces internal
 watcher metadata after child termination. Early startup no longer forwards main's
 stdin into Vite: cancellation owns the pending child rather than releasing a remote
 graph gate. No valid resource assertion is replaced solely by `close()` resolution.
+
+## Native adapter deletion assertion map
+
+The joined-input decorators were conversion-only test extensions with no product
+callers. Native Nest resolves parameters concurrently and its fail-fast aggregate
+does **not** join resource-using sibling factories/pipes. Such I/O must be returned
+and awaited in controllers, services or route interceptors; coercion and validation
+remain ordinary native parameter/DI/class/global pipe work.
+
+- Former `input-factory` / `input-pipe` resource and original-400 probes now await
+  business work in the controller. Their suspended-work, late SQLite read,
+  shutdown lease, original status/envelope/header and storage-close assertions remain.
+  These no longer assert sibling parameter ownership.
+- The partial-body probe injects cancellation before the real guarded reader,
+  rather than using a sibling parameter failure. The same 15-second deadline,
+  original 400 delivery, readable-listener cleanup before housekeeping, and root
+  closure assertions remain. Existing product partial-body shutdown and malformed,
+  oversized and media-error tests cover the real cancellation/error sources.
+- Successful resource-input probes now use awaited controller I/O, retaining
+  successful/disconnected late reads and close assertions. Cooperative sibling
+  cancellation is retired; manual-response lifetime tests and guard-disconnect
+  probes cover cooperative cancellation in awaited operations.
+- Body/method/class-pipe rejection probes now positively accept native metadata.
+  Global-pipe restriction assertions become positive fluent global-pipe acceptance.
+  Ordered asynchronous local pipes, emitted data/types and inherited concrete
+  metadata still compare with an independent native Nest composition.
+- Public proxy identity/fluent assertions now include exact identity with the
+  object returned by NestFactory. Startup failure/port collision/start-close probes
+  exercise ApplicationOwner explicitly. Direct native init/listen callers must
+  own cleanup; the factory only owns acquisition and post-create setup failure.
+- Post-create cleanup still injects at real transport attachment/admission seams.
+  Completed manual response versus premature disconnect, deep OIDC/security,
+  housekeeping and real product business/storage assertions remain supported.

@@ -1,3 +1,4 @@
+import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -62,7 +63,7 @@ test('compiled Nest decorators serve health through DI and close the listening a
   assert.equal(server.address(), null)
 })
 
-test('factory rejects overlapping startup instead of running Nest initialization twice', async () => {
+test('startup owner rejects overlapping starts instead of running Nest initialization twice', async () => {
   const { Module } = await import('@nestjs/common')
   let enter!: () => void
   let release!: () => void
@@ -91,11 +92,12 @@ test('factory rejects overlapping startup instead of running Nest initialization
   const directory = mkdtempSync(join(tmpdir(), 'study-startup-gate-'))
   const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
   const app = await createApplication(configuration, [GatedModule])
-  const initializing = app.init()
+  const owner = new ApplicationOwner(Promise.resolve(app))
+  const initializing = owner.start(0, '127.0.0.1')
   try {
     await entered
-    await assert.rejects(app.init(), /startup is already in progress/)
-    await assert.rejects(app.listen(0, '127.0.0.1'), /startup is already in progress/)
+    await assert.rejects(owner.start(0, '127.0.0.1'), /startup is already owned/)
+    assert.equal(initializations, 1)
   } finally {
     release()
     await initializing

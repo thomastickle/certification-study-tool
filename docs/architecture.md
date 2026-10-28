@@ -4,7 +4,7 @@ Nest transport layout follows feature ownership. Only `main.ts`, `application.ts
 `application.module.ts`, and `production-application.ts` remain at `src/server/`:
 
 - `runtime/` owns configuration, startup acquisition/unwind, runtime aliases and study scope.
-- `security/` owns admission, global guards/filter/interceptor and joined request input/lifetime.
+- `security/` owns admission, global guards/filter/interceptor and guarded body parsing and request lifetime.
 - `auth/` owns authentication/session controllers and workflows; its module borrows the
   runtime-owned authentication singleton. `health/` owns its controller and service.
 - `library-http/` and `study-http/` keep controllers, route guards and private feature
@@ -189,4 +189,8 @@ measurements. Final integrated review remains a separate gate. Issue #81 stays o
 The [infrastructure review](nest-infrastructure-review.md) records standard-framework
 replacements, deleted transition code and the tested compatibility exceptions.
 Normal product controllers use guarded body interception with standard Nest Body
-parameters; asynchronous resource inputs use a separate explicit compatibility opt-in.
+parameters; resource I/O stays in awaited controller/service/interceptor operations.
+
+The factory returns the native Nest object. `ApplicationOwner` owns sequential
+init/listen and one joined close for main/development startup; it does not expose
+an app-shaped facade. Native parameter metadata and pipes are unmodified.

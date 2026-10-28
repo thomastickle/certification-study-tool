@@ -1,3 +1,4 @@
+import { ApplicationOwner } from '../runtime/application-owner.ts'
 import { fork, type ChildProcess } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -9,6 +10,7 @@ import type { RuntimeConfiguration } from '../runtime/runtime-configuration.ts'
 /** Own one private Nest API and one public stock Vite process; a crash fails the entire generation. */
 export class DevelopmentApplication {
   readonly backend: ReturnType<typeof createApplication>
+  private readonly owner: ApplicationOwner
   readonly failed: Promise<Error>
   private reportFailure!: (error: Error) => void
   private child: ChildProcess | undefined
@@ -25,6 +27,7 @@ export class DevelopmentApplication {
       this.reportFailure = resolve
     })
     this.backend = createApplication(configuration, [LibraryHttpModule, StudyHttpModule])
+    this.owner = new ApplicationOwner(this.backend)
   }
 
   /** Announce readiness only after Nest listens and the public child has completed stock listen.
@@ -32,7 +35,11 @@ export class DevelopmentApplication {
    */
   start(): Promise<void> {
     this.starting ??= this.initialize().catch(async (error: unknown) => {
-      await this.close()
+      try {
+        await this.close()
+      } catch {
+        console.error('Development startup cleanup failed.')
+      }
       throw error
     })
     return this.starting
@@ -43,8 +50,7 @@ export class DevelopmentApplication {
     if (this.closing) {
       throw new Error('Development application is closing.')
     }
-    await backend.init()
-    await backend.listen(0, '127.0.0.1')
+    await this.owner.start(0, '127.0.0.1')
     if (this.closing) {
       throw new Error('Development application is closing.')
     }
@@ -172,8 +178,7 @@ export class DevelopmentApplication {
       }
     } finally {
       try {
-        const backend = await this.backend.catch(() => undefined)
-        await backend?.close()
+        await this.owner.close()
       } finally {
         await this.terminateFrontend()
       }

@@ -1,3 +1,4 @@
+import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import assert from 'node:assert/strict'
 import { NestFactory } from '@nestjs/core'
 import type { LibraryRepository } from '../../src/server/questions/library-repository.ts'
@@ -49,10 +50,6 @@ async function fixture(
   let now = Date.now()
   config.authentication.now = () => now
   const app = await createApplication(config, [ProbeModule, ...features])
-  app.use((req: { inputProbe?: ProbeWork }, _res: unknown, next: () => void) => {
-    req.inputProbe = app.get(ProbeWork)
-    next()
-  })
   await app.listen(0, '127.0.0.1')
   const server = app.getHttpServer() as Server
   const address = server.address()
@@ -596,7 +593,7 @@ test('failed Nest feature construction releases the runtime acquired by the same
   }
 })
 
-test('Nest init failure closes HTTP and roots once even when listen also catches the failure', async () => {
+test('startup owner closes HTTP and roots once after Nest init failure', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-security-init-'))
   const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
   const feature = {
@@ -614,11 +611,12 @@ test('Nest init failure closes HTTP and roots once even when listen also catches
   }
   const app = await createApplication(config, [feature])
   const runtime = app.get(ApplicationRuntime)
+  const owner = new ApplicationOwner(Promise.resolve(app))
   const adapter = app.getHttpAdapter()
   const closeHttp = adapter.close.bind(adapter)
   const close = mock.method(adapter, 'close', closeHttp)
   try {
-    await assert.rejects(app.listen(0, '127.0.0.1'), /synthetic-init-failure/)
+    await assert.rejects(owner.start(0, '127.0.0.1'), /synthetic-init-failure/)
     assert.equal(close.mock.callCount(), 1)
     assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
     assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
@@ -636,9 +634,10 @@ test('Nest listen failure releases initialized roots without closing another lis
   assert.ok(address && typeof address !== 'string')
   const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
   const app = await createApplication(config)
+  const owner = new ApplicationOwner(Promise.resolve(app))
   const runtime = app.get(ApplicationRuntime)
   try {
-    await assert.rejects(app.listen(address.port, '127.0.0.1'), /EADDRINUSE/)
+    await assert.rejects(owner.start(address.port, '127.0.0.1'), /EADDRINUSE/)
     assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
     assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
     assert.equal(listener.listening, true)
@@ -756,7 +755,7 @@ test('raw HTTP retains case/slash/percent rules and original Host checks despite
 })
 
 test(
-  'app.close joins in-flight Nest initialization before disposing roots or a late listener',
+  'the startup owner joins Nest initialization before disposing roots',
   { timeout: 15000 },
   async () => {
     const directory = mkdtempSync(join(tmpdir(), 'nest-security-start-close-'))
@@ -779,10 +778,11 @@ test(
     }
     const app = await createApplication(config, [feature])
     const runtime = app.get(ApplicationRuntime)
-    const listening = app.listen(0, '127.0.0.1')
+    const owner = new ApplicationOwner(Promise.resolve(app))
+    const listening = owner.start(0, '127.0.0.1')
     await entered.promise
     let closed = false
-    const closing = app.close().then(() => {
+    const closing = owner.close().then(() => {
       closed = true
     })
     try {
@@ -824,7 +824,7 @@ test('failed startup refuses delayed DI acquisition after another provider has a
 
 for (const input of ['factory', 'pipe']) {
   test(
-    `a rejecting sibling retains pending resource ${input} work and the shutdown lease`,
+    `awaited business work migrated from ${input} retains storage and the shutdown lease`,
     { timeout: 15000 },
     async () => {
       const f = await fixture()
@@ -852,7 +852,7 @@ for (const input of ['factory', 'pipe']) {
           await setImmediate()
         }
         assert.equal(work.inputControllerCalls, 0)
-        assert.equal(responded, false, 'HTTP error waits for owned non-cancellable input work')
+        assert.equal(responded, false, 'HTTP error waits for awaited non-cancellable business work')
         work.personal!.sources()
         let closed = false
         const closing = f.app.close().then(() => {
@@ -866,7 +866,7 @@ for (const input of ['factory', 'pipe']) {
         release.resolve()
         await closing
         await calling
-        assert.equal(work.lateRead, true, 'late parameter DB work completes before storage closes')
+        assert.equal(work.lateRead, true, 'late business DB work completes before storage closes')
         assert.throws(() => work.personal!.sources(), /closed|not open/)
       } finally {
         release.resolve()
@@ -879,7 +879,7 @@ for (const input of ['factory', 'pipe']) {
 
 for (const input of ['factory', 'pipe']) {
   test(
-    `owned ${input} work settles before returning the original sibling 400`,
+    `awaited business work migrated from ${input} settles before the original 400`,
     { timeout: 15000 },
     async () => {
       const f = await fixture()
@@ -922,7 +922,7 @@ for (const input of ['factory', 'pipe']) {
 }
 
 test(
-  'a rejecting sibling cancels the actual partial JSON body before observation and the original 400',
+  'guarded partial JSON cancellation settles before observation and the original 400',
   { timeout: 15000 },
   async () => {
     const f = await fixture()
@@ -1009,7 +1009,7 @@ test(
 
 for (const disconnect of [false, true]) {
   test(
-    `owned successful input work remains usable through ${disconnect ? 'disconnect' : 'resolution'}`,
+    `awaited controller work remains usable through ${disconnect ? 'disconnect' : 'resolution'}`,
     { timeout: 15000 },
     async () => {
       const f = await fixture()
@@ -1071,36 +1071,25 @@ for (const disconnect of [false, true]) {
   )
 }
 
-for (const invalid of [UnownedBodyModule, UnownedPipeModule, UnownedClassPipeModule]) {
-  test(`invalid unowned input composition ${invalid.name} is rejected before any request work`, async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'nest-unowned-input-'))
-    let runtime: ApplicationRuntime | undefined
+for (const feature of [UnownedBodyModule, UnownedPipeModule, UnownedClassPipeModule]) {
+  test(`native input composition ${feature.name} accepts ordinary Nest metadata`, async () => {
+    const f = await fixture(undefined, [feature])
     try {
-      const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
-      const capture = {
-        module: FailureModule,
-        providers: [
-          {
-            provide: 'CapturedRuntime',
-            inject: [ApplicationRuntime],
-            useFactory: (value: ApplicationRuntime) => {
-              runtime = value
-              return value
-            },
-          },
-        ],
-      }
-      await assert.rejects(
-        createApplication(config, [invalid, capture]),
-        /(StudyRequest.*(inputs|parameter-local)|parameter-local pipe instances)/,
+      const session = await f.login('bob')
+      const path =
+        feature === UnownedBodyModule
+          ? 'unowned-input'
+          : feature === UnownedPipeModule
+            ? 'unowned-pipe'
+            : 'unowned-class-pipe'
+      const response = await f.authorized(
+        `/api/${path}`,
+        session,
+        feature === UnownedBodyModule ? 'POST' : 'GET',
       )
-      assert.ok(runtime)
-      assert.throws(() => runtime!.sharedLibrary.sources(), /closed|not open/)
-      assert.throws(() => runtime!.authentication.legacyOwnerId('closed'), /closed|not open/)
+      assert.equal(response.status, feature === UnownedBodyModule ? 201 : 200)
     } finally {
-      await runtime?.onModuleDestroy()
-      runtime?.onApplicationShutdown()
-      rmSync(directory, { recursive: true, force: true })
+      await f.close()
     }
   })
 }
@@ -1125,68 +1114,10 @@ test('JSON body parameters outside the registered personal scope fail without re
   }
 })
 
-test('cooperative input cancellation finishes its resource cleanup before the original sibling 400', async () => {
+test('ordinary parameters accept global Nest pipes', async () => {
   const f = await fixture()
   try {
-    const entered = deferred()
-    const work = f.app.get(ProbeWork)
-    work.inputEntered = entered.resolve
-    work.beforeFailure = entered.promise
-    const session = await f.login('bob')
-    const response = await f.authorized('/api/probe/input-cooperative', session)
-    assert.equal(response.status, 400)
-    assert.deepEqual(JSON.parse(response.body), {
-      error: 'Synthetic parameter rejection.',
-      details: [],
-    })
-    assert.equal(work.cooperativeCleanup, true)
-    assert.equal(work.inputControllerCalls, 0)
-    assert.throws(() => work.personal!.sources(), /closed|not open/)
-  } finally {
-    await f.close()
-  }
-})
-
-test('joined resource inputs reject global pipes through Nest provider and public factory APIs', async () => {
-  const { APP_PIPE } = await import('@nestjs/core')
-  const { Scope } = await import('@nestjs/common')
-  for (const scope of [Scope.DEFAULT, Scope.REQUEST]) {
-    const directory = mkdtempSync(join(tmpdir(), 'nest-global-pipe-'))
-    try {
-      const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
-      const feature = {
-        module: FailureModule,
-        providers: [
-          {
-            provide: APP_PIPE,
-            scope,
-            useFactory: () => ({
-              transform(value: unknown) {
-                return value
-              },
-            }),
-          },
-        ],
-      }
-      await assert.rejects(
-        createApplication(config, [ProbeModule, feature]),
-        /global and class pipes are not supported/,
-      )
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
-  }
-  const f = await fixture()
-  try {
-    assert.throws(
-      () =>
-        f.app.useGlobalPipes({
-          transform(value: unknown) {
-            return value
-          },
-        }),
-      /global pipes are not supported/,
-    )
+    assert.equal(f.app.useGlobalPipes({ transform: (value: unknown) => value }), f.app)
     assert.equal((await f.call('/api/health')).status, 200)
   } finally {
     await f.close()

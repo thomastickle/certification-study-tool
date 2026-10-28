@@ -31,7 +31,7 @@ export async function jsonObjectBody(
   }
 }
 
-/** Stop a pending Nest body read on sibling failure without destroying its intended error response. */
+/** Stop a pending guarded body read on cancellation without destroying its intended error response. */
 function cancellableChunks(request: IncomingMessage, signal: AbortSignal): Promise<Buffer[]> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
