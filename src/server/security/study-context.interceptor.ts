@@ -66,9 +66,7 @@ export class StudyContextInterceptor implements NestInterceptor {
         // A later guard may have awaited past the client's close event before scope entry.
         if (
           request.aborted ||
-          response.destroyed ||
-          response.writableEnded ||
-          request.socket.destroyed
+          (!response.writableFinished && (response.destroyed || request.socket.destroyed))
         ) {
           disconnect()
         }

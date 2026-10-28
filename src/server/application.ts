@@ -35,12 +35,10 @@ export async function createApplication(
     await startup.closeFailedStartup()
     throw error
   })
-  let joinedStudyInputs: boolean
-  let lifetime: SecurityRequestLifetime
   try {
-    joinedStudyInputs = registerStudyInputs(app.get(DiscoveryService))
+    const joinedStudyInputs = registerStudyInputs(app.get(DiscoveryService))
     const authentication = app.get(ApplicationAuthentication)
-    lifetime = app.get(SecurityRequestLifetime)
+    const lifetime = app.get(SecurityRequestLifetime)
     app.get(ApplicationRuntime).attachTransport(async () => {
       lifetime.stop()
       try {
@@ -84,10 +82,14 @@ export async function createApplication(
       }
     })
     await publicWeb?.initialize(app.getHttpServer() as Server, configuration)
+    return ownApplicationLifecycle(app, lifetime, joinedStudyInputs)
   } catch (error) {
     // A cleanup failure must not replace the setup error that caused this unwind.
-    await app.close().catch(() => undefined)
+    try {
+      await app.close()
+    } catch {
+      console.error('Application setup cleanup failed.')
+    }
     throw error
   }
-  return ownApplicationLifecycle(app, lifetime, joinedStudyInputs)
 }
