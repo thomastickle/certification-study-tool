@@ -1147,7 +1147,7 @@ test('cooperative input cancellation finishes its resource cleanup before the or
   }
 })
 
-test('global pipes are explicitly rejected through both the Nest provider and public factory APIs', async () => {
+test('joined resource inputs reject global pipes through Nest provider and public factory APIs', async () => {
   const { APP_PIPE } = await import('@nestjs/core')
   const { Scope } = await import('@nestjs/common')
   for (const scope of [Scope.DEFAULT, Scope.REQUEST]) {
@@ -1169,7 +1169,7 @@ test('global pipes are explicitly rejected through both the Nest provider and pu
         ],
       }
       await assert.rejects(
-        createApplication(config, [feature]),
+        createApplication(config, [ProbeModule, feature]),
         /global and class pipes are not supported/,
       )
     } finally {

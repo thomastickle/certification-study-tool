@@ -14,20 +14,19 @@ dismissal, under `/api`, `/api/shared`, and `/api/private`. Unsupported prefixed
 resources remain absent. Unprefixed sources combine both libraries with prefixed
 private IDs; unprefixed questions and content mutations select shared storage.
 
-A local LibraryRouteGuard runs after global authentication/workspace policy and
-before study scope/parameters. It checks the admitted normalized raw pathname
-against the legacy patterns before checking the shared admin role. This deliberately
-replaces LibraryWrite metadata for this controller: global write metadata would
-produce 403 for invalid paths that must be 404. Digits-only deletion paths then
-receive role checks before positive-safe-integer validation; UUID and digest
-patterns retain their permissive legacy lowercase shape. Encoded IDs are not
-accepted through Express decoding. Implicit HEAD remains rejected by global
-method policy; there are no catch-all routes or legacy dispatcher calls.
+Browse, import, content deletion and concept mutation controllers are separate
+resource owners. Shared/unprefixed and private write controllers inherit the same
+operations and declare static `@LibraryWrite('shared' | 'private')` metadata. The
+single global SecurityGuard authenticates, checks `@OriginalPath` metadata, then
+applies that write policy. There is no second role-checking route guard or method
+dispatch table. This retains malformed-path 404 before shared-write 403, then
+positive-safe-integer validation. Encoded IDs cannot bypass original-path checks.
+History static paths are registered before dynamic quiz-ID routes.
 
-All service work completes inside StudyRequest. JSON parsing uses the existing
-owned JsonObjectBody input; domain validation remains in existing services.
-Concept removal and dismissal explicitly serialize JSON null, because Nest's
-normal null return emits an empty body. Question/source deletions remain 204.
+All operations complete inside StudyRequest. ReadJsonBody awaits parsing before
+ordinary Nest Body extraction. Domain validation remains in the existing services.
+Concept removal/dismissal return the literal JSON null bytes through Nest's normal
+response path with explicit status/content type. Question/source deletes remain 204.
 
 ## Retained and migrated test mapping
 

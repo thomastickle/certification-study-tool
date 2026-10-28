@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
-import { watch, type FSWatcher } from 'node:fs'
+import { readFileSync, watch, type FSWatcher } from 'node:fs'
 import { once } from 'node:events'
 
 const watchedDirectories = ['src/server', 'src/shared', 'docs', 'scripts']
 const watchedRootFiles = new Set(['package.json', 'tsconfig.json', 'tsconfig.server.json'])
+const rootContents = new Map([...watchedRootFiles].map((file) => [file, readRootFile(file)]))
 
 type ChildRole = 'build' | 'server'
 
@@ -15,7 +16,15 @@ let debounceTimer: NodeJS.Timeout | undefined
 const changeWaiters = new Set<() => void>()
 const debounceWaiters = new Set<() => void>()
 const watchers: FSWatcher[] = []
-const rootFileWatchers = new Map<string, FSWatcher>()
+
+/** Treat unavailable configs as a state change; the compiler reports the underlying error. */
+function readRootFile(file: string): string | undefined {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    return undefined
+  }
+}
 
 /** Build serially and run one server generation at a time. */
 async function runDevelopment(): Promise<void> {
@@ -128,21 +137,6 @@ function requestRestart(): void {
   }, 100)
 }
 
-/** Follow editor saves that replace a root configuration file with a new inode. */
-function watchRootFile(fileName: string): void {
-  try {
-    // Keep the previous handle until a replacement is acquired. The directory
-    // watcher observes recreation after an editor's unlink/write save sequence.
-    const replacement = watch(fileName, requestRestart)
-    rootFileWatchers.get(fileName)?.close()
-    rootFileWatchers.set(fileName, replacement)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error
-    }
-  }
-}
-
 for (const directory of watchedDirectories) {
   watchers.push(
     watch(directory, { recursive: true }, (_event, filename) => {
@@ -153,20 +147,21 @@ for (const directory of watchedDirectories) {
   )
 }
 
+// The directory watch covers both in-place edits and replacement gaps without binding an inode.
 watchers.push(
   watch('.', (_event, filename) => {
     const changedFile = filename?.toString()
     if (changedFile && watchedRootFiles.has(changedFile)) {
-      requestRestart()
-      watchRootFile(changedFile)
+      const content = readRootFile(changedFile)
+      if (content !== rootContents.get(changedFile)) {
+        rootContents.set(changedFile, content)
+        requestRestart()
+      }
     }
   }),
 )
-for (const fileName of watchedRootFiles) {
-  watchRootFile(fileName)
-}
 
-/** Close every watcher and stop the server; allow an active compiler to finish. */
+/** Close watchers, forward shutdown through the owned phase, and await its descendants. */
 function stop(signal: NodeJS.Signals): void {
   if (stopping) {
     return
@@ -187,13 +182,8 @@ function stop(signal: NodeJS.Signals): void {
   for (const watcher of watchers) {
     watcher.close()
   }
-  for (const watcher of rootFileWatchers.values()) {
-    watcher.close()
-  }
 
-  if (activeChildRole === 'server') {
-    activeChild?.kill(signal)
-  }
+  activeChild?.kill(signal)
 }
 
 process.once('SIGINT', stop)

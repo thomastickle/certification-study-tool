@@ -66,131 +66,61 @@ and revocation. The obsolete `handle` adapter is removed; Nest calls the maintai
 
 ## Study controllers
 
-Each study controller or handler uses `@StudyRequest()`. Guards run first. The
-scope interceptor then opens the actor's personal library with the approved
-`StudyLibraryScope.withLibrary`, synchronizes shared deletions and enters parameter
-resolution/controller work. The factory registers owned input metadata before Nest
-snapshots its parameter pipeline. This scope encloses every registered custom
-factory and its parameter-local pipe chain, body streaming, awaited controller
-services, errors and disconnects. Only after those operations settle does it observe
-the attempted operation and close the personal connection. It never closes the shared root.
+Each study controller uses `@StudyRequest()`. Guards authenticate and validate the
+original target before the scope interceptor acquires the verified actor's personal
+library. The scope encloses route interceptors, Nest parameter resolution, awaited
+controller work, error handling and disconnect cleanup. Storage is observed and
+closed only after that work settles; feature code never closes the shared root.
+
+Product routes use ordinary Nest body parameters after one guarded parser:
 
 ```ts
 @Controller('api/quizzes')
 @StudyRequest()
 export class QuizController {
   @Post()
-  @HttpCode(201)
-  start(
-    @JsonObjectBody() input: Record<string, unknown>,
-    @StudyContext() context: StudyRequestContext,
-  ) {
+  @ReadJsonBody()
+  start(@Body() input: Record<string, unknown>, @StudyContext() context: StudyRequestContext) {
     return new QuizService(context.study).start(input)
   }
 }
 ```
 
-`context.study` is the combined personal/shared `StudyLibrary` for quiz/home/report
-services. `context.personal` is the owned private repository;
-`context.shared` is the borrowed shared repository. `context.content(visibility)`
-returns an actor-bound `LibraryView` for concept services. Import/library services
-that require `LibraryRepository` use the selected personal/shared repository.
-`@VerifiedActor()` exposes the same verified actor; `context.actor`, `context.url`
-and `context.query` are also available. Do not retain repositories after the
-handler's returned promise settles or start detached service work.
+`ReadJsonBody` awaits the object-only, case-sensitive application/json parser inside
+the personal scope, before Nest resolves parameters or pipes. It retains the 10 MiB
+limit and existing 400/413/415 messages. Only pause uses `ReadJsonBody(true)` for the
+empty-body exception. Body-free routes do not read input. Earned settings run
+`ExpireEarnedInterceptor` before the body interceptor, including for invalid input.
+Normal validation pipes and `@Body`, `@Param`, and `@Query` are supported. Use the
+normalized query helper when first-value semantics matter; validate original raw
+paths before accepting decoded IDs. Validation pipes must remain validation-only:
+resource I/O belongs in an awaited service/controller workflow, not parallel pipes.
+Nest BadRequestException validation failures use the existing study error envelope.
 
-Content controllers declare every alias with normal Nest routes. Shared aliases
-(including unprefixed shared writes) use `@LibraryWrite('shared')`; private aliases
-use `@LibraryWrite('private')`. Keep distinct handlers when policy differs, and
-factor their service operation into a focused helper. Shared writes require the
-verified session's admin role; private writes allow student/admin in their own
-storage. Mark **all** content mutations, including body-free delete/dismiss and
-preview confirmation, before any ticket consumption. Domain authorization and
-preview binding remain in their existing services.
+`context.study` combines shared content and actor-owned history. `context.personal`
+is the owned private repository; `context.shared` is borrowed; `context.content()`
+composes the selected verified view. Pure domain services are composed explicitly
+from these views, without request-scoped domain providers or a service locator.
 
-```ts
-@Post('shared/imports/preview')
-@LibraryWrite('shared')
-previewShared(
-  @JsonObjectBody() input: Record<string, unknown>,
-  @StudyContext() context: StudyRequestContext,
-  @VerifiedActor() actor: SessionUser,
-) {
-  const preview = new ImportService(context.shared).preview(input.bank)
-  const token = this.previews.issue(actor.id, preview.token, 'shared')
-  return { ...preview, token }
-}
-```
+### Optional asynchronous-input compatibility adapter
 
-### Owned input resolution
+Only endpoints explicitly marked `@JoinedStudyInputs()` use
+`security/study-input-registration.ts`. This is a compatibility adapter for custom
+parameter factories that perform asynchronous resource I/O. It is not the default
+endpoint pattern. The adversarial probes in `compiled/security.spec.ts` opt in
+explicitly and retain all sibling-failure, inherited metadata, cancellation and
+storage-lifetime assertions. Run these tests on every Nest upgrade.
 
-Installed Nest 12.3.2 resolves parameters concurrently with fail-fast `Promise.all`.
-Rejection of `next.handle()` is therefore **not** proof that sibling factories or
-pipes finished. `registerStudyInputs` uses Nest's discovery and parameter metadata
-at factory composition, before routing initialization. For `@StudyRequest()`
-handlers it wraps **every ordinary Nest custom parameter factory and its complete
-ordered parameter-local instance-pipe chain** as one `StudyInputWork` operation.
-It does not replace routing, patch Nest core, or infer completion from a response.
-Existing `@StudyContext`, `@VerifiedActor`, normalized query/URL and JSON-body
-parameters keep their call syntax. Ordinary `createParamDecorator` factories are
-also registered automatically; they may return asynchronous resource-using work.
-The wrapper preserves custom pipe data/metatype and parameter order. It retains
-original factory/pipe metadata separately, deriving metatypes from each concrete
-handler even when parameter decorators are inherited or an app is composed again.
-
-A first input failure cancels cooperative siblings through
-`context.inputSignal`, retains that original error, and joins **all** input
-operations inside `withLibrary` before observation, connection closure or lease
-release. A non-cooperative factory/pipe must settle with its database still usable.
-Consequently the HTTP error itself waits for that input, even if another input
-already rejected. Tests release controlled gates before awaiting the 400; awaiting
-the HTTP response before releasing a non-cooperative input would deadlock by
-contract. `app.close()` also waits. A response finish or client disconnect does
-not dispose storage while non-cooperative resource work remains pending. When
-scope ownership starts, cancellation listeners also reconcile an already closed
-request/response/socket: a client disconnect during an awaited guard cannot be lost.
-
-Custom factories may use `context.inputSignal` for cooperative cancellation, but
-must return/await their entire operation and cleanup. Racing a cancellation promise
-against work that continues in the background does not establish ownership. Pipes
-may be asynchronous, but must be **instances attached to the parameter**:
-
-```ts
-@Get()
-read(
-  @NormalizedQuery({
-    transform(query: URLSearchParams) {
-      return { provider: query.get('provider') ?? undefined }
-    },
-  }) scope: { provider?: string },
-  @StudyContext() context: StudyRequestContext,
-) {
-  return new QuizService(context.study).recent(scope)
-}
-```
-
-This staged boundary deliberately rejects `@UsePipes`, class-based pipe tokens,
-`APP_PIPE`, `useGlobalPipes`, and parameter schemas rather than leaving work outside
-its ownership. Instantiate parameter pipes explicitly or keep domain validation in
-the existing services. No new validation framework is introduced. Built-in study
-`@Body`/`@Query`/`@Param` and other unregistered extraction modes are rejected during
-composition; use the normalized/custom decorators above. Raw `@Req`, `@Res` and
-`@Next` extraction is allowed, but must not start asynchronous input work.
-Registration validation fails startup and closes acquired roots. JSON-body/context
-parameters used without the registered personal scope fail before body consumption.
-Do not mutate route/pipe metadata or install controllers after factory composition.
-
-`@JsonObjectBody()` requires `@StudyRequest()` and reads only after guards and
-scope acquisition. It preserves the exact case-sensitive `application/json`
-prefix, 10 MiB limit, non-null object-only JSON, and existing 400/413/415 messages.
-The Nest reader uses cancellable readable-stream waits. A failed sibling removes
-those waits and cancels the pending body operation without destroying the response
-or waiting for the client to send the remainder of a declared body. Its cancellation
-is joined before storage observation/closure. The retained benchmark/pure-helper reader uses the non-destroying iterator
-introduced in stage three; it is unchanged by this correction. Both readers permit the intended JSON 413 response.
-Use `@JsonObjectBody(true)` **only for pause**: no transfer-encoding and zero/missing
-content-length permits `{}` without a content type. DTO/service validation stays
-in existing services. Body-free routes should not add this decorator.
+Nest resolves parameters concurrently and can reject before an unfinished sibling
+factory/pipe releases its resources. The adapter registers those operations with
+StudyInputWork and joins them before closing storage. Such inputs must await all
+work and honor cancellation where possible; detached work is unsupported. Within
+this opt-in boundary only parameter-local pipe instances are supported. Class,
+method, global pipes and schemas are rejected rather than pretending to own them.
+Applications containing joined-input endpoints retain the global-pipe restriction;
+ordinary product compositions do not. The legacy custom `JsonObjectBody` decorator
+is available only for these compatibility inputs. Both paths use the same mandatory
+cancellable parser; the obsolete unowned iterator branch has been deleted.
 
 The global filter emits authentication `{error}`, workspace
 `{code: 'workspace_changed', error}`, and admitted study `{error, details}` schemas.

@@ -15,6 +15,7 @@ import {
 import type { ServerResponse } from 'node:http'
 import {
   JsonObjectBody,
+  JoinedStudyInputs,
   LibraryWrite,
   NormalizedQuery,
   NormalizedUrl,
@@ -189,6 +190,7 @@ const secondParameterPipe = {
 /** Test-only controllers exercise the public stage-four API on real compiled Nest routing. */
 @Controller('api/probe')
 @StudyRequest()
+@JoinedStudyInputs()
 export class ProbeController {
   constructor(@Inject(ProbeWork) private readonly work: ProbeWork) {}
 
@@ -364,6 +366,7 @@ export class FailureModule {}
 
 @Controller('api/unowned-input')
 @StudyRequest()
+@JoinedStudyInputs()
 export class UnownedBodyController {
   @Post()
   read(@Body() value: unknown) {
@@ -373,6 +376,7 @@ export class UnownedBodyController {
 
 @Controller('api/unowned-pipe')
 @StudyRequest()
+@JoinedStudyInputs()
 export class UnownedPipeController {
   @Get()
   @UsePipes({
@@ -411,6 +415,7 @@ class UnownedClassPipe {
 
 @Controller('api/unowned-class-pipe')
 @StudyRequest()
+@JoinedStudyInputs()
 class UnownedClassPipeController {
   @Get()
   read(@StudyContext(UnownedClassPipe) context: StudyRequestContext) {
@@ -425,6 +430,7 @@ export class UnownedClassPipeModule {}
 export function inheritedInputModule(reverse: boolean) {
   @Controller('api/inherited-base')
   @StudyRequest()
+  @JoinedStudyInputs()
   class Base {
     @Get()
     read(

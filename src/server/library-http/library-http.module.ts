@@ -1,7 +1,27 @@
+import { JsonBodyInterceptor } from '../security/json-body.interceptor.ts'
 import { Module } from '@nestjs/common'
-import { LibraryController } from './library.controller.ts'
-import { LibraryRouteGuard } from './library-route.guard.ts'
+import { LibraryBrowseController } from './library-browse.controller.ts'
+import {
+  SharedLibraryImportController,
+  PrivateLibraryImportController,
+} from './library-import.controller.ts'
+import {
+  SharedLibraryContentController,
+  PrivateLibraryContentController,
+} from './library-content.controller.ts'
+import { SharedConceptController, PrivateConceptController } from './concept.controller.ts'
 
-/** Compose with createApplication(config, [LibraryHttpModule]); never register a second runtime. */
-@Module({ controllers: [LibraryController], providers: [LibraryRouteGuard] })
+/** Register resource controllers; the root security guard owns metadata-driven write policy. */
+@Module({
+  providers: [JsonBodyInterceptor],
+  controllers: [
+    LibraryBrowseController,
+    SharedLibraryImportController,
+    PrivateLibraryImportController,
+    SharedLibraryContentController,
+    PrivateLibraryContentController,
+    SharedConceptController,
+    PrivateConceptController,
+  ],
+})
 export class LibraryHttpModule {}
