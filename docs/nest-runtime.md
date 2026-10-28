@@ -48,16 +48,32 @@ roots open because Nest runs this phase before disposing its HTTP transport.
 `beforeApplicationShutdown` drains the attached intermediate transport: Vite and
 upgraded HMR sockets first, then HTTP sockets and every active handler promise.
 Development Vite has an owner before its factory is awaited. `DevelopmentVite`
-resolves configuration once and uses Vite's exported plugin-patching point to put
-its pre-ordered capture hook before file-config hooks, including other pre hooks.
-It records environment initialization resources for failures that precede
-`configureServer`. A rejected environment factory defers its original error to
-Vite's `init` boundary solely to capture the already allocated watcher; that
-failure carrier never enters a ready graph. Parallel initialization drains before
-partial environments, HMR and watchers close. If public-file scanning fails before
-those handles are exposed, the owner removes HMR listeners from its unbound HTTP
-server. Factory rejection disposes immediately and retains the startup error;
-subsequent Nest transport shutdown shares the same disposal promise.
+coordinates initial boot and all public/file-triggered `restart()` calls through
+the same application-owned replacement path. Each attempt gets a separate
+`DevelopmentViteGraph`, which resolves configuration once and uses Vite's exported
+plugin-patching point to order capture before file-config pre hooks. Environment
+initialization resources are owned before `configureServer`, including the R1
+failure-only `name`/`init` carrier for a rejected environment factory. Parallel
+initialization drains before partial environments, HMR and watchers close.
+
+The live graph is retained until its replacement fully initializes. Failed
+replacement creation disposes only that attempt, logs Vite's usual restart failure
+and leaves the live middleware/HMR available; initial startup failure still
+rejects with the original error. A successful handoff closes the previous graph
+and selects the replacement. A stable public server view follows that selection;
+its `close()` closes the application-owned set of graphs. Successfully disposed
+attempts are released from the owner's set. Shutdown joins in-progress creation
+before closing every remaining graph and rejects new reload work.
+
+Each graph's HMR server is an unbound HTTP bridge, with no listening port. One
+upgrade route on the actual listener dispatches exclusively to the live graph.
+A partial/replacement graph therefore cannot accept live HMR connections or remove
+another graph's upgrade listeners during cleanup. Public-file scanning failure
+can safely clear its own bridge even before Vite exposes environment handles.
+This uses Vite's published `resolveConfig`, `createServer`, environment/init and
+`restart` APIs rather than calling or patching internal `_createServer` /
+`restartServer`. Previous environment instances and force-optimization requests
+are passed into replacement initialization.
 
 After Vite's hooks drain, close its watcher once more: Vite closes watchers in
 parallel with those hooks, and a late watch registration can reopen Chokidar.

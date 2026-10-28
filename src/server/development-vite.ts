@@ -1,168 +1,131 @@
-import { setImmediate as nextTurn } from 'node:timers/promises'
-import type { Server } from 'node:http'
-import type {
-  DevEnvironment,
-  FSWatcher,
-  Plugin,
-  ResolvedConfig,
-  ViteDevServer,
-  WebSocketServer,
-} from 'vite'
+import type { IncomingMessage, Server } from 'node:http'
+import type { Duplex } from 'node:stream'
+import type { ViteDevServer } from 'vite'
+import { DevelopmentViteGraph } from './development-vite-graph.ts'
 
-/** Own Vite from environment allocation through fallible hooks, not only after its factory returns. */
+/** Serialize startup/reload handoffs while retaining every live and partial Vite graph until disposal. */
 export class DevelopmentVite {
-  private vite: ViteDevServer | undefined
-  private watchers = new Set<FSWatcher>()
-  private sockets = new Set<WebSocketServer>()
-  private environments = new Set<DevEnvironment>()
-  private initializing = new Set<Promise<unknown>>()
+  private graphs = new Set<DevelopmentViteGraph>()
+  private live: { graph: DevelopmentViteGraph; server: ViteDevServer } | undefined
+  private starting: Promise<ViteDevServer> | undefined
+  private reloading: Promise<void> | undefined
   private closing: Promise<void> | undefined
   private http: Server | undefined
-  private originalUpgradeListeners: ReturnType<Server['rawListeners']> = []
+  private upgrade: ((request: IncomingMessage, socket: Duplex, head: Buffer) => void) | undefined
 
-  /** Resolve plugins once and capture ownership before pre-ordered user initialization hooks.
-   * @throws Preserves the startup error after disposal; aggregates a separate cleanup failure if needed.
+  /** Establish one stable middleware/API handle; fallible replacements never displace its live graph.
+   * @throws Preserves initial startup errors after the attempt has explicitly released its resources.
    */
-  async initialize(http: Server): Promise<ViteDevServer> {
+  initialize(http: Server): Promise<ViteDevServer> {
     this.http = http
-    this.originalUpgradeListeners = http.rawListeners('upgrade')
-    const { createServer, resolveConfig } = await import('vite')
-    const ownership: Plugin = {
-      name: 'study-vite-ownership',
-      enforce: 'pre',
-      configureServer: {
-        order: 'pre',
-        handler: (vite) => {
-          this.vite = vite
-          this.watchers.add(vite.watcher)
-        },
-      },
-    }
-    try {
-      const inline = {
-        server: { middlewareMode: true as const, hmr: { server: http } },
-        appType: 'spa' as const,
-        plugins: [ownership],
+    this.upgrade = (request, socket, head) => {
+      if (!this.live?.graph.upgrade(request, socket, head)) {
+        socket.destroy()
       }
-      const config = await resolveConfig(
-        inline,
-        'serve',
-        undefined,
-        undefined,
-        false,
-        undefined,
-        (plugins) => {
-          // File-config plugins precede inline plugins, even with enforce/order pre. Patch before sorting.
-          const existing = plugins.indexOf(ownership)
-          if (existing !== -1) {
-            plugins.splice(existing, 1)
-          }
-          plugins.unshift(ownership)
-        },
-      )
-      this.ownEnvironments(config)
-      const vite = await createServer(config)
-      this.vite = vite
-      return vite
-    } catch (error) {
-      try {
-        await this.close()
-      } catch (cleanupError) {
-        throw new AggregateError([error, cleanupError], 'Vite initialization and cleanup failed.', {
-          cause: cleanupError,
+    }
+    http.on('upgrade', this.upgrade)
+    const graph = this.acquireGraph()
+    this.starting = graph
+      .initialize((force) => this.restart(force))
+      .then((server) => {
+        this.live = { graph, server }
+
+        // Vite normally mutates one server during restart. Keep that stable public view without
+        // overwriting the independent close handles for live/partial graphs.
+        const close = () => this.close()
+
+        return new Proxy(server, {
+          get: (_target, key) => (key === 'close' ? close : Reflect.get(this.live!.server, key)),
+          set: (_target, key, value) => Reflect.set(this.live!.server, key, value),
         })
-      }
-      throw error
+      })
+    return this.starting
+  }
+
+  /** Allocate an owner before invoking Vite, so even a rejected factory has a disposal path. */
+  private acquireGraph(): DevelopmentViteGraph {
+    const graph = new DevelopmentViteGraph()
+    this.graphs.add(graph)
+    return graph
+  }
+
+  /** Coalesce public and file-triggered reloads through the same owned creation path as startup. */
+  private restart(forceOptimize = false): Promise<void> {
+    if (this.closing) {
+      return Promise.resolve()
     }
+    this.reloading ??= this.replace(forceOptimize).finally(() => {
+      this.reloading = undefined
+    })
+    return this.reloading
   }
 
-  /** Capture watcher and HMR ownership before an environment's fallible init/options hooks. */
-  private ownEnvironments(config: ResolvedConfig): void {
-    for (const options of Object.values(config.environments)) {
-      const create = options.dev.createEnvironment
-      options.dev.createEnvironment = (name, configuration, context) => {
-        this.sockets.add(context.ws)
-        const creating = Promise.resolve()
-          .then(() => create.call(options.dev, name, configuration, context))
-          .then(
-            (environment) => {
-              this.environments.add(environment)
-              const init = environment.init.bind(environment)
-              environment.init = (options) => {
-                if (options?.watcher) {
-                  this.watchers.add(options.watcher)
-                }
-                return this.track(init(options))
-              }
-              return environment
-            },
-            (error) => {
-              // Vite only reads name and calls init before awaiting it. Delay the original rejection
-              // until init exposes the already allocated watcher, even if every factory failed.
-              return {
-                name,
-                init: async (options: Parameters<DevEnvironment['init']>[0]) => {
-                  if (options?.watcher) {
-                    this.watchers.add(options.watcher)
-                  }
-                  throw error
-                },
-              } as unknown as DevEnvironment
-            },
-          )
-        return this.track(creating)
-      }
+  /** Retain Vite's logged-restart-failure semantics and keep the current graph on creation failure. */
+  private async replace(forceOptimize: boolean): Promise<void> {
+    // A file change during boot joins the initial acquisition before attempting a replacement.
+    await this.starting
+    if (this.closing) {
+      return
     }
+    const previous = this.live!
+    const graph = this.acquireGraph()
+    let server: ViteDevServer
+    try {
+      server = await graph.initialize(
+        (force) => this.restart(force),
+        previous.server.environments,
+        forceOptimize,
+      )
+    } catch (error) {
+      // Failed creation already disposed the attempt. Retain ownership/reporting if disposal failed.
+      try {
+        await this.releaseGraph(graph)
+      } catch (cleanupError) {
+        previous.server.config.logger.error(String(cleanupError), { timestamp: true })
+      }
+      // Vite's own restart() logs creation failures and resolves, retaining the live server.
+      previous.server.config.logger.error(error instanceof Error ? error.message : String(error), {
+        timestamp: true,
+      })
+      previous.server.config.logger.error('server restart failed', { timestamp: true })
+      return
+    }
+    if (this.closing) {
+      await this.releaseGraph(graph)
+      return
+    }
+    await this.releaseGraph(previous.graph)
+    this.live = { graph, server }
+    server.config.logger.info('server restarted.', { timestamp: true })
   }
 
-  /** Wait for parallel environment initialization before releasing resources from a rejected factory. */
-  private track<T>(pending: Promise<T>): Promise<T> {
-    this.initializing.add(pending)
-    void pending.then(
-      () => this.initializing.delete(pending),
-      () => this.initializing.delete(pending),
-    )
-    return pending
+  /** Forget a graph only after its independent disposal has completed successfully. */
+  private async releaseGraph(graph: DevelopmentViteGraph): Promise<void> {
+    await graph.close()
+    this.graphs.delete(graph)
   }
 
-  /** Close HMR and environments, then watchers that finishing hooks may have reopened. */
+  /** Drain in-progress replacement work before closing every acquired graph and HMR bridge. */
   close(): Promise<void> {
     this.closing ??= this.dispose()
     return this.closing
   }
 
-  /** Release partial environment resources even when Vite has not yet exposed its full server. */
+  /** Keep the HTTP listener's single upgrade route until all live/partial WebSocket owners close. */
   private async dispose(): Promise<void> {
     try {
-      while (this.initializing.size) {
-        await Promise.allSettled([...this.initializing])
-      }
-      if (this.vite) {
-        await this.vite.close()
-      } else {
-        // A failed options hook can leave an environment without an initialized plugin container.
-        await Promise.allSettled([
-          ...[...this.environments].flatMap((environment) => [
-            Promise.resolve().then(() => environment.close()),
-            Promise.resolve().then(() => environment.depsOptimizer?.close()),
-          ]),
-          ...[...this.sockets].map((socket) => socket.close()),
-        ])
+      await this.starting?.catch(() => undefined)
+      await this.reloading?.catch(() => undefined)
+      const results = await Promise.allSettled([...this.graphs].map((graph) => graph.close()))
+      const failures = results
+        .filter((result) => result.status === 'rejected')
+        .map((result) => result.reason)
+      if (failures.length) {
+        throw new AggregateError(failures, 'Vite graph disposal failed.')
       }
     } finally {
-      try {
-        await Promise.all([...this.watchers].map((watcher) => watcher.close()))
-        // Chokidar resolves before fs.watch's native close callbacks. Cross the close phase before
-        // a startup rejection can terminate Node and hide still-closing FSEventWrap resources.
-        await nextTurn()
-        await nextTurn()
-      } finally {
-        // Public-file scanning can reject after HMR attaches, before environment factories run.
-        for (const listener of this.http?.rawListeners('upgrade') ?? []) {
-          if (!this.originalUpgradeListeners.includes(listener)) {
-            this.http?.removeListener('upgrade', listener as (...args: unknown[]) => void)
-          }
-        }
+      if (this.upgrade) {
+        this.http?.off('upgrade', this.upgrade)
       }
     }
   }
