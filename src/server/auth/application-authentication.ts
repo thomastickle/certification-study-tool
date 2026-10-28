@@ -54,7 +54,7 @@ export class ApplicationAuthentication {
   /** Validate the request before routing authentication, public assets, or private study APIs. */
   async handle(request: IncomingMessage, response: ServerResponse): Promise<AuthenticationResult> {
     try {
-      const url = this.validateRequest(request)
+      const url = this.admit(request)
       response.setHeader('Referrer-Policy', 'same-origin')
       if (url.pathname.startsWith('/auth/')) {
         response.setHeader('Referrer-Policy', 'no-referrer')
@@ -62,14 +62,20 @@ export class ApplicationAuthentication {
         return { route: 'handled' }
       }
       if (!url.pathname.startsWith('/api/')) {
-        return { route: 'public', url: requestUrl(url) }
+        return { route: 'public', url }
       }
       return this.authorizeStudyRequest(request, response, url)
     } catch (error) {
       const expected = error instanceof ApplicationError
       const status = expected ? error.status : 500
       const message = expected ? error.message : 'The request could not be completed. Please retry.'
-      sendJson(response, status, { error: message })
+      sendJson(
+        response,
+        status,
+        error instanceof WorkspaceChangedError
+          ? { code: 'workspace_changed', error: message }
+          : { error: message },
+      )
       return { route: 'handled' }
     }
   }
@@ -85,7 +91,7 @@ export class ApplicationAuthentication {
   }
 
   /** Permit provider return documents while retaining origin checks on auth and study operations. */
-  private validateRequest(request: IncomingMessage): URL {
+  admit(request: IncomingMessage): RequestUrl {
     const url = new URL(request.url ?? '/', this.options.origin)
     // Cross-site redirects from an issuer must reach both the callback and the public shell.
     const callback = url.pathname === '/auth/callback'
@@ -95,43 +101,52 @@ export class ApplicationAuthentication {
     if (url.origin !== this.options.origin.origin) {
       throw new ApplicationError('Invalid request URL.', 403)
     }
-    return url
+    return requestUrl(url)
   }
 
   /** Reject expired/foreign-issuer sessions and stale workspaces before selecting personal storage. */
   private authorizeStudyRequest(
     request: IncomingMessage,
     response: ServerResponse,
-    url: URL,
+    url: RequestUrl,
   ): AuthenticationResult {
     if (url.pathname === '/api/health' && request.method === 'GET') {
       sendJson(response, 200, { status: 'ok' })
       return { route: 'handled' }
     }
-    const token = cookie(request, this.sessionName)
-    const user = token ? this.accounts.session(token, this.now(), this.options.issuer) : undefined
+    const user = this.session(request)
     if (url.pathname === '/api/session' && request.method === 'GET') {
       sendJson(response, 200, { user: user ?? null })
       return { route: 'handled' }
     }
+    const actor = this.requireWorkspace(request, user)
+    return { route: 'study', user: actor, url }
+  }
+
+  /** Resolve only the durable, issuer-verified session; headers never select an account. */
+  session(request: IncomingMessage): SessionUser | undefined {
+    const token = cookie(request, this.sessionName)
+    return token ? this.accounts.session(token, this.now(), this.options.issuer) : undefined
+  }
+
+  /** Enforce the browser's workspace binding after identity verification.
+   * @throws {ApplicationError} For missing sessions or a stale workspace binding.
+   */
+  requireWorkspace(request: IncomingMessage, user: SessionUser | undefined): SessionUser {
     if (!user) {
       throw new ApplicationError('Sign in to access study data.', 401)
     }
     if (request.headers['x-study-account'] !== user.id) {
-      sendJson(response, 409, {
-        code: 'workspace_changed',
-        error: 'Your sign-in changed. Reopen the workspace before continuing.',
-      })
-      return { route: 'handled' }
+      throw new WorkspaceChangedError()
     }
-    return { route: 'study', user, url: requestUrl(url) }
+    return user
   }
 
   /** Map each authentication route to its workflow; each flow owns its cookies and failure rules. */
   private async authRoute(
     request: IncomingMessage,
     response: ServerResponse,
-    url: URL,
+    url: RequestUrl,
   ): Promise<void> {
     response.setHeader('Cache-Control', 'no-store')
     if (url.pathname === '/auth/login' && request.method === 'GET') {
@@ -147,7 +162,7 @@ export class ApplicationAuthentication {
   }
 
   /** Supersede the browser's old attempt and reserve capacity across asynchronous provider work. */
-  private async startLogin(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  async startLogin(request: IncomingMessage, response: ServerResponse): Promise<void> {
     for (const [key, value] of this.pending) {
       if (value.expiresAt <= this.now()) {
         this.pending.delete(key)
@@ -178,10 +193,10 @@ export class ApplicationAuthentication {
   }
 
   /** Consume the pending attempt once, verify the issuer response, then establish a local session. */
-  private async completeLogin(
+  async completeLogin(
     request: IncomingMessage,
     response: ServerResponse,
-    url: URL,
+    url: RequestUrl,
   ): Promise<void> {
     const key = cookie(request, this.loginName)
     const pending = key ? this.pending.get(key) : undefined
@@ -197,7 +212,10 @@ export class ApplicationAuthentication {
     }
     let identity
     try {
-      identity = await this.login.complete(url, pending.transaction)
+      identity = await this.login.complete(
+        new URL(url.pathname + url.search, this.options.origin),
+        pending.transaction,
+      )
     } catch {
       throw new ApplicationError('Sign-in could not be verified. Start sign-in again.', 400)
     }
@@ -234,7 +252,7 @@ export class ApplicationAuthentication {
   }
 
   /** Revoke local access before attempting provider logout, including during provider outages. */
-  private async logout(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  async logout(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const token = cookie(request, this.sessionName)
     if (token) {
       this.accounts.revokeSession(token)
@@ -267,6 +285,13 @@ export class ApplicationAuthentication {
   close(): void {
     this.pending.clear()
     this.accounts.close()
+  }
+}
+
+/** Preserve the distinct workspace rejection schema at both transitional and Nest boundaries. */
+export class WorkspaceChangedError extends ApplicationError {
+  constructor() {
+    super('Your sign-in changed. Reopen the workspace before continuing.', 409)
   }
 }
 

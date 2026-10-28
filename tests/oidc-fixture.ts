@@ -8,6 +8,7 @@ type AuthorizationCode = { challenge: string; nonce: string; subject: string }
 export async function oidcFixture(
   issuerPath = '/realms/test',
   additionalClaims: (subject: string) => Record<string, unknown> = () => ({}),
+  beforeTokenExchange: () => Promise<void> = async () => {},
 ) {
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
   const otherKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey
@@ -119,6 +120,7 @@ export async function oidcFixture(
     } else if (url.pathname.endsWith('/authorize')) {
       authorizeCode(url, response)
     } else if (url.pathname.endsWith('/token')) {
+      await beforeTokenExchange()
       await exchangeCodeForToken(request, response)
     } else {
       response.writeHead(404)
