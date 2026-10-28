@@ -12,6 +12,8 @@ Nest transport layout follows feature ownership. Only `main.ts`, `application.ts
 - `web/` owns static/Vite serving and watcher lifetime; `http/` contains framework-free
   request/body/routing helpers and application errors.
 
+Production assets use [configured Express static middleware](nest-static-serving.md).
+
 The global runtime is registered once. Auth and health modules are composed by the
 application module; security keeps its existing global provider order. Domain
 repositories and services retain their existing directories and ownership.
