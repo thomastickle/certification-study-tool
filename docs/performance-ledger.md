@@ -202,3 +202,47 @@ Source reconstruction/common-harness audit, final diff checks and redacted stage
 Gitleaks passed. Independent review/CI remain pending with the parent; this is
 local verification, not PR readiness. The measured-source to publication-source
 code delta is one linter-required blank line, retained in `publication-format.patch`.
+
+## 2026-10-28 — authenticated Nest conversion, workload v2
+
+[Complete results, raw normal observations and measurement limits](nest-performance.md).
+Pinned pre-Nest `fcf980bcc1f45e61a251cd3584fadb200e62a023` versus integrated Nest
+`22ac48926710c8d475e0feaf0fcdaaa26d14f5df`; common v2 workload, four profiles
+(small/bank/history/diverse), three fresh-fixture sequential repetitions each,
+24 fixtures and 696 measured HTTP requests. Node 24.22.1 / i5-8265U / eight CPUs /
+31.1 GiB RAM, shared host with changing load, warm setup/cache, fixed baseline-first
+order. No competing owned checks/benchmarks during sampling. Current dependencies
+are reused on both sources. Old adapter bypasses sessions; Nest uses actual cookie
+admission/guards/controllers/private scopes. API-only manual upkeep excludes OIDC
+login, public assets and production background scheduling. Service-clock boundaries
+differ; this is not a pure framework-overhead comparison or production guarantee.
+
+HTTP milliseconds median (range), n=3 per cell:
+
+| Profile / operation |            Pre-Nest |                Nest |
+| ------------------- | ------------------: | ------------------: |
+| history quiz-start  | 181.9 (165.1–280.4) | 183.9 (180.8–199.3) |
+| history due-read    | 163.1 (157.2–176.6) | 157.2 (155.3–175.1) |
+| diverse quiz-start  | 173.3 (170.6–200.0) | 177.4 (176.7–233.6) |
+| diverse due-read    | 175.6 (169.4–177.4) | 186.2 (171.8–238.3) |
+
+Nest normal target: 12/12 below 300 ms, 10/12 below 200 ms, maximum 238.3 ms;
+baseline 12/12 and 11/12, maximum 280.4 ms. Counts use unrounded values. Keep the
+300/preferred-200 target and #81 open: other-account sampled p95/max reached
+305.8/313.7 ms, annotation 480.2 ms, backlog 502.3 ms, first-use 1036.6 ms,
+version rebuild 1194.4 ms and seeded startup 2419.9 ms. The baseline seeded-startup
+16577.0 ms outlier is retained, with no startup speedup claim. Nest recurring upkeep
+medians were higher (history 712.1 vs 598.5 ms; diverse 704.9 vs 598.0 ms), without
+an isolated cause. Sampled HTTP-phase worker RSS maximum 539.5 vs 473.7 MiB; not
+a production memory bound. Full service/gap/RSS/write/restart/recovery results are
+in the report, including the differently bounded empty initialization metric.
+
+All repetitions passed scoring/replay/provenance/isolation/cursor/connection and
+shutdown invariants. Independent arithmetic/count audit and both exact source
+reconstructions passed; reconstructed Nest emit matched its manifest. Evidence
+`/tmp/study-performance-2cpxjmb9` and `/tmp/nest-final-integration`, 0700/0600.
+Fresh integrated `npm run check` passed 293 native +180 compiled tests plus all
+checks/builds; redacted staged/hook/full-range Gitleaks passed. Child benchmark
+and test migrations were independently approved; final integrated review/CI remain
+pending. Earlier intermittent supervisor failures remain disclosed and unproven
+fixed. No target relaxation, timing CI gate, telemetry service or ORM introduced.

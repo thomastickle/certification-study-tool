@@ -10,7 +10,8 @@ obsolete transport/authentication and API/concept dispatchers are removed. See
 `nest-http-test-migration.md` for the assertion mapping. The foreground benchmark
 also uses authenticated Nest controllers; `nest-benchmark-migration.md` records
 its boundaries and pinned legacy adapter. Historical results remain historical.
-Final comparative measurements and integrated review remain; #81 stays open.
+The [pinned comparison](nest-performance.md) records new measurements. Final
+integrated review remains; #81 stays open.
 
 ## Composition and admission
 

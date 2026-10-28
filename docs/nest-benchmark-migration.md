@@ -1,7 +1,9 @@
 # Foreground benchmark transport migration
 
-This is harness correctness work, not a comparative timing report. Issue #81
-remains open; the normal quiz/due target remains below 300 ms, preferably 200 ms.
+This describes harness correctness and measurement boundaries. The subsequent
+[pinned comparison](nest-performance.md) records the integrated conversion's
+measurements. Issue #81 remains open; the normal quiz/due target remains below
+300 ms, preferably 200 ms.
 Do not run comparative series while sibling checks or other benchmarks compete.
 
 ## Nest execution

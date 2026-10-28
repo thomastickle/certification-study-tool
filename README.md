@@ -177,8 +177,9 @@ pure helpers; the obsolete dispatchers are removed. See the
 [assertion mapping](docs/nest-http-test-migration.md). The foreground benchmark
 also uses authenticated Nest controllers and actual request-owned storage; its
 [methodology](docs/nest-benchmark-migration.md) distinguishes the historical
-dispatcher baseline. Final comparative measurements and integrated review remain
-under the [conversion plan](docs/nest-conversion-plan.md). Issue #81 stays open.
+dispatcher baseline. The [pinned comparison](docs/nest-performance.md) records all
+normal and slow paths; final integrated review remains under the
+[conversion plan](docs/nest-conversion-plan.md). Issue #81 stays open.
 
 ## Curated CLF-C02 batch import
 

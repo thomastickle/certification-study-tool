@@ -25,8 +25,10 @@ request-handler and authentication dispatch adapters are removed. See
 limits. The benchmark now uses authenticated compiled Nest API modules and actual
 request-owned storage; the final unused `http-controller` and `concept-routes`
 dispatchers are removed. An inert legacy worker fixture supports pinned pre-Nest
-comparisons only. Final comparative measurements and integrated review remain;
-no timing claim is made here. Issue #81 stays open.
+comparisons only. The [pinned comparison](nest-performance.md) records 24 passing
+fresh-fixture runs and remaining slow paths. Final integrated review remains;
+implementation and measurements do not themselves establish readiness. Issue #81
+stays open.
 
 ## Implementation stages
 

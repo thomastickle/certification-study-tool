@@ -163,5 +163,5 @@ actual authenticated Nest API modules with deterministic manual housekeeping.
 Its inert legacy fixture supports pinned pre-Nest comparisons only. See
 [assertion mappings](nest-http-test-migration.md) and
 [measurement boundaries](nest-benchmark-migration.md). Existing reports remain
-historical; final comparative measurements and integrated review remain separate
-gates. Issue #81 remains open.
+historical; the [pinned Nest comparison](nest-performance.md) records the new
+measurements. Final integrated review remains a separate gate. Issue #81 stays open.
