@@ -56,3 +56,13 @@ Fixture correction: an arbitrary digest is a domain 409, not successful dismissa
 successful dismissal now uses an actual suggestion. No fresh Docker/Keycloak or
 performance run is claimed; inherited foundation evidence remains with its stages.
 Parent owns independent review, CI, integration and final cutover.
+
+## Legacy test migration follow-up
+
+The non-benchmark legacy suites described above have now moved to compiled Nest
+HTTP fixtures, preserving their full assertions; native pure domain/helper cases
+remain native. Obsolete transport/request-handler/authentication adapters are
+removed. Earlier stage descriptions of retained legacy tests are historical.
+See [the complete assertion mapping](nest-http-test-migration.md). The old
+benchmark still retains the API/concept dispatcher until sibling integration;
+this change makes no performance or final-review claim.

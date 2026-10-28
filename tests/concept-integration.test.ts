@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createServer } from 'node:http'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { ConceptService } from '../src/server/concepts/concept-service.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
-import { apiTestHandler } from './support/api-test-handler.ts'
 import { populate } from './quiz-fixtures.ts'
 
 const options = { sourceFilter: 'mixed', questionType: 'mixed' }
@@ -107,87 +105,6 @@ test('Due Review keeps actual due identity and never substitutes its unseen grou
     assert.ok(!due.questions.some((question) => question.reference === 'd1-11'))
     assert.equal(due.total, 20)
   } finally {
-    repository.close()
-  }
-})
-
-test('concept HTTP routes preserve local mutation gates and reject stale saves atomically', async () => {
-  const { repository, group } = setup()
-  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}`
-
-  async function send(path: string, method: string, value?: unknown, origin = base) {
-    return fetch(base + path, {
-      method,
-      headers: { Origin: origin, 'Content-Type': 'application/json' },
-      body: value === undefined ? undefined : JSON.stringify(value),
-    })
-  }
-
-  try {
-    const response = await fetch(base + '/api/concepts')
-    assert.equal(response.status, 200)
-    const data = await response.json()
-    assert.equal(data.groups[0].id, group.id)
-    assert.equal(
-      (await send('/api/concepts', 'POST', group, 'https://untrusted.example')).status,
-      403,
-    )
-    assert.equal(
-      (await send(`/api/concepts/${group.id}`, 'PUT', group, 'https://untrusted.example')).status,
-      403,
-    )
-    assert.equal(
-      (await send(`/api/concepts/${group.id}`, 'DELETE', undefined, 'https://untrusted.example'))
-        .status,
-      403,
-    )
-    const suggestion = data.suggestions[0]
-    assert.ok(suggestion)
-    assert.equal(
-      (
-        await send(
-          `/api/concept-suggestions/${suggestion.id}/dismiss`,
-          'POST',
-          {},
-          'https://untrusted.example',
-        )
-      ).status,
-      403,
-    )
-    assert.equal(
-      (
-        await send('/api/concepts', 'POST', {
-          ...group,
-          name: 'Invalid',
-          members: [{ id: 99999, reviewToken: 'stale' }],
-        })
-      ).status,
-      409,
-    )
-    assert.equal(
-      (await send(`/api/concepts/${group.id}`, 'PUT', { ...group, name: 'HTTP rename' })).status,
-      200,
-    )
-    assert.equal(
-      (await send('/api/concepts', 'POST', { ...group, name: 'Manual HTTP group' })).status,
-      201,
-    )
-    assert.equal(
-      (await send(`/api/concept-suggestions/${suggestion.id}/dismiss`, 'POST', {})).status,
-      200,
-    )
-    assert.equal((await send(`/api/concepts/${group.id}`, 'DELETE')).status, 200)
-    const after = await (await fetch(base + '/api/concepts')).json()
-    assert.equal(after.groups.length, 1)
-    assert.equal(after.groups[0].name, 'Manual HTTP group')
-  } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    )
     repository.close()
   }
 })

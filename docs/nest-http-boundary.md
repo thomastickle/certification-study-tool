@@ -5,8 +5,10 @@ Nest application with both feature modules and public static/development serving
 The core `createApplication(config, featureModules)` remains useful for focused
 integration/lifetime tests. Neither factory mounts a legacy API bridge.
 
-Legacy HTTP/transport tests and the benchmark still retain the old dispatcher until
-the next bounded migration. Benchmark results do not measure Nest. Overall conversion
+Legacy HTTP/transport tests now use real Nest or maintained pure helpers, and the
+obsolete transport/authentication dispatch adapters are removed. Only the old
+benchmark retains the API/concept dispatcher pending sibling integration. See
+`nest-http-test-migration.md` for the assertion mapping. Benchmark results do not measure Nest. Overall conversion
 and comparable performance evidence remain incomplete; #81 remains open.
 
 ## Composition and admission
@@ -58,7 +60,7 @@ has no shell route. Foreign Origin/Host remain denied.
 Auth controllers invoke `startLogin`, `completeLogin` and `logout` directly. These
 are the original workflows, including pending-capacity reservation, PKCE/nonce,
 browser binding, single-use callback, cookies, issuer/session checks, role fixation
-and revocation. `handle` remains only for legacy HTTP tests awaiting migration.
+and revocation. The obsolete `handle` adapter is removed; Nest calls the maintained workflows directly.
 
 ## Study controllers
 
@@ -182,9 +184,8 @@ prefix, 10 MiB limit, non-null object-only JSON, and existing 400/413/415 messag
 The Nest reader uses cancellable readable-stream waits. A failed sibling removes
 those waits and cancels the pending body operation without destroying the response
 or waiting for the client to send the remainder of a declared body. Its cancellation
-is joined before storage observation/closure. The retained legacy test call path
-uses the non-destroying iterator introduced in stage three; it is unchanged by
-this correction. Both readers permit the intended JSON 413 response.
+is joined before storage observation/closure. The retained benchmark/pure-helper reader uses the non-destroying iterator
+introduced in stage three; it is unchanged by this correction. Both readers permit the intended JSON 413 response.
 Use `@JsonObjectBody(true)` **only for pause**: no transfer-encoding and zero/missing
 content-length permits `{}` without a content type. DTO/service validation stays
 in existing services. Body-free routes should not add this decorator.

@@ -17,13 +17,14 @@ features, and unrelated readability work are outside this conversion.
 
 ## Current bounded cutover
 
-Production main now uses the full Nest HTTP composition, public static/Vite serving
-and sequential startup with owned shutdown. Legacy HTTP tests/transport suites and
-old benchmark callers remain maintained pending the next task; their retained
-`legacy-transport`, `request-handler`, `ApplicationAuthentication.handle`,
-`http-controller` and `concept-routes` paths are not production routing. The old
-benchmark does not measure Nest. Test migration/removal and a comparable benchmark
-series remain necessary before completing the overall conversion. Issue #81 stays open.
+Production main uses the full Nest HTTP composition, public static/Vite serving
+and sequential startup with owned shutdown. Legacy non-benchmark HTTP tests now
+exercise compiled Nest controllers or maintained pure helpers; obsolete transport,
+request-handler and authentication dispatch adapters are removed. See
+`nest-http-test-migration.md` for the complete assertion mapping and validation
+limits. The old benchmark alone retains `http-controller` and `concept-routes`
+pending sibling integration. It does not measure Nest. A comparable benchmark
+series remains deferred; no timing claim is made here. Issue #81 stays open.
 
 ## Implementation stages
 

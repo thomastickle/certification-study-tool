@@ -1,36 +1,47 @@
+import { createProductionApplication } from '../../src/server/production-application.ts'
+import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import type { RequestUrl } from '../../src/server/request-url.ts'
+import type { SessionUser } from '../../src/shared/auth-contracts.ts'
+
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
-import { createServer, request as httpRequest } from 'node:http'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { request as httpRequest } from 'node:http'
 import type { IncomingMessage } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { test } from 'node:test'
-import type { AuthenticationResult } from '../src/server/auth/application-authentication.ts'
-import { ApplicationAuthentication } from '../src/server/auth/application-authentication.ts'
-import { apiController } from '../src/server/http-controller.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { ImportService } from '../src/server/importer/import-service.ts'
-import { bank } from './fixtures.ts'
-import { closeServer, oidcFixture } from './oidc-fixture.ts'
-import { BrowserCookies } from './support/browser-cookies.ts'
-import { QuizService } from '../src/server/quizzes/quiz-service.ts'
-import { ImportPreviews } from '../src/server/importer/import-previews.ts'
-import { applicationRequestHandler } from '../src/server/request-handler.ts'
-import type { ApplicationHandlers } from '../src/server/request-handler.ts'
-import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
+import { mock, test } from 'node:test'
+import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
+import { ImportService } from '../../src/server/importer/import-service.ts'
+import { bank } from '../fixtures.ts'
+import { closeServer, oidcFixture } from '../oidc-fixture.ts'
+import { BrowserCookies } from '../support/browser-cookies.ts'
+import { QuizService } from '../../src/server/quizzes/quiz-service.ts'
+
+type AdmittedStudy = { route: 'study'; url: RequestUrl; user: SessionUser }
 
 /** Exercise verified identities and role checks in front of the shared-content/private-study API. */
 async function fixture(
   issuerPath = '/realms/test',
-  afterAuthentication?: (request: IncomingMessage, context: AuthenticationResult) => void,
+  afterAuthentication?: (request: IncomingMessage, context: AdmittedStudy) => void,
 ) {
   const administrators = new Set(['alice', 'charlie'])
   const provider = await oidcFixture(issuerPath, (subject) => ({
     study_roles: administrators.has(subject) ? ['admin'] : [],
   }))
   const directory = mkdtempSync(join(tmpdir(), 'study-owner-login-'))
-  const library = new LibraryRepository(join(directory, 'library.sqlite3'))
-  const privateLibraries = new PrivateLibraries(join(directory, 'users'))
+  writeFileSync(join(directory, 'index.html'), '<!doctype html><title>Study workspace</title>')
+  const configuration = runtimeConfiguration({
+    STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+    STUDY_OIDC_ISSUER: provider.issuerIdentifier,
+    NODE_ENV: 'production',
+  })
+  configuration.staticRoot = directory
+  let now = Date.now()
+  configuration.authentication.now = () => now
+  let app = await createProductionApplication(configuration)
+  let runtime = app.get(ApplicationRuntime)
+  const library = runtime.sharedLibrary
   const importer = new ImportService(library)
   const input = bank()
   input.questions = Array.from({ length: 20 }, (_, index) => ({
@@ -39,43 +50,30 @@ async function fixture(
     question: `Synthetic owner question ${index}?`,
   }))
   importer.confirm(input, importer.preview(input).token, false)
-  let authentication: ApplicationAuthentication
-  let now = Date.now()
-  const previews = new ImportPreviews(() => now)
-  const handlers: ApplicationHandlers = {
-    authentication: {
-      handle: async (request, response) => {
-        const context = await authentication.handle(request, response)
-        afterAuthentication?.(request, context)
-        return context
-      },
-    },
-    study: (user) => async (request, response, url) => {
-      const privateLibrary = privateLibraries.open(user.id)
-      try {
-        await apiController(library, user, origin, previews, privateLibrary)(request, response, url)
-      } finally {
-        privateLibrary.close()
+  const origin = configuration.origin
+
+  /** Observe actual admission, then perturb the raw target before the Nest adapter restores it. */
+  function observeAdmission() {
+    const authentication = app.get(ApplicationAuthentication)
+    const admit = authentication.admit.bind(authentication)
+    return mock.method(authentication, 'admit', (request: IncomingMessage) => {
+      const url = admit(request)
+      if (afterAuthentication && url.pathname.endsWith('/questions')) {
+        afterAuthentication(request, {
+          route: 'study',
+          url,
+          user: authentication.session(request)!,
+        })
       }
-    },
-    web: (_request, response) => {
-      response.writeHead(200, { 'Content-Type': 'text/html' })
-      response.end('<!doctype html><title>Study workspace</title>')
-    },
+      return url
+    })
   }
-  const server = createServer(applicationRequestHandler(handlers))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
+
+  let observation = observeAdmission()
+  await app.listen(0, '127.0.0.1')
+  const address = (app.getHttpServer() as import('node:http').Server).address()
   assert.ok(address && typeof address !== 'string')
-  const origin = new URL(`http://127.0.0.1:${address.port}`)
-  const options = {
-    issuer: provider.issuerIdentifier,
-    origin,
-    clientId: 'study-tool',
-    accountsPath: join(directory, 'accounts.sqlite3'),
-    now: () => now,
-  }
-  authentication = new ApplicationAuthentication(options)
+  origin.port = String(address.port)
   const accounts = new Map<string, string>()
 
   const call = (path: string, cookie = '', init: RequestInit = {}) => {
@@ -148,8 +146,12 @@ async function fixture(
     authorize,
     provider,
     directory,
-    library,
-    privateLibraries,
+    get library() {
+      return runtime.sharedLibrary
+    },
+    get privateLibraries() {
+      return runtime.privateLibraries
+    },
     origin,
     setAdmin: (subject: string, admin: boolean) => {
       if (admin) {
@@ -161,14 +163,21 @@ async function fixture(
     advance: (ms: number) => {
       now += ms
     },
-    restart: (issuer = options.issuer) => {
-      authentication.close()
-      authentication = new ApplicationAuthentication({ ...options, issuer })
+    restart: async (issuer = provider.issuerIdentifier) => {
+      observation.mock.restore()
+      await app.close()
+      configuration.authentication.issuer = issuer
+      app = await createProductionApplication(configuration)
+      runtime = app.get(ApplicationRuntime)
+      observation = observeAdmission()
+      await app.listen(0, '127.0.0.1')
+      const address = (app.getHttpServer() as import('node:http').Server).address()
+      assert.ok(address && typeof address !== 'string')
+      origin.port = String(address.port)
     },
     close: async () => {
-      await closeServer(server)
-      authentication.close()
-      library.close()
+      observation.mock.restore()
+      await app.close()
       await closeServer(provider.server)
       rmSync(directory, { recursive: true, force: true })
     },
@@ -259,7 +268,7 @@ test('a fresh login replaces the browser session with its newly verified role', 
         .status,
       403,
     )
-    app.restart()
+    await app.restart()
     assert.equal((await app.json('/api/session', changed.cookie)).user.role, 'student')
   } finally {
     await app.close()
@@ -318,7 +327,7 @@ test('a root issuer without a trailing slash admits the owner and survives resta
   try {
     const owner = await app.login('alice')
     assert.equal(owner.response.status, 302)
-    app.restart()
+    await app.restart()
     assert.equal((await app.call('/api/questions', owner.cookie)).status, 200)
   } finally {
     await app.close()
@@ -367,14 +376,14 @@ test('sessions survive restart, expire at eight hours and reject a changed issue
   const app = await fixture()
   try {
     const owner = await app.login('alice')
-    app.restart()
+    await app.restart()
     assert.equal((await app.call('/api/questions', owner.cookie)).status, 200)
     app.advance(8 * 60 * 60_000)
     assert.equal((await app.call('/api/questions', owner.cookie)).status, 401)
     const replacement = await app.login('alice')
-    app.restart('https://other.example/realm')
+    await app.restart('https://other.example/realm')
     assert.equal((await app.call('/api/questions', replacement.cookie)).status, 401)
-    app.restart()
+    await app.restart()
     const bob = await app.login('bob')
     assert.equal((await app.call('/api/questions', bob.cookie)).status, 200)
   } finally {
@@ -523,7 +532,7 @@ test('provider validation failure clears transaction cookies and exposes no toke
 })
 
 test('validated context preserves query and namespace while downstream ignores a changed raw target', async () => {
-  const admitted: AuthenticationResult[] = []
+  const admitted: AdmittedStudy[] = []
   const app = await fixture('/realms/test', (request, context) => {
     if (context.route === 'study') {
       admitted.push(context)

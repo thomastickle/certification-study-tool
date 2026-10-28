@@ -5,8 +5,8 @@ Production `main.ts` calls `createProductionApplication(configuration)` from
 security controllers/guards and `PublicWeb` through one configured RuntimeModule.
 `createApplication(config, extraFeatures)` remains the focused integration factory.
 No production request calls `startLegacyTransport`, `apiController` or the legacy
-authentication dispatcher. Those remain for legacy tests and the old benchmark;
-the next stage migrates callers and removes obsolete adapters.
+authentication dispatcher. The legacy transport/request-handler/authentication adapters are removed. Only the
+old benchmark still calls `apiController`; see `nest-http-test-migration.md`.
 
 `runtimeConfiguration(environment)` validates settings without I/O or ambient
 environment reads. Explicit shared paths derive adjacent accounts and users paths;
@@ -22,8 +22,8 @@ do not register it independently in each feature module. It exports:
   listener, shared/private paths, authentication options, legacy subject, production
   mode and static root.
 - `ApplicationAuthentication`: the singleton verified-session/OIDC/accounts owner.
-  Its transitional `handle` supports legacy tests only.
-  The production Nest transport calls its admission/session/workflow methods directly.
+  The Nest transport calls its admission/session/workflow methods directly.
+  The obsolete `handle` dispatcher is removed.
 - `SHARED_LIBRARY_REPOSITORY`: the singleton shared `LibraryRepository`. Consumers
   borrow it; they must never close it or substitute a private root.
 - `ImportPreviews`, `PrivateLibraries`, and `StudyHousekeeping`: the same singleton

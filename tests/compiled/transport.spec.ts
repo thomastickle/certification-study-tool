@@ -6,31 +6,24 @@ import { createServer, request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mock, test } from 'node:test'
-import { NestFactory } from '@nestjs/core'
 import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { AccountRepository } from '../../src/server/auth/account-repository.ts'
-import { startLegacyTransport } from '../../src/server/legacy-transport.ts'
+import { libraryFixture } from './library-http-fixture.ts'
+import { StudyHttpModule } from '../../src/server/study-http/study.module.ts'
+import { createProductionApplication } from '../../src/server/production-application.ts'
+import { observeRuntime } from './runtime-observation.ts'
 import type { LibraryRepository } from '../../src/server/questions/library-repository.ts'
 import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
-import { RuntimeModule } from '../../src/server/runtime.module.ts'
 
 for (const disconnect of [false, true]) {
   test(
     `real HTTP keeps private storage across a deferred body and drains it before roots (disconnect=${disconnect})`,
     { timeout: 10000 },
     async () => {
-      const directory = mkdtempSync(join(tmpdir(), 'study-transport-'))
-      writeFileSync(join(directory, 'index.html'), '<!doctype html><title>fixture</title>')
-      const configuration = runtimeConfiguration({
-        STUDY_DB_PATH: join(directory, 'library.sqlite3'),
-        NODE_ENV: 'production',
-      })
-      configuration.port = 0
-      configuration.staticRoot = directory
-      const app = await NestFactory.createApplicationContext(
-        RuntimeModule.register(configuration),
-        { logger: false, abortOnError: false },
-      )
+      const fixture = await libraryFixture(undefined, [StudyHttpModule])
+      const app = fixture.app
+      const configuration = fixture.config
+      const session = await fixture.login('alice')
+      const actor = fixture.sessions.get(session)!
       const runtime = app.get(ApplicationRuntime)
       let entered!: () => void
       const opened = new Promise<void>((resolve) => {
@@ -58,26 +51,18 @@ for (const disconnect of [false, true]) {
         },
       )
       try {
-        const server = await startLegacyTransport(runtime, configuration)
+        const server = app.getHttpServer() as import('node:http').Server
         const address = server.address()
         assert.ok(address && typeof address !== 'string')
         const origin = `http://127.0.0.1:${address.port}`
         // Origin is explicit so the real admission policy is exercised on the ephemeral listener.
         configuration.origin.port = String(address.port)
-        const accounts = new AccountRepository(configuration.authentication.accountsPath)
-        const actor = accounts.identify({
-          issuer: configuration.authentication.issuer,
-          subject: 'fixture',
-          name: 'Fixture',
-        })
-        accounts.saveSession('synthetic-session', actor.id, Date.now() + 60000)
-        accounts.close()
         const req = request(`${origin}/api/quizzes`, {
           method: 'POST',
           headers: {
             Origin: origin,
-            Cookie: 'study_session=synthetic-session',
-            'X-Study-Account': actor.id,
+            Cookie: session,
+            'X-Study-Account': actor,
             'Content-Type': 'application/json',
             'Content-Length': '2',
           },
@@ -117,7 +102,7 @@ for (const disconnect of [false, true]) {
         open.mock.restore()
         observe.mock.restore()
         await app.close()
-        rmSync(directory, { recursive: true, force: true })
+        await fixture.close()
       }
     },
   )
@@ -140,24 +125,26 @@ test('listen and missing-static failures can close their already initialized Nes
         STUDY_PORT: String(address.port),
       })
       configuration.staticRoot = directory
-      const app = await NestFactory.createApplicationContext(
-        RuntimeModule.register(configuration),
-        { logger: false, abortOnError: false },
-      )
-      const runtime = app.get(ApplicationRuntime)
+      const captured = observeRuntime()
       try {
         await assert.rejects(
-          startLegacyTransport(runtime, configuration),
+          (async () => {
+            const app = await createProductionApplication(configuration)
+            await app.listen(configuration.port, configuration.host)
+          })(),
           missingStatic ? /npm run build/ : /EADDRINUSE/,
         )
-        await app.close()
+        captured.restore()
         assert.throws(
-          () => runtime.sharedLibrary.quizStore().nextHousekeepingAt(),
+          () => captured.runtime.sharedLibrary.quizStore().nextHousekeepingAt(),
           /closed|not open/,
         )
-        assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+        assert.throws(
+          () => captured.runtime.authentication.legacyOwnerId('closed'),
+          /closed|not open/,
+        )
       } finally {
-        await app.close()
+        captured.restore()
         rmSync(directory, { recursive: true, force: true })
       }
     }
