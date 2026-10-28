@@ -1,10 +1,13 @@
 # Stage three HTTP boundary and controller handoff
 
-Production still uses `main.ts` → one configured runtime context → the **complete
-legacy router**. Stage three is routing-incomplete. `createApplication(config,
-featureModules)` creates the real compiled Nest security surface for integration
-tests and the subsequent atomic cutover. It does not mount a legacy bridge, SPA,
-or product feature controllers. Do not change production to this partial app.
+Production uses `main.ts` → `createProductionApplication(config)` → one configured
+Nest application with both feature modules and public static/development serving.
+The core `createApplication(config, featureModules)` remains useful for focused
+integration/lifetime tests. Neither factory mounts a legacy API bridge.
+
+Legacy HTTP/transport tests and the benchmark still retain the old dispatcher until
+the next bounded migration. Benchmark results do not measure Nest. Overall conversion
+and comparable performance evidence remain incomplete; #81 remains open.
 
 ## Composition and admission
 
@@ -35,8 +38,9 @@ same auth/workspace ordering as other unknown API paths.
 Express is configured **before its lazy router is created**: case-sensitive,
 strict trailing slashes, trust proxy disabled. Original Host/authority validation
 never trusts forwarding headers. `bodyParser: false` stays enabled. No automatic
-JSON parser, CORS/OPTIONS handler, catch-all controller, global prefix or SPA
-fallback is installed. Nest's terminal not-found filter runs after all controllers;
+JSON parser, CORS/OPTIONS handler, catch-all API controller or global prefix is installed.
+The production composition serves public paths outside `/api/` and `/auth/` through
+owned public middleware, including bare `/api` and `/auth` as in the baseline. Nest's terminal not-found filter runs after all controllers;
 it invokes the same guard policy before returning API JSON 404. Thus adding later
 feature modules cannot be shadowed by a security catch-all route.
 
@@ -54,7 +58,7 @@ has no shell route. Foreign Origin/Host remain denied.
 Auth controllers invoke `startLogin`, `completeLogin` and `logout` directly. These
 are the original workflows, including pending-capacity reservation, PKCE/nonce,
 browser binding, single-use callback, cookies, issuer/session checks, role fixation
-and revocation. `handle` remains the transitional adapter for production/core tests.
+and revocation. `handle` remains only for legacy HTTP tests awaiting migration.
 
 ## Study controllers
 
@@ -178,8 +182,8 @@ prefix, 10 MiB limit, non-null object-only JSON, and existing 400/413/415 messag
 The Nest reader uses cancellable readable-stream waits. A failed sibling removes
 those waits and cancels the pending body operation without destroying the response
 or waiting for the client to send the remainder of a declared body. Its cancellation
-is joined before storage observation/closure. The production legacy call path
-retains the non-destroying iterator introduced in stage three; it is unchanged by
+is joined before storage observation/closure. The retained legacy test call path
+uses the non-destroying iterator introduced in stage three; it is unchanged by
 this correction. Both readers permit the intended JSON 413 response.
 Use `@JsonObjectBody(true)` **only for pause**: no transfer-encoding and zero/missing
 content-length permits `{}` without a content type. DTO/service validation stays
@@ -207,16 +211,15 @@ to unblock partial bodies, and joins every lease while roots are open. Nest then
 disposes HTTP once; `onApplicationShutdown` closes shared/accounts roots. There is
 no asynchronous RxJS finalizer. Non-cooperative input and controller promises
 deliberately keep shutdown pending; controllers must return/await their work. This seam applies
-to the staged Nest factory; production retains its existing transport drain.
+to both the core factory and full production composition; public work additionally
+joins response completion and returned handler promises.
 
 The factory contains provider construction, init and listen failures. Its public
 lifecycle wrapper joins in-flight init/listen and shares a single close promise; it does not assign methods onto
 NestFactory's proxy or separately call `server.close`. This tracks startup for
-shutdown; it **does not serialize or deduplicate concurrent `init()`/`listen()`
-calls**. R1-N1 remains a documented inherited Nest limitation: parallel startup can
-run init hooks twice. Callers must await startup sequentially, and stage four must
-serialize startup before supporting concurrent callers. No startup rearchitecture
-is part of the R1-B1 correction.
+shutdown. R1-N1 is now resolved by rejecting overlapping `init()`/`listen()`
+calls with an explicit startup-in-progress error. Callers await startup sequentially;
+controlled init-hook gates verify that duplicate initialization cannot enter.
 
 `tests/compiled/security.spec.ts` uses the actual factory, compiled decorators,
 raw Node HTTP, the existing synthetic issuer and test-only probe controllers.

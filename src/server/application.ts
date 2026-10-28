@@ -14,13 +14,15 @@ import { securityFailure } from './security.filter.ts'
 import type { AdmittedRequest } from './security-context.ts'
 import { registerStudyInputs } from './study-input-registration.ts'
 import { ApplicationError } from './errors.ts'
+import type { PublicWeb } from './public-web.ts'
 
-/** Create the staged Nest transport; production retains the complete legacy router until stage four.
+/** Create one configured Nest transport with focused feature modules and optional public serving.
  * @throws Rejects initialization/listen failures after cleaning the acquired resource graph.
  */
 export async function createApplication(
   configuration: RuntimeConfiguration,
   features: DynamicModule['imports'] = [],
+  publicWeb?: PublicWeb,
 ): Promise<NestExpressApplication> {
   const adapter = new SecurityExpressAdapter()
   const startup = new RuntimeStartup()
@@ -40,7 +42,14 @@ export async function createApplication(
   }
   const authentication = app.get(ApplicationAuthentication)
   const lifetime = app.get(SecurityRequestLifetime)
-  app.get(ApplicationRuntime).attachTransport(() => lifetime.drain(app.getHttpServer() as Server))
+  app.get(ApplicationRuntime).attachTransport(async () => {
+    lifetime.stop()
+    try {
+      await publicWeb?.close()
+    } finally {
+      await Promise.all([lifetime.drain(app.getHttpServer() as Server), publicWeb?.drain()])
+    }
+  })
   adapter.installAdmission((incoming, response: ServerResponse, next: () => void) => {
     const request = incoming as AdmittedRequest
     try {
@@ -64,11 +73,23 @@ export async function createApplication(
       )
       response.setHeader('Cache-Control', 'no-store')
       response.setHeader('X-Content-Type-Options', 'nosniff')
-      next()
+      if (publicWeb && !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/auth/')) {
+        void publicWeb
+          .handle(request, response, url)
+          .catch((error: unknown) => securityFailure(error, request, response))
+      } else {
+        next()
+      }
     } catch (error) {
       securityFailure(error, request, response)
     }
   })
+  try {
+    await publicWeb?.initialize(app.getHttpServer() as Server, configuration)
+  } catch (error) {
+    await app.close()
+    throw error
+  }
   const initialize = app.init.bind(app)
   const listen = app.listen.bind(app)
   const close = app.close.bind(app)
@@ -77,6 +98,7 @@ export async function createApplication(
 
   /** Share disposal between init/listen failure and later callers; Nest closes HTTP once. */
   const closeApplication = (): Promise<void> => {
+    lifetime.stop()
     closing ??= (async () => {
       await Promise.allSettled([...starting])
       await close()
@@ -87,6 +109,9 @@ export async function createApplication(
   const initializeApplication = async () => {
     if (closing) {
       throw new Error('The application is closing.')
+    }
+    if (starting.size) {
+      throw new Error('Application startup is already in progress. Await init/listen sequentially.')
     }
     const operation = initialize()
     starting.add(operation)
@@ -108,6 +133,9 @@ export async function createApplication(
   ) => {
     if (closing) {
       throw new Error('The application is closing.')
+    }
+    if (starting.size) {
+      throw new Error('Application startup is already in progress. Await init/listen sequentially.')
     }
     const operation =
       typeof hostnameOrCallback === 'string'

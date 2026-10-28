@@ -1,18 +1,9 @@
 import 'reflect-metadata'
-import { NestFactory } from '@nestjs/core'
-import { ApplicationRuntime } from './application-runtime.ts'
 import { runtimeConfiguration } from './runtime-configuration.ts'
-import { RuntimeModule } from './runtime.module.ts'
-import { startLegacyTransport } from './legacy-transport.ts'
+import { createProductionApplication } from './production-application.ts'
 
 const configuration = runtimeConfiguration(process.env)
-const contextStarting = NestFactory.createApplicationContext(
-  RuntimeModule.register(configuration),
-  {
-    abortOnError: false,
-    logger: false,
-  },
-)
+const contextStarting = createProductionApplication(configuration)
 let startingTransport: Promise<unknown> | undefined
 let closing: Promise<void> | undefined
 
@@ -44,7 +35,12 @@ process.on('SIGTERM', onSignal)
 try {
   const context = await contextStarting
   if (!closing) {
-    startingTransport = startLegacyTransport(context.get(ApplicationRuntime), configuration)
+    startingTransport = (async () => {
+      await context.init()
+      if (!closing) {
+        await context.listen(configuration.port, configuration.host)
+      }
+    })()
     await startingTransport
   }
   if (closing) {

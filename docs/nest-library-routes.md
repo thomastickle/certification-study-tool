@@ -4,8 +4,8 @@ Compose `createApplication(config, [LibraryHttpModule])`, importing
 `LibraryHttpModule` from `src/server/library-http/library-http.module.ts`.
 Await startup sequentially (R1-N1). The module borrows the one configured global
 runtime and singleton ImportPreviews. It never closes or retains repositories.
-Production main and the complete legacy dispatcher remain unchanged; atomic
-cutover belongs to the integration owner. No ORM or domain changes are included.
+Production now composes this module through `createProductionApplication`; legacy
+HTTP tests and the old benchmark still retain the dispatcher until their migration. No ORM or domain changes are included.
 
 The controller declares only sources/questions reads, imports preview/confirm,
 question/source deletes, concept reads/create/update/delete and suggestion
@@ -42,7 +42,7 @@ initialization/listening sequentially and closes app, issuer and disposable file
 | `application-authentication.test.ts`: content admission and ticket binding | `compiled library lists authenticate and expose normalized first-value queries`, plus the ownership test: actual login, anonymous denial, admin/student roles and verified actor ticket ownership                                                                                                              |
 | Concept route CRUD/status behavior                                         | `concept create/update/removal and dismissal retain scoped JSON null responses`: real suggestion creation, group rename/removal, dismissal, exact JSON null and selected namespace                                                                                                                             |
 
-Legacy tests stay in place for current production routing. Quiz/home/report
+Legacy tests stay in place pending the next HTTP-test migration task. Quiz/home/report
 assertions in mixed legacy files belong to stage 4B and must not be removed solely
 because this module is integrated. Domain tests remain authoritative for revision,
 review, expiry, broad identity and mastery behavior; stage-three compiled security

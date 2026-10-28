@@ -15,6 +15,16 @@ API behavior, account isolation, OIDC identity/session behavior, and saved histo
 ORM adoption, database replacement, identity-provider changes, new product
 features, and unrelated readability work are outside this conversion.
 
+## Current bounded cutover
+
+Production main now uses the full Nest HTTP composition, public static/Vite serving
+and sequential startup with owned shutdown. Legacy HTTP tests/transport suites and
+old benchmark callers remain maintained pending the next task; their retained
+`legacy-transport`, `request-handler`, `ApplicationAuthentication.handle`,
+`http-controller` and `concept-routes` paths are not production routing. The old
+benchmark does not measure Nest. Test migration/removal and a comparable benchmark
+series remain necessary before completing the overall conversion. Issue #81 stays open.
+
 ## Implementation stages
 
 Each stage must build and pass its relevant checks before publication. Intermediate
