@@ -139,3 +139,21 @@ content or other user-supplied markup to it. SVG strokes use `currentColor`, and
 shared wrapper controls size so navigation and action icons follow their theme.
 The quiz and practice destinations share the same artwork. Existing artwork is
 preserved by this extraction; it is not attributed to an external icon set.
+
+## Nest HTTP production composition
+
+Compiled `main.ts` uses `createProductionApplication`: one RuntimeModule supplies
+security, LibraryHttpModule and StudyHttpModule. Admission normalizes original
+request targets before Express selection. Guards precede body/parameter work;
+request-owned personal storage remains alive through the actual operation and
+housekeeping observation. Public static/Vite middleware owns public paths, while
+unknown `/api/*` and `/auth/*` retain JSON security/error handling.
+
+Main serializes initialization and listening, shares early/repeated signal shutdown,
+and lets the process drain naturally. One transport owner stops admission, disposes
+Vite/HMR, aborts HTTP to unblock pending bodies, joins API/public work, then lets Nest
+close HTTP and database roots. Overlapping factory startup is rejected.
+
+The legacy dispatcher and transport adapters remain for old tests/benchmarks only.
+Migrating those tests and establishing comparable Nest performance are subsequent
+work; existing benchmark reports remain historical and issue #81 remains open.

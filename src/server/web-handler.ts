@@ -1,11 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { existsSync, statSync, createReadStream } from 'node:fs'
 import { resolve, extname, sep } from 'node:path'
-import type { RoutedHttpHandler } from './request-handler.ts'
+import { pipeline } from 'node:stream/promises'
+import type { RoutedHttpHandler } from './routed-http-handler.ts'
 
 /** Serve the built shell and assets within the configured distribution directory. */
 export function staticWebHandler(root: string): RoutedHttpHandler {
-  return (request, response, url) => {
+  return async (request, response, url) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       response.writeHead(405)
       response.end()
@@ -31,8 +32,15 @@ export function staticWebHandler(root: string): RoutedHttpHandler {
         'Cache-Control': 'no-cache',
       })
       if (request.method === 'HEAD') response.end()
-      else createReadStream(file).pipe(response)
+      else await pipeline(createReadStream(file), response)
     } catch {
+      if (response.destroyed || response.writableEnded) {
+        return
+      }
+      if (response.headersSent) {
+        response.destroy()
+        return
+      }
       response.writeHead(404)
       response.end('Not found.')
     }
@@ -41,10 +49,10 @@ export function staticWebHandler(root: string): RoutedHttpHandler {
 
 /** Adapt the admitted route for middleware that reads Node's request target. */
 export function developmentWebHandler(
-  middleware: (request: IncomingMessage, response: ServerResponse) => void,
+  middleware: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>,
 ): RoutedHttpHandler {
   return (request, response, url) => {
     request.url = url.pathname + url.search
-    middleware(request, response)
+    return middleware(request, response)
   }
 }

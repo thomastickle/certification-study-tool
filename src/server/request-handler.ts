@@ -1,15 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { ApplicationAuthentication } from './auth/application-authentication.ts'
-import type { RequestUrl } from './request-url.ts'
 import type { SessionUser } from '../shared/auth-contracts.ts'
 
 type HttpHandler = (request: IncomingMessage, response: ServerResponse) => void | Promise<void>
 
-export type RoutedHttpHandler = (
-  request: IncomingMessage,
-  response: ServerResponse,
-  url: RequestUrl,
-) => void | Promise<void>
+export type { RoutedHttpHandler } from './routed-http-handler.ts'
+
+import type { RoutedHttpHandler } from './routed-http-handler.ts'
 
 export type ApplicationHandlers = {
   authentication: Pick<ApplicationAuthentication, 'handle'>

@@ -164,13 +164,18 @@ decorated application modules in that compiled suite; use relative `.ts` imports
 throughout it so both tests and providers share one emitted module graph. Do not
 import decorated modules into native TypeScript tests.
 
-The Nest conversion is intermediate: `ApplicationModule` and `createApplication`
-provide an Express application with an injected health controller, exercised over
-real loopback HTTP. Global body parsing is disabled so future authorization can
-precede streaming reads. Production still uses the complete existing router;
-resource ownership, authentication/guards, feature controllers, and atomic routing
-cutover remain for later stages of the [conversion plan](docs/nest-conversion-plan.md).
-The foundation health endpoint alone is not a production replacement.
+Production `main` awaits `createProductionApplication(configuration)`, initializes it,
+then listens. This composes one global runtime, authentication/health/session
+controllers, LibraryHttpModule and StudyHttpModule, plus public static/Vite serving.
+Admission precedes routing; bodies remain unparsed until guards and owned inputs run.
+Both signals share shutdown, which drains web/HMR and actual request work before
+closing database roots. Await `init()` and `listen()` sequentially: overlapping
+startup is rejected explicitly.
+
+The [conversion plan](docs/nest-conversion-plan.md) remains incomplete. Legacy native
+HTTP tests and transport/Vite suites still exercise the old boundary and await
+migration. The old benchmark also bypasses Nest; it provides no Nest performance
+evidence. Equivalent benchmark conversion/comparison and issue #81 remain open.
 
 ## Curated CLF-C02 batch import
 

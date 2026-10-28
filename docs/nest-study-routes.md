@@ -3,8 +3,8 @@
 Compose with `createApplication(config, [StudyHttpModule])`, importing
 `StudyHttpModule` from `src/server/study-http/study.module.ts`. The module
 borrows the globally configured runtime and request-owned study context; it
-does not register another runtime or close storage. Production retains the
-complete legacy dispatcher until the parent's atomic cutover.
+does not register another runtime or close storage. Production now composes both feature modules through `createProductionApplication`.
+Legacy HTTP tests and the old benchmark still await migration.
 
 Explicit routes cover home, earned settings, reports, quiz recent/current/due/
 deleted/start/read/answers/submit/pause/resume/abandon/restore/delete. No visibility
@@ -18,7 +18,8 @@ otherwise emits an empty response.
 
 ## Retained and migrated tests
 
-All legacy tests remain unchanged while production uses their dispatcher.
+All legacy tests remain unchanged pending the next HTTP-test migration task;
+production already uses Nest.
 
 | Existing coverage                                        | New compiled Nest coverage in study-http.spec.ts                                                                                                      |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |

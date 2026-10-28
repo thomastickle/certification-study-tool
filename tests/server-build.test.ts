@@ -5,11 +5,14 @@ import { test } from 'node:test'
 test('server build emits runnable ESM and its schema separately from the web bundle', async () => {
   assert.ok(existsSync('build/src/server/main.js'), 'Compile the production entry point')
   const main = readFileSync('build/src/server/main.js', 'utf8')
-  assert.match(main, /from ['"]\.\/legacy-transport\.js['"]/)
-  assert.match(main, /from ['"]\.\/runtime\.module\.js['"]/)
-  const transport = readFileSync('build/src/server/legacy-transport.js', 'utf8')
-  assert.match(transport, /from ['"]\.\/http-controller\.js['"]/)
-  assert.doesNotMatch(transport, /from ['"][^'"]+\.ts['"]/)
+  // Production now composes the real Nest controllers, not the transitional legacy listener.
+  assert.match(main, /from ['"]\.\/production-application\.js['"]/)
+  assert.doesNotMatch(main, /legacy-transport|apiController|createApplicationContext/)
+  const composition = readFileSync('build/src/server/production-application.js', 'utf8')
+  assert.match(composition, /LibraryHttpModule/)
+  assert.match(composition, /StudyHttpModule/)
+  assert.match(composition, /PublicWeb/)
+  assert.doesNotMatch(composition, /legacy-transport|http-controller/)
   assert.doesNotMatch(main, /from ['"][^'"]+\.ts['"]/)
   assert.deepEqual(
     readFileSync('build/docs/question-bank.schema.json'),

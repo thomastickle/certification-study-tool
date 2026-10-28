@@ -1,9 +1,12 @@
 # Staged Nest runtime boundary
 
-Production creates one `RuntimeModule.register(configuration)` application context.
-The complete existing router remains in `startLegacyTransport`; the foundation
-health controller is not the production HTTP server. This is an intermediate
-lifecycle conversion, before the atomic controller/guard cutover.
+Production `main.ts` calls `createProductionApplication(configuration)` from
+`production-application.ts`. It composes `LibraryHttpModule`, `StudyHttpModule`,
+security controllers/guards and `PublicWeb` through one configured RuntimeModule.
+`createApplication(config, extraFeatures)` remains the focused integration factory.
+No production request calls `startLegacyTransport`, `apiController` or the legacy
+authentication dispatcher. Those remain for legacy tests and the old benchmark;
+the next stage migrates callers and removes obsolete adapters.
 
 `runtimeConfiguration(environment)` validates settings without I/O or ambient
 environment reads. Explicit shared paths derive adjacent accounts and users paths;
@@ -19,8 +22,8 @@ do not register it independently in each feature module. It exports:
   listener, shared/private paths, authentication options, legacy subject, production
   mode and static root.
 - `ApplicationAuthentication`: the singleton verified-session/OIDC/accounts owner.
-  Its transitional `handle` result supplies the verified `SessionUser` to the legacy router.
-  The staged Nest transport calls its admission/session/workflow methods directly.
+  Its transitional `handle` supports legacy tests only.
+  The production Nest transport calls its admission/session/workflow methods directly.
 - `SHARED_LIBRARY_REPOSITORY`: the singleton shared `LibraryRepository`. Consumers
   borrow it; they must never close it or substitute a private root.
 - `ImportPreviews`, `PrivateLibraries`, and `StudyHousekeeping`: the same singleton
@@ -105,12 +108,19 @@ keep those regression tests when upgrading Vite.
 These methods are idempotent; aliases have no competing disposal responsibility.
 Nest 12 reports hook exceptions and continues its remaining shutdown phases.
 
-When HTTP moves to Nest, replace the legacy transport attachment with the Nest
-request-lifetime drain rather than moving root disposal into `onModuleDestroy`.
-Keep body parsing after authorization and retain the request scope until its asynchronous handler/interceptor chain settles.
-The current entry point installs both signal listeners during startup, shares one
-shutdown promise, waits for in-progress initialization, removes its listeners after
-closure, and exits through normal event-loop drainage.
+The single transport attachment stops admission, closes Vite/HMR, aborts HTTP
+connections to unblock body/response waits, and joins both public work and the
+Nest security lifetime before Nest disposes HTTP. Public work retains both response
+completion/disconnect and returned handler promises; neither alone releases owned
+work. Static streams use awaited pipelines with late failure containment. Nest owns
+HTTP closure exactly once. Shared/accounts roots close last.
+
+Main installs both signal listeners during startup and shares one shutdown promise.
+Early/repeated signals wait for acquisition and initialization, prevent listening,
+and remove listeners only after disposal. Init/listen failures unwind through the
+same owner and allow natural process drainage. R1-N1 is resolved by explicit factory
+rejection of overlapping startup calls; no concurrent startup scheduler is offered.
+Always await `init()` then `listen()` sequentially (or a single `listen()`).
 
 ### Disposed watcher recovery (CI follow-up)
 
@@ -138,6 +148,5 @@ Recheck this dependency-specific boundary when upgrading Vite/Chokidar.
 See [the HTTP boundary handoff](nest-http-boundary.md) for the compiled Nest app
 factory, security controllers/guard metadata, normalized input decorators,
 after-guard body parsing, personal/shared context and request lifetime API.
-Production still uses the complete legacy router. The staged Nest app is tested
-through real OIDC/HTTP but has no product feature controllers or SPA transport;
-atomic routing cutover remains stage four.
+Production now uses the full Nest composition described above. The stage-three
+notes describe the focused core factory, not a separate production runtime.

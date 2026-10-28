@@ -4,7 +4,7 @@ import type { RuntimeConfiguration } from './runtime-configuration.ts'
 import { Module } from '@nestjs/common'
 import { SecurityModule } from './security.module.ts'
 
-/** Foundation only; production keeps the complete legacy entry point until atomic cutover. */
+/** Configure one global runtime for security and all selected feature controllers. */
 @Module({})
 export class ApplicationModule {
   /** Share the same configured providers when feature controllers replace the legacy transport. */

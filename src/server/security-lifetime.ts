@@ -22,6 +22,11 @@ export class SecurityRequestLifetime {
     return complete
   }
 
+  /** Reject new admissions before asynchronous web disposal begins. */
+  stop(): void {
+    this.stopping = true
+  }
+
   /** Unblock partial body reads, then join work before Nest disposes HTTP and database roots. */
   async drain(server: Server): Promise<void> {
     this.stopping = true
