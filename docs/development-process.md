@@ -8,6 +8,10 @@ cookies. A separate Node child owns the public listener through stock Vite
 proxies with `changeOrigin: false`. Production main still uses the existing
 built-static Nest composition and does not load or launch Vite.
 
+The configured public hostname is explicitly included in Vite's allowed hosts.
+The shared raw admission gate still rejects foreign Host and Origin values before
+Vite; its defaults must not block approved API/auth traffic behind TLS termination.
+
 The child receives public origin, listen host/port, backend target and project
 working directory. Its environment contains PATH, development NODE_ENV and public
 VITE-prefixed settings, rather than backend credentials or storage configuration.
@@ -36,7 +40,16 @@ acknowledge within the bound, the parent terminates it before draining the backe
 Nest retains its existing request-work/private-connection/root lifetime ordering.
 Then the parent signals the frontend process group, escalates after a bounded
 grace period and joins the direct child, including failed/partial Vite startup.
-Repeated shutdown and shutdown during pending readiness share one close operation.
+Direct-child exit alone is insufficient: after forced termination the owner waits
+up to two seconds for the entire group to disappear, or reports a cleanup failure.
+Backend cleanup still runs if public stop/termination fails. Repeated shutdown and
+shutdown during pending readiness share one close operation.
+
+Before importing Vite, the child registers IPC-disconnect handling and checks that
+its owner is still connected. Loss of the main process terminates the child's own
+detached process group immediately, including during partial startup or restart.
+This fault path contains resources even when the main cannot execute shutdown;
+it does not promise graceful plugin hooks after an abrupt owner death.
 
 `tests/compiled/development-process.spec.ts` covers real signed OIDC/session
 proxying, frontend transform, raw HTTP/upgrade denial, atomic CSS HMR, stock config

@@ -18,6 +18,7 @@ import { createServer, request, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { test } from 'node:test'
 import { DevelopmentApplication } from '../../src/server/web/development-application.ts'
 import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
@@ -54,7 +55,7 @@ async function freePort() {
 }
 
 /** Keep source/config edits and all SQLite files outside the checkout and human state. */
-async function fixture() {
+async function fixture(publicHostname?: string) {
   const root = mkdtempSync(join(tmpdir(), 'study-vite-process-'))
   cpSync('src/web', join(root, 'src/web'), { recursive: true })
   cpSync('src/shared', join(root, 'src/shared'), { recursive: true })
@@ -73,6 +74,7 @@ async function fixture() {
   const port = await freePort()
   const configuration = runtimeConfiguration({
     STUDY_PORT: String(port),
+    STUDY_ORIGIN: publicHostname ? `https://${publicHostname}:${port}` : undefined,
     STUDY_DB_PATH: join(root, 'private/library.sqlite3'),
     STUDY_OIDC_ISSUER: provider.issuerIdentifier,
   })
@@ -126,19 +128,199 @@ async function fixture() {
 /** Send the unnormalized target and optional upgrade headers directly over Node HTTP. */
 function raw(origin: string, path: string, headers = {}) {
   return bounded(
-    new Promise<{ status: number; body: string }>((resolve, reject) => {
-      const req = request(origin, { path, headers }, (response) => {
-        let body = ''
-        response.on('data', (chunk) => {
-          body += chunk
+    new Promise<{ status: number; body: string; contentType: string | undefined }>(
+      (resolve, reject) => {
+        const req = request(origin, { path, headers }, (response) => {
+          let body = ''
+          response.on('data', (chunk) => {
+            body += chunk
+          })
+          response.on('end', () =>
+            resolve({
+              status: response.statusCode!,
+              body,
+              contentType: response.headers['content-type'],
+            }),
+          )
         })
-        response.on('end', () => resolve({ status: response.statusCode!, body }))
-      })
-      req.on('error', reject)
-      req.end()
-    }),
+        req.on('error', reject)
+        req.end()
+      },
+    ),
     'raw response',
   )
+}
+
+test('configured public hostname reaches Nest while foreign authorities remain denied', async () => {
+  const f = await fixture('study.example')
+  const endpoint = `http://127.0.0.1:${f.port}`
+  const headers = { Host: new URL(f.origin).host, Origin: f.origin }
+  try {
+    await f.owner.start()
+    const health = await raw(endpoint, '/api/health', headers)
+    assert.equal(health.status, 200)
+    assert.equal(health.contentType, 'application/json; charset=utf-8')
+    assert.deepEqual(JSON.parse(health.body), { status: 'ok' })
+    const session = await raw(endpoint, '/api/session', headers)
+    assert.equal(session.status, 200)
+    assert.deepEqual(JSON.parse(session.body), { user: null })
+    const missingAuth = await raw(endpoint, '/auth/missing', headers)
+    assert.equal(missingAuth.status, 404)
+    assert.equal(missingAuth.contentType, 'application/json')
+    assert.deepEqual(JSON.parse(missingAuth.body), { error: 'Not found.' })
+    for (const denied of [
+      { ...headers, Host: 'foreign.example' },
+      { ...headers, Origin: 'https://foreign.example' },
+    ]) {
+      const response = await raw(endpoint, '/api/health', denied)
+      assert.equal(response.status, 403)
+      assert.equal(response.contentType, 'application/json')
+    }
+  } finally {
+    await f.close()
+  }
+})
+
+/** Observe the complete detached group rather than only the directly forked main process. */
+async function assertGroupStops(pid: number): Promise<void> {
+  const deadline = Date.now() + 3000
+  while (Date.now() < deadline) {
+    try {
+      process.kill(-pid, 0)
+    } catch (error) {
+      assert.equal((error as NodeJS.ErrnoException).code, 'ESRCH')
+      return
+    }
+    await delay(25)
+  }
+  assert.fail('The detached frontend group survived loss of its owner')
+}
+
+test('development close waits for remaining frontend group members', async (t) => {
+  const f = await fixture()
+  let frontendPid: number | undefined
+  const kill = process.kill.bind(process)
+  const helper = join(f.root, 'held-descendant.cjs')
+  writeFileSync(
+    helper,
+    "process.on('SIGTERM', () => {}); process.send('ready'); setInterval(() => {}, 1000)",
+  )
+  const config = join(f.root, 'vite.config.ts')
+  writeFileSync(
+    config,
+    "import { fork } from 'node:child_process';\n" +
+      readFileSync(config, 'utf8').replace(
+        'defineConfig({',
+        `defineConfig({ plugins: [{ name: 'held-descendant', async configureServer() {
+          const child = fork(${JSON.stringify(helper)}, [], { execArgv: [], stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+          await new Promise(resolve => child.once('message', resolve));
+          process.once('SIGTERM', () => process.exit(0));
+        } }],`,
+      ),
+  )
+  try {
+    await f.owner.start()
+    frontendPid = Number(
+      readFileSync(`/proc/${process.pid}/task/${process.pid}/children`, 'utf8').trim(),
+    )
+    assert.ok(Number.isInteger(frontendPid) && frontendPid > 0)
+    let requested!: () => void
+    const terminationRequested = new Promise<void>((resolve) => {
+      requested = resolve
+    })
+    // Signal delivery is asynchronous: retain a real group member until the test releases it.
+    t.mock.method(process, 'kill', (pid: number, signal?: NodeJS.Signals | number) => {
+      if (pid === -frontendPid! && signal === 'SIGKILL') {
+        requested()
+        return true
+      }
+      return kill(pid, signal)
+    })
+    let completed = false
+    const closing = f.owner.close().then(() => {
+      completed = true
+    })
+    await bounded(terminationRequested, 'descendant termination requested')
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    assert.equal(completed, false, 'Close must join the group, not only the direct child')
+    kill(-frontendPid, 0)
+    kill(-frontendPid, 'SIGKILL')
+    await bounded(closing, 'remaining descendant exit')
+    assert.throws(() => kill(-frontendPid!, 0), { code: 'ESRCH' })
+  } finally {
+    t.mock.restoreAll()
+    if (frontendPid) {
+      try {
+        kill(-frontendPid, 'SIGKILL')
+      } catch (error) {
+        assert.equal((error as NodeJS.ErrnoException).code, 'ESRCH')
+      }
+    }
+    await f.close()
+  }
+})
+
+for (const phase of ['starting', 'serving', 'restarting']) {
+  test(`frontend stops when its main owner dies while ${phase}`, { timeout: 30000 }, async () => {
+    const f = await fixture()
+    let frontendPid: number | undefined
+    const config = join(f.root, 'vite.config.ts')
+    const original = readFileSync(config, 'utf8')
+    const pendingConfig = original.replace(
+      'defineConfig({',
+      `defineConfig({ plugins: [{ name: 'owner-loss-pending', async configureServer(vite) { await new Promise(resolve => vite.watcher.once('ready', resolve)); (await import('node:fs')).writeFileSync(${JSON.stringify(join(f.root, 'owner-loss-pending'))}, 'yes'); await new Promise(() => {}) } }],`,
+    )
+    const pending = phase === 'serving' ? undefined : changed(f.root, 'owner-loss-pending', 'yes')
+    if (phase === 'starting') {
+      writeFileSync(config, pendingConfig)
+    }
+    const main = fork(resolve('build/src/server/main.js'), [], {
+      cwd: f.root,
+      execArgv: [],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      env: {
+        PATH: process.env.PATH,
+        STUDY_PORT: String(f.port),
+        STUDY_DB_PATH: join(f.root, 'main/library.sqlite3'),
+        STUDY_OIDC_ISSUER: f.configuration.authentication.issuer,
+      },
+    })
+    main.stderr!.resume()
+    const exited = once(main, 'exit')
+    try {
+      if (phase !== 'starting') {
+        await ready(main)
+        assert.equal((await f.call('/')).status, 200)
+      }
+      if (phase === 'restarting') {
+        writeFileSync(config + '.new', pendingConfig)
+        renameSync(config + '.new', config)
+      }
+      await pending
+      frontendPid = Number(
+        readFileSync(`/proc/${main.pid}/task/${main.pid}/children`, 'utf8').trim(),
+      )
+      assert.ok(Number.isInteger(frontendPid) && frontendPid > 0)
+      main.kill('SIGKILL')
+      const result = await bounded(exited, 'abrupt main exit')
+      assert.equal(result[1], 'SIGKILL')
+      await assertGroupStops(frontendPid)
+      await assert.rejects(fetch(f.origin + '/api/health'))
+    } finally {
+      if (main.exitCode === null && main.signalCode === null) {
+        main.kill('SIGKILL')
+        await exited
+      }
+      if (frontendPid) {
+        try {
+          process.kill(-frontendPid, 'SIGKILL')
+        } catch (error) {
+          assert.equal((error as NodeJS.ErrnoException).code, 'ESRCH')
+        }
+      }
+      await f.close()
+    }
+  })
 }
 
 /** Observe file replacement via the containing directory rather than binding the previous inode. */

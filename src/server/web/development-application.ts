@@ -1,5 +1,6 @@
 import { fork, type ChildProcess } from 'node:child_process'
 import type { AddressInfo } from 'node:net'
+import { setTimeout as delay } from 'node:timers/promises'
 import { createApplication } from '../application.ts'
 import { LibraryHttpModule } from '../library-http/library-http.module.ts'
 import { StudyHttpModule } from '../study-http/study.module.ts'
@@ -124,7 +125,9 @@ export class DevelopmentApplication {
     })
   }
 
-  /** Stop public admission, drain Nest-owned work before SQLite roots, then terminate and join the child group. */
+  /** Stop public admission, drain Nest-owned work before SQLite roots, then terminate and join the child group.
+   * @throws {Error} If the owned group remains after forced termination or transport disposal fails.
+   */
   close(): Promise<void> {
     this.closing ??= this.dispose()
     return this.closing
@@ -132,45 +135,48 @@ export class DevelopmentApplication {
 
   private async dispose(): Promise<void> {
     this.cancelReady?.()
-    const child = this.child
-    if (child?.connected) {
-      const stopped = await new Promise<boolean>((resolve) => {
-        const timer = setTimeout(() => done(false), 1000)
+    try {
+      const child = this.child
+      if (child?.connected) {
+        const stopped = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => done(false), 1000)
 
-        function done(stopped: boolean) {
-          clearTimeout(timer)
-          child!.off('message', onMessage)
-          resolve(stopped)
-        }
-
-        function onMessage(message: unknown) {
-          if (
-            message &&
-            typeof message === 'object' &&
-            'event' in message &&
-            message.event === 'stopped'
-          ) {
-            done(true)
+          function done(stopped: boolean) {
+            clearTimeout(timer)
+            child!.off('message', onMessage)
+            resolve(stopped)
           }
-        }
 
-        child.on('message', onMessage)
-        child.send({ command: 'stop' }, (error) => {
-          if (error) {
-            done(false)
+          function onMessage(message: unknown) {
+            if (
+              message &&
+              typeof message === 'object' &&
+              'event' in message &&
+              message.event === 'stopped'
+            ) {
+              done(true)
+            }
           }
+
+          child.on('message', onMessage)
+          child.send({ command: 'stop' }, (error) => {
+            if (error) {
+              done(false)
+            }
+          })
         })
-      })
-      if (!stopped) {
-        // An unresponsive frontend must lose its public listener before backend drainage begins.
+        if (!stopped) {
+          // An unresponsive frontend must lose its public listener before backend drainage begins.
+          await this.terminateFrontend()
+        }
+      }
+    } finally {
+      try {
+        const backend = await this.backend.catch(() => undefined)
+        await backend?.close()
+      } finally {
         await this.terminateFrontend()
       }
-    }
-    try {
-      const backend = await this.backend.catch(() => undefined)
-      await backend?.close()
-    } finally {
-      await this.terminateFrontend()
     }
   }
 
@@ -178,13 +184,15 @@ export class DevelopmentApplication {
   private async terminateFrontend(): Promise<void> {
     const child = this.child
     if (child?.pid) {
-      const signalGroup = (signal: NodeJS.Signals) => {
+      const signalGroup = (signal: NodeJS.Signals | 0): boolean => {
         try {
           process.kill(-child.pid!, signal)
+          return true
         } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
-            throw error
+          if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+            return false
           }
+          throw error
         }
       }
 
@@ -196,6 +204,14 @@ export class DevelopmentApplication {
         clearTimeout(timer)
         signalGroup('SIGKILL')
       }
+      const deadline = performance.now() + 2000
+      while (signalGroup(0)) {
+        if (performance.now() >= deadline) {
+          throw new Error('Development frontend process group did not exit.')
+        }
+        await delay(10)
+      }
+      this.child = undefined
     }
   }
 }

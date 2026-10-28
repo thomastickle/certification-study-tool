@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { createServer, type Plugin } from 'vite'
+import type { Plugin } from 'vite'
 import { admitRequest } from '../http/admit-request.ts'
 import { admissionFailure } from '../http/admission-failure.ts'
 import { ApplicationError } from '../http/errors.ts'
@@ -8,6 +8,21 @@ import { ApplicationError } from '../http/errors.ts'
 const [originText, host, port, target] = process.argv.slice(2)
 const origin = new URL(originText!)
 let accepting = true
+
+/** Contain this detached group even when its main owner cannot clean up partial Vite startup. */
+function loseOwner(): never {
+  accepting = false
+  try {
+    process.kill(-process.pid, 'SIGKILL')
+  } finally {
+    process.exit(1)
+  }
+}
+
+process.once('disconnect', loseOwner)
+if (!process.connected) {
+  loseOwner()
+}
 
 const admission: Plugin = {
   name: 'study-original-target-admission',
@@ -67,12 +82,14 @@ process.on('message', (message: unknown) => {
 })
 
 try {
+  const { createServer } = await import('vite')
   const server = await createServer({
     plugins: [admission],
     server: {
       host,
       port: Number(port),
       strictPort: true,
+      allowedHosts: [origin.hostname],
       proxy: {
         '/api/': { target, changeOrigin: false },
         '/auth/': { target, changeOrigin: false },
