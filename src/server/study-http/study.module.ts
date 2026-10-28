@@ -202,13 +202,14 @@ class StudyController {
 
   /** Accept only the first exact boolean option; irrelevant bodies remain unread. */
   @Delete('quizzes/:id')
+  @Header('Content-Type', 'application/json')
   @UseGuards(QuizPathGuard)
   remove(@StudyContext() ctx: StudyRequestContext) {
     const permanent = ctx.query.get('permanent')
     if (permanent !== null && permanent !== 'true' && permanent !== 'false') {
       throw new ApplicationError('Choose a valid permanent deletion option.')
     }
-    return new QuizService(ctx.study).deleteResult(quizId(ctx), permanent === 'true')
+    return new QuizService(ctx.study).deleteResult(quizId(ctx), permanent === 'true') ?? 'null'
   }
 }
 

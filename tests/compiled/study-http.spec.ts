@@ -272,3 +272,81 @@ test('overdue paused snapshots retain answers and history without grading until 
     await f.close()
   }
 })
+
+for (const kind of ['missing', 'foreign', 'permanent'] as const) {
+  test(`quiz DELETE returns JSON null for ${kind} results without reading a body`, async () => {
+    const f = await fixture(undefined, [StudyHttpModule])
+    try {
+      const alice = await f.login('alice')
+      let actor = alice
+      let path = '/api/quizzes/' + '-'.repeat(36)
+      if (kind !== 'missing') {
+        populate(f.app.get(ApplicationRuntime).sharedLibrary, 12)
+        const created = await f.authorized(
+          '/api/quizzes',
+          alice,
+          'POST',
+          {
+            'Content-Type': 'application/json',
+          },
+          JSON.stringify({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        )
+        assert.equal(created.status, 201)
+        const quiz = JSON.parse(created.body)
+        path = '/api/quizzes/' + quiz.id
+        const answers = quiz.questions.map((question: { questionId: number }) => ({
+          questionId: question.questionId,
+          selected: [],
+          confidence: null,
+          flagged: false,
+        }))
+        const submitted = await f.authorized(
+          path + '/submit',
+          alice,
+          'POST',
+          {
+            'Content-Type': 'application/json',
+          },
+          JSON.stringify({ answers }),
+        )
+        assert.equal(submitted.status, 200)
+        if (kind === 'foreign') {
+          actor = await f.login('bob')
+        } else {
+          const soft = await f.authorized(path, alice, 'DELETE')
+          assert.equal(soft.status, 200)
+          assert.equal(JSON.parse(soft.body).status, 'deleted')
+          assert.match(soft.headers['content-type']!, /^application\/json(?:;|$)/)
+        }
+      }
+      for (const permanent of kind === 'permanent' ? [true] : [false, true]) {
+        const response = await f.authorized(
+          path + '?permanent=' + permanent,
+          actor,
+          'DELETE',
+          {
+            'Content-Type': 'text/plain',
+            'Content-Length': '4',
+          },
+          'oops',
+        )
+        assert.equal(response.status, 200)
+        assert.equal(response.body, 'null', 'successful deletion responses remain consumable JSON')
+        assert.equal(JSON.parse(response.body), null)
+        assert.match(response.headers['content-type']!, /^application\/json(?:;|$)/)
+        assert.equal(response.headers['cache-control'], 'no-store')
+        assert.equal(response.headers['x-content-type-options'], 'nosniff')
+      }
+      if (kind === 'foreign') {
+        const unchanged = await f.authorized(path, alice)
+        assert.equal(unchanged.status, 200)
+        assert.equal(JSON.parse(unchanged.body).status, 'completed')
+      } else if (kind === 'permanent') {
+        assert.equal((await f.authorized(path, alice)).status, 404)
+        assert.deepEqual(JSON.parse((await f.authorized('/api/quizzes/deleted', alice)).body), [])
+      }
+    } finally {
+      await f.close()
+    }
+  })
+}

@@ -13,7 +13,7 @@ still-encoded pathname against the legacy permissive 36-character lowercase
 hex/hyphen pattern before parameters or bodies. Global authentication/workspace
 policy runs first. Services retain DTO validation and all domain behavior.
 Earned settings use a custom owned input to preserve expiry before body parsing.
-Nullable current/abandon results explicitly serialize JSON null, since Nest
+Nullable current/abandon/delete results explicitly serialize JSON null, since Nest
 otherwise emits an empty response.
 
 ## Retained and migrated tests
@@ -30,6 +30,10 @@ All legacy tests remain unchanged while production uses their dispatcher.
 
 The owned fixture starts/listens sequentially, seeds synthetic content via existing
 repository/ImportService seams, and closes only its app/issuer/temp directory.
+Nullable deletion regressions assert literal JSON null, JSON/cache/security headers,
+foreign-actor storage preservation and successful permanent removal. Irrelevant
+malformed DELETE bodies remain unread.
+
 Broad history/performance and complete expiry timing suites remain at their existing
 domain/legacy seams for the parent's final migration. Shared security tests retain
 their existing body size/cancellation and lifecycle coverage. Docker/Keycloak
