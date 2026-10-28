@@ -53,10 +53,12 @@ Removed `src/server/legacy-transport.ts`, `src/server/request-handler.ts`,
 `tests/support/api-test-handler.ts`, and authentication's obsolete `handle`,
 `authorizeStudyRequest`, `authRoute`, result union and JSON helper. Useful
 admission/session/workflow methods remain. Pure request-url/local-request/routed
-handler modules remain. The only executable old dispatcher caller is
-`tests/foreground-benchmark-worker.ts` (import and call); `http-controller.ts`
-continues to import/call `conceptRoute`. Parent removes those after sibling
-integration. Negative source assertions mentioning dispatcher names are retained.
+handler modules remain. After integration of the separately reviewed authenticated
+Nest benchmark, no executable old dispatcher callers remain. The unused
+`http-controller.ts` and `concepts/concept-routes.ts` are removed. Negative source
+assertions mentioning dispatcher names are retained. The inert legacy benchmark
+fixture is used only with archived pre-Nest sources, as described in
+`nest-benchmark-migration.md`.
 
 Validation evidence is private in `/tmp/nest-test-migration-evidence` (0700/0600).
 The first mixed-concept run exposed a fixture error: attempt keys were read from

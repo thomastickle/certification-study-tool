@@ -6,10 +6,11 @@ The core `createApplication(config, featureModules)` remains useful for focused
 integration/lifetime tests. Neither factory mounts a legacy API bridge.
 
 Legacy HTTP/transport tests now use real Nest or maintained pure helpers, and the
-obsolete transport/authentication dispatch adapters are removed. Only the old
-benchmark retains the API/concept dispatcher pending sibling integration. See
-`nest-http-test-migration.md` for the assertion mapping. Benchmark results do not measure Nest. Overall conversion
-and comparable performance evidence remain incomplete; #81 remains open.
+obsolete transport/authentication and API/concept dispatchers are removed. See
+`nest-http-test-migration.md` for the assertion mapping. The foreground benchmark
+also uses authenticated Nest controllers; `nest-benchmark-migration.md` records
+its boundaries and pinned legacy adapter. Historical results remain historical.
+Final comparative measurements and integrated review remain; #81 stays open.
 
 ## Composition and admission
 

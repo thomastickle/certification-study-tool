@@ -4,8 +4,9 @@ Compose `createApplication(config, [LibraryHttpModule])`, importing
 `LibraryHttpModule` from `src/server/library-http/library-http.module.ts`.
 Await startup sequentially (R1-N1). The module borrows the one configured global
 runtime and singleton ImportPreviews. It never closes or retains repositories.
-Production now composes this module through `createProductionApplication`; legacy
-HTTP tests and the old benchmark still retain the dispatcher until their migration. No ORM or domain changes are included.
+Production composes this module through `createProductionApplication`. Migrated
+HTTP tests and the benchmark use Nest; obsolete dispatchers are removed. No ORM
+or domain changes are included.
 
 The controller declares only sources/questions reads, imports preview/confirm,
 question/source deletes, concept reads/create/update/delete and suggestion
@@ -42,9 +43,9 @@ initialization/listening sequentially and closes app, issuer and disposable file
 | `application-authentication.test.ts`: content admission and ticket binding | `compiled library lists authenticate and expose normalized first-value queries`, plus the ownership test: actual login, anonymous denial, admin/student roles and verified actor ticket ownership                                                                                                              |
 | Concept route CRUD/status behavior                                         | `concept create/update/removal and dismissal retain scoped JSON null responses`: real suggestion creation, group rename/removal, dismissal, exact JSON null and selected namespace                                                                                                                             |
 
-Legacy tests stay in place pending the next HTTP-test migration task. Quiz/home/report
-assertions in mixed legacy files belong to stage 4B and must not be removed solely
-because this module is integrated. Domain tests remain authoritative for revision,
+The table records the focused controller coverage added before the full legacy
+test migration. The original suites' complete assertion mapping is linked below.
+Domain tests remain authoritative for revision,
 review, expiry, broad identity and mastery behavior; stage-three compiled security
 tests retain exhaustive admission/OIDC/body-size/lifetime coverage. This stage
 adds content route coverage without duplicating every protocol or lifetime probe.
@@ -63,6 +64,6 @@ The non-benchmark legacy suites described above have now moved to compiled Nest
 HTTP fixtures, preserving their full assertions; native pure domain/helper cases
 remain native. Obsolete transport/request-handler/authentication adapters are
 removed. Earlier stage descriptions of retained legacy tests are historical.
-See [the complete assertion mapping](nest-http-test-migration.md). The old
-benchmark still retains the API/concept dispatcher until sibling integration;
-this change makes no performance or final-review claim.
+See [the complete assertion mapping](nest-http-test-migration.md). The benchmark
+also uses Nest and the API/concept dispatchers are removed. This route document
+makes no performance or final-review claim.

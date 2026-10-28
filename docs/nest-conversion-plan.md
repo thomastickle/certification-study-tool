@@ -22,9 +22,11 @@ and sequential startup with owned shutdown. Legacy non-benchmark HTTP tests now
 exercise compiled Nest controllers or maintained pure helpers; obsolete transport,
 request-handler and authentication dispatch adapters are removed. See
 `nest-http-test-migration.md` for the complete assertion mapping and validation
-limits. The old benchmark alone retains `http-controller` and `concept-routes`
-pending sibling integration. It does not measure Nest. A comparable benchmark
-series remains deferred; no timing claim is made here. Issue #81 stays open.
+limits. The benchmark now uses authenticated compiled Nest API modules and actual
+request-owned storage; the final unused `http-controller` and `concept-routes`
+dispatchers are removed. An inert legacy worker fixture supports pinned pre-Nest
+comparisons only. Final comparative measurements and integrated review remain;
+no timing claim is made here. Issue #81 stays open.
 
 ## Implementation stages
 

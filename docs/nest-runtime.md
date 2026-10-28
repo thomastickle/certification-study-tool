@@ -5,8 +5,9 @@ Production `main.ts` calls `createProductionApplication(configuration)` from
 security controllers/guards and `PublicWeb` through one configured RuntimeModule.
 `createApplication(config, extraFeatures)` remains the focused integration factory.
 No production request calls `startLegacyTransport`, `apiController` or the legacy
-authentication dispatcher. The legacy transport/request-handler/authentication adapters are removed. Only the
-old benchmark still calls `apiController`; see `nest-http-test-migration.md`.
+authentication dispatcher. The legacy transport/request-handler/authentication and
+API/concept dispatchers are removed. Tests and the foreground benchmark use Nest;
+see `nest-http-test-migration.md` and `nest-benchmark-migration.md`.
 
 `runtimeConfiguration(environment)` validates settings without I/O or ambient
 environment reads. Explicit shared paths derive adjacent accounts and users paths;

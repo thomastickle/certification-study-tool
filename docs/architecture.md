@@ -1,6 +1,6 @@
 # Application architecture
 
-One Node HTTP server serves React and the API. The default deployment is local;
+One NestJS HTTP application serves React and the API. The default deployment is local;
 remote origins require HTTPS. One SQLite database holds shared bank content; each
 user has a separate file for private banks and study records. Another database
 holds identities and hashed application sessions.
@@ -10,7 +10,7 @@ flowchart LR
   GUI[React GUI] --> Auth[Session and workspace checks]
   Auth <--> Provider[OIDC provider]
   Auth --> Accounts[(Accounts and sessions)]
-  Auth --> HTTP[HTTP controller]
+  Auth --> HTTP[Nest feature controllers]
   HTTP --> Admin[Admin role check]
   Admin --> Import[Import service]
   Admin --> Library[Library service]
@@ -33,9 +33,12 @@ flowchart LR
   and initial schema creation live in the repository; services own transactions.
 - `src/server/auth/` verifies OIDC identity and role claims, manages opaque
   sessions, and binds admitted requests to an application account.
-- `src/server/http-controller.ts` translates authenticated requests into service
-  calls. It enforces origin, request-size, and shared-content role checks.
-- `src/server/main.ts` owns startup, the database connection, and frontend serving.
+- `src/server/library-http/` and `src/server/study-http/` contain Nest controllers
+  that translate authenticated requests into existing service calls. Admission,
+  guards, owned input parsing and the security filter preserve HTTP policy.
+- `src/server/main.ts` starts the compiled production composition. The configured
+  `RuntimeModule` owns shared resources; `StudyLibraryScope` owns each verified
+  actor's request storage. `PublicWeb` serves static files or development Vite.
 - `src/web/` owns React presentation, file selection, and confirmation dialogs.
 - `src/shared/` contains TypeScript request/result types used across boundaries.
 
@@ -154,6 +157,11 @@ and lets the process drain naturally. One transport owner stops admission, dispo
 Vite/HMR, aborts HTTP to unblock pending bodies, joins API/public work, then lets Nest
 close HTTP and database roots. Overlapping factory startup is rejected.
 
-The legacy dispatcher and transport adapters remain for old tests/benchmarks only.
-Migrating those tests and establishing comparable Nest performance are subsequent
-work; existing benchmark reports remain historical and issue #81 remains open.
+HTTP/security/lifecycle tests now exercise compiled Nest or maintained pure helpers;
+the legacy dispatchers and transport adapters are removed. The benchmark runs the
+actual authenticated Nest API modules with deterministic manual housekeeping.
+Its inert legacy fixture supports pinned pre-Nest comparisons only. See
+[assertion mappings](nest-http-test-migration.md) and
+[measurement boundaries](nest-benchmark-migration.md). Existing reports remain
+historical; final comparative measurements and integrated review remain separate
+gates. Issue #81 remains open.

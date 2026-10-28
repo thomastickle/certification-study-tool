@@ -172,10 +172,13 @@ Both signals share shutdown, which drains web/HMR and actual request work before
 closing database roots. Await `init()` and `listen()` sequentially: overlapping
 startup is rejected explicitly.
 
-The [conversion plan](docs/nest-conversion-plan.md) remains incomplete. Legacy native
-HTTP tests and transport/Vite suites still exercise the old boundary and await
-migration. The old benchmark also bypasses Nest; it provides no Nest performance
-evidence. Equivalent benchmark conversion/comparison and issue #81 remain open.
+HTTP, authentication and transport/Vite tests exercise compiled Nest or maintained
+pure helpers; the obsolete dispatchers are removed. See the
+[assertion mapping](docs/nest-http-test-migration.md). The foreground benchmark
+also uses authenticated Nest controllers and actual request-owned storage; its
+[methodology](docs/nest-benchmark-migration.md) distinguishes the historical
+dispatcher baseline. Final comparative measurements and integrated review remain
+under the [conversion plan](docs/nest-conversion-plan.md). Issue #81 stays open.
 
 ## Curated CLF-C02 batch import
 

@@ -4,7 +4,7 @@ Compose with `createApplication(config, [StudyHttpModule])`, importing
 `StudyHttpModule` from `src/server/study-http/study.module.ts`. The module
 borrows the globally configured runtime and request-owned study context; it
 does not register another runtime or close storage. Production now composes both feature modules through `createProductionApplication`.
-Legacy HTTP tests and the old benchmark still await migration.
+Migrated HTTP tests and the benchmark use Nest; obsolete dispatchers are removed.
 
 Explicit routes cover home, earned settings, reports, quiz recent/current/due/
 deleted/start/read/answers/submit/pause/resume/abandon/restore/delete. No visibility
@@ -18,8 +18,8 @@ otherwise emits an empty response.
 
 ## Retained and migrated tests
 
-All legacy tests remain unchanged pending the next HTTP-test migration task;
-production already uses Nest.
+The table records focused module coverage added before the full legacy test
+migration; its complete assertion mapping is linked below.
 
 | Existing coverage                                        | New compiled Nest coverage in study-http.spec.ts                                                                                                      |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -35,8 +35,8 @@ Nullable deletion regressions assert literal JSON null, JSON/cache/security head
 foreign-actor storage preservation and successful permanent removal. Irrelevant
 malformed DELETE bodies remain unread.
 
-Broad history/performance and complete expiry timing suites remain at their existing
-domain/legacy seams for the parent's final migration. Shared security tests retain
+Broad history and expiry timing suites retain their domain boundaries; HTTP
+coverage uses compiled Nest fixtures. Shared security tests retain
 their existing body size/cancellation and lifecycle coverage. Docker/Keycloak
 packaging is unchanged; no fresh Docker or live Keycloak run is claimed here.
 Independent review, CI monitoring and integration belong to the parent.
@@ -47,6 +47,6 @@ The non-benchmark legacy suites described above have now moved to compiled Nest
 HTTP fixtures, preserving their full assertions; native pure domain/helper cases
 remain native. Obsolete transport/request-handler/authentication adapters are
 removed. Earlier stage descriptions of retained legacy tests are historical.
-See [the complete assertion mapping](nest-http-test-migration.md). The old
-benchmark still retains the API/concept dispatcher until sibling integration;
-this change makes no performance or final-review claim.
+See [the complete assertion mapping](nest-http-test-migration.md). The benchmark
+also uses Nest and the API/concept dispatchers are removed. This route document
+makes no performance or final-review claim.
