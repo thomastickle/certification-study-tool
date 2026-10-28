@@ -66,99 +66,37 @@ Only after readiness does the unreferenced one-second upkeep interval run.
 
 `onModuleDestroy` cancels the timer and awaits `StudyHousekeeping.stop()`. It leaves
 roots open because Nest runs this phase before disposing its HTTP transport.
-`beforeApplicationShutdown` drains the attached intermediate transport: Vite and
-upgraded HMR sockets first, then HTTP sockets and every active handler promise.
-Development Vite has an owner before its factory is awaited. `DevelopmentVite`
-coordinates initial boot and all public/file-triggered `restart()` calls through
-the same application-owned replacement path. Each attempt gets a separate
-`DevelopmentViteGraph`, which resolves configuration once and uses Vite's exported
-plugin-patching point to order capture before file-config pre hooks. Environment
-initialization resources are owned before `configureServer`, including the R1
-failure-only `name`/`init` carrier for a rejected environment factory. Parallel
-initialization drains before partial environments, HMR and watchers close.
+`beforeApplicationShutdown` drains the attached Nest transport: it stops admission,
+aborts HTTP sockets to unblock body/response waits, and joins every actual handler
+promise before `onApplicationShutdown` closes shared/accounts roots. Public work
+retains response completion/disconnect and returned handler promises; neither alone
+releases storage ownership. Static serving is the separately verified Express
+adapter described in [static serving](nest-static-serving.md).
 
-Replacement creation and activation are separate. For replacements, the public
-`createServer` call invokes a deferred environment `listen` wrapper, so it finishes
-construction, `init`, configure hooks and buildStart without activating endpoints.
-The coordinator fully closes the previous graph, selects the replacement, then
-calls the public environment `listen` methods through `activate()`. This preserves
-Vite's documented **new init → previous close → new listen** contract, including
-custom environments that reuse an endpoint from `previousInstance`. Initial boot
-retains ordinary public `createServer` activation. Force-optimization and previous
-environment propagation are unchanged.
+Development main owns a private real Nest API and a public stock Vite child. The
+child uses the actual project config, stock proxy/HMR/restart APIs and shared pure
+original-target admission before Node request/upgrade dispatch. The parent owns
+bounded readiness, early/repeated signal cancellation, crash propagation,
+stop-admission acknowledgement, backend drainage and process-group termination.
+The public origin remains authoritative for Host/Origin/OIDC/session behavior.
+See [development process ownership and assertion migration](development-process.md).
 
-A construction failure disposes only that attempt, logs Vite's usual restart
-failure and leaves the previous middleware/HMR graph live. Activation failure is
-different: the predecessor has already closed, just as in Vite's own restart.
-The public restart rejects with the original activation error after parallel
-listen work drains. As in Vite, the failed, potentially partially activated
-selection stays owned and watched, allowing a real config-file edit or public
-restart to recover. There is no live predecessor fallback. A retry receives the
-failed selection's environments as predecessors, fully closes that selection,
-then activates its replacement. Shutdown also closes every remaining watcher,
-WebSocket, environment and endpoint in that failed selection.
-
-A stable public server view follows selection; its `close()` closes the
-application-owned set of graphs. Successfully disposed attempts leave the owner's
-set. Shutdown rejects new reload work, joins in-progress init or activation, and
-then closes every remaining graph. If shutdown arrives before replacement
-activation, that unactivated attempt is disposed instead of starting listeners.
-Initial startup errors still reject with the original error after cleanup.
-
-Each graph's HMR server is an unbound HTTP bridge, with no listening port. One
-upgrade route on the actual listener dispatches exclusively to the selected graph.
-A partial/replacement graph therefore cannot accept live HMR connections or remove
-another graph's upgrade listeners during cleanup. Public-file scanning failure
-can safely clear its own bridge even before Vite exposes environment handles.
-This uses Vite's published `resolveConfig`, `createServer`, environment/init and
-`restart` APIs rather than calling or patching internal `_createServer` /
-`restartServer`. Previous environment instances and force-optimization requests
-are passed into replacement initialization.
-
-After Vite's hooks drain, close its watcher once more: Vite closes watchers in
-parallel with those hooks, and a late watch registration can reopen Chokidar.
-Disposal also crosses Node's native watcher close phase before rethrowing a startup
-error, so fatal exit cannot hide pending `FSEventWrap` cleanup. These adapters are
-covered against installed Vite 7.3.7 public environment init/listen and plugin hooks;
-keep those regression tests when upgrading Vite.
-`onApplicationShutdown` closes shared/accounts roots after transport disposal.
-These methods are idempotent; aliases have no competing disposal responsibility.
-Nest 12 reports hook exceptions and continues its remaining shutdown phases.
-
-The single transport attachment stops admission, closes Vite/HMR, aborts HTTP
-connections to unblock body/response waits, and joins both public work and the
-Nest security lifetime before Nest disposes HTTP. Public work retains both response
-completion/disconnect and returned handler promises; neither alone releases owned
-work. Static streams use awaited pipelines with late failure containment. Nest owns
-HTTP closure exactly once. Shared/accounts roots close last.
+The former `DevelopmentVite` / `DevelopmentViteGraph` implementations are deleted.
+There is no application-owned plugin/environment initialization, watcher sealing,
+HMR bridge, graph handoff or remote Vite server facade. Mutable watcher metadata
+inside a terminated child is not a resource contract: tests prove acquisition,
+then process-group disappearance and closed SQLite roots. The process boundary
+contains callbacks and watches even if stock initialization never returns a handle.
+Custom environment identity and in-process graph-method seams are explicitly
+retired; local Vite plugin SSR remains tested through HTTP in the child.
 
 Main installs both signal listeners during startup and shares one shutdown promise.
-Early/repeated signals wait for acquisition and initialization, prevent listening,
-and remove listeners only after disposal. Init/listen failures unwind through the
-same owner and allow natural process drainage. R1-N1 is resolved by explicit factory
-rejection of overlapping startup calls; no concurrent startup scheduler is offered.
-Always await `init()` then `listen()` sequentially (or a single `listen()`).
-
-### Disposed watcher recovery (CI follow-up)
-
-Vite 7.3.7's bundled Chokidar does not await outstanding filesystem `stat`
-callbacks in `close()`. A missing-file callback delivered afterwards can leave an
-empty parent entry in `getWatched()` while `closed` remains true and no native
-watch exists. A second distinct removal can call Chokidar's public `add()` recovery
-path, which resets `closed` and opens a native watch. Thus exact empty metadata is
-not a reliable resource-disposal contract, and late recovery is a real ownership
-risk. The observed CI failure showed only the empty metadata; it did not establish
-that CI had reopened native resources.
-
-After Vite/environment close hooks finish, graph disposal seals public watcher
-`add()` before its final close. Live watching and late registrations during close
-hooks retain their existing behavior; permanently disposed graphs cannot acquire
-new watches through queued filesystem recovery. Empty late directory metadata may
-remain. Tests assert closed state, no tracked filenames, baseline native-handle
-restoration, and no post-close events. Controlled real filesystem completions
-exercise both the metadata-only case and native reopening, with unmodified Vite as
-a positive leak control. The Nest regression also verifies SQLite root closure.
-Recheck this dependency-specific boundary when upgrading Vite/Chokidar.
+Early signals cancel pending child readiness, prevent public readiness and exit
+cleanly after disposal. Unexpected frontend death fails the generation with a
+nonzero exit. Backend public Nest initialization/listening still uses the existing
+sequential lifecycle and PR94 root-lifetime fixes. Always await `init()` then
+`listen()` sequentially (or a single `listen()`). Historical performance evidence
+is unchanged; no new timing claim follows from this transport replacement.
 
 ## Stage three controller handoff
 

@@ -4,40 +4,30 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { staticWebHandler, developmentWebHandler } from '../src/server/web/web-handler.ts'
+import { staticWebHandler } from '../src/server/web/web-handler.ts'
 import { closeServer } from './oidc-fixture.ts'
 
-for (const mode of ['static', 'development'] as const) {
-  test(`${mode} serving consumes admitted context instead of the raw target`, async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'study-web-context-'))
-    writeFileSync(join(directory, 'asset.js'), 'synthetic asset')
-    const url = Object.freeze({ pathname: '/asset.js', search: '?v=one+two&v=%2F' })
-    const web =
-      mode === 'static'
-        ? staticWebHandler(directory)
-        : developmentWebHandler((request, response) => {
-            response.end(request.url)
-          })
-    const server = createServer((request, response) => {
-      void web(request, response, url)
-    })
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const address = server.address()
-    assert.ok(address && typeof address !== 'string')
-    try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/api/missing.js?wrong=true`)
-      assert.equal(response.status, 200)
-      assert.equal(
-        await response.text(),
-        mode === 'static' ? 'synthetic asset' : '/asset.js?v=one+two&v=%2F',
-      )
-      assert.deepEqual(url, { pathname: '/asset.js', search: '?v=one+two&v=%2F' })
-    } finally {
-      await closeServer(server)
-      rmSync(directory, { recursive: true, force: true })
-    }
+test('static serving consumes admitted context instead of the raw target', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'study-web-context-'))
+  writeFileSync(join(directory, 'asset.js'), 'synthetic asset')
+  const url = Object.freeze({ pathname: '/asset.js', search: '?v=one+two&v=%2F' })
+  const web = staticWebHandler(directory)
+  const server = createServer((request, response) => {
+    void web(request, response, url)
   })
-}
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string')
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/missing.js?wrong=true`)
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), 'synthetic asset')
+    assert.deepEqual(url, { pathname: '/asset.js', search: '?v=one+two&v=%2F' })
+  } finally {
+    await closeServer(server)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('static serving retains shell fallback, method, decoding and containment rules', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-static-rules-'))

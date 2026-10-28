@@ -182,7 +182,7 @@ for (const failure of ['vite', 'listen', 'static'] as const) {
           fixture.output(),
           {
             vite: /Synthetic Vite initialization failure/,
-            listen: /EADDRINUSE/,
+            listen: /EADDRINUSE|Port \d+ is already in use/,
             static: /npm run build/,
           }[failure],
         )
@@ -296,11 +296,10 @@ for (const phase of ['configureServer', 'buildStart']) {
         name: 'first-user-pre-failure', enforce: 'pre',
         configureServer: { order: 'pre', async handler(server) {
           await new Promise(resolve => server.watcher.once('ready', resolve))
-          process.on('exit', () => writeFileSync(${JSON.stringify(observation)}, JSON.stringify({
-            closed: server.watcher.closed,
+          writeFileSync(${JSON.stringify(observation)}, JSON.stringify({
+            pid: process.pid,
             watched: Object.keys(server.watcher.getWatched()).length,
-            fsWatchers: process.getActiveResourcesInfo().filter(name => name === 'FSEventWrap').length,
-          }), { mode: 0o600 }))
+          }), { mode: 0o600 })
           ${phase === 'configureServer' ? "throw new Error('post-allocation configureServer failure')" : ''}
         } },
         ${phase === 'buildStart' ? "buildStart: { order: 'pre', handler() { throw new Error('post-allocation buildStart failure') } }," : ''}
@@ -317,11 +316,13 @@ for (const phase of ['configureServer', 'buildStart']) {
         assert.equal(code, 1)
         assert.match(fixture.output(), new RegExp(`post-allocation ${phase} failure`))
         assertSqliteClosed(directory)
-        assert.deepEqual(JSON.parse(readFileSync(observation, 'utf8')), {
-          closed: true,
-          watched: 0,
-          fsWatchers: 0,
-        })
+        // Vite is process-isolated: OS resource disappearance replaces mutable watcher metadata.
+        const acquired = JSON.parse(readFileSync(observation, 'utf8')) as {
+          pid: number
+          watched: number
+        }
+        assert.ok(acquired.watched > 0, 'Failure must happen after real watcher acquisition')
+        assert.throws(() => process.kill(-acquired.pid, 0), { code: 'ESRCH' })
       } finally {
         if (fixture.child.exitCode === null && fixture.child.signalCode === null) {
           fixture.child.kill('SIGKILL')

@@ -1,15 +1,25 @@
 import assert from 'node:assert/strict'
+import { once } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { createProductionApplication } from '../../src/server/production-application.ts'
+import { DevelopmentApplication } from '../../src/server/web/development-application.ts'
 import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
+import { observeRuntime } from './runtime-observation.ts'
+import { closeServer } from '../oidc-fixture.ts'
 
-test('production development composition serves Vite SSR and releases its runtime', async () => {
+test('stock child executes local Vite SSR plugins and releases its real Nest runtime', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-dev-ssr-'))
-  const previousDirectory = process.cwd()
+  const reservation = createServer()
+  reservation.listen(0, '127.0.0.1')
+  await once(reservation, 'listening')
+  const address = reservation.address()
+  assert.ok(address && typeof address !== 'string')
+  await closeServer(reservation)
   writeFileSync(join(directory, 'index.html'), '<title>development fixture</title>')
   writeFileSync(join(directory, 'probe.js'), 'export const answer = 42')
   writeFileSync(
@@ -22,25 +32,36 @@ test('production development composition serves Vite SSR and releases its runtim
     }
   }] }`,
   )
-  const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
-  process.chdir(directory)
-  let app: Awaited<ReturnType<typeof createProductionApplication>> | undefined
+  const configuration = runtimeConfiguration({
+    STUDY_PORT: String(address.port),
+    STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+  })
+  const owner = new DevelopmentApplication(configuration, directory)
   try {
-    app = await createProductionApplication(configuration)
-    const runtime = app.get(ApplicationRuntime)
-    await app.init()
-    await app.listen(0, '127.0.0.1')
-    const address = app.getHttpServer().address()
-    assert.ok(address && typeof address !== 'string')
-    configuration.origin.port = String(address.port)
+    await owner.start()
+    const runtime = (await owner.backend).get(ApplicationRuntime)
     const response = await fetch(configuration.origin.origin + '/ssr-probe')
     assert.equal(response.status, 200)
     assert.equal(await response.text(), '42')
-    await app.close()
+    await owner.close()
     assert.throws(() => runtime.sharedLibrary.quizStore().nextHousekeepingAt(), /closed|not open/)
   } finally {
-    await app?.close()
-    process.chdir(previousDirectory)
+    await owner.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('static factory rejects obsolete development composition after closing acquired roots', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'nest-dev-factory-'))
+  const observation = observeRuntime()
+  try {
+    const configuration = runtimeConfiguration({
+      STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+    })
+    await assert.rejects(createProductionApplication(configuration), /DevelopmentApplication/)
+    assert.throws(() => observation.runtime.sharedLibrary.sources(), /closed|not open/)
+  } finally {
+    observation.restore()
     rmSync(directory, { recursive: true, force: true })
   }
 })

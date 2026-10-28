@@ -2,6 +2,7 @@ import { BadRequestException, Catch, Inject, NotFoundException } from '@nestjs/c
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { ServerResponse } from 'node:http'
 import { ApplicationError } from '../http/errors.ts'
+import { admissionFailure } from '../http/admission-failure.ts'
 import { WorkspaceChangedError } from '../auth/application-authentication.ts'
 import type { AdmittedRequest } from './security-context.ts'
 import { SecurityGuard } from './security.guard.ts'
@@ -49,6 +50,10 @@ export function securityFailure(
     return
   }
   const study = request.studyErrors === true
+  if (!study && !(error instanceof WorkspaceChangedError)) {
+    admissionFailure(error, response)
+    return
+  }
   const expected = error instanceof ApplicationError
   const status = expected ? error.status : 500
   let value: object

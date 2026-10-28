@@ -156,7 +156,9 @@ commands continue to run native TypeScript without decorators.
 
 `npm run dev` rebuilds the server before starting it and restarts on backend,
 shared, schema, build-script, or TypeScript configuration changes. Vite handles
-frontend HMR. After a build or server startup failure, the watcher stays alive and
+frontend HMR. Development main now owns a stock Vite child and private Nest API;
+see [process ownership and assertion migration](docs/development-process.md).
+After a build or server startup failure, the watcher stays alive and
 waits for a source change before trying again. `npm test` builds first, retains
 native TypeScript/Node tests and the SVG loader, then runs
 `tests/compiled/**/*.spec.ts` from emitted JavaScript. Put tests that import
@@ -166,10 +168,11 @@ import decorated modules into native TypeScript tests.
 
 Production `main` awaits `createProductionApplication(configuration)`, initializes it,
 then listens. This composes one global runtime, authentication/health/session
-controllers, LibraryHttpModule and StudyHttpModule, plus public static/Vite serving.
+controllers, LibraryHttpModule and StudyHttpModule, plus built static serving.
 Admission precedes routing; bodies remain unparsed until guards and owned inputs run.
-Both signals share shutdown, which drains web/HMR and actual request work before
-closing database roots. Await `init()` and `listen()` sequentially: overlapping
+Both signals share shutdown and retain actual request work until database roots
+can close. Development stops public admission before backend drainage and then
+terminates the frontend process group. Await `init()` and `listen()` sequentially: overlapping
 startup is rejected explicitly.
 
 HTTP, authentication and transport/Vite tests exercise compiled Nest or maintained
