@@ -11,6 +11,7 @@ interface Row {
     requestServiceMs: { count: number }
     actorServiceMs: { count: number }[]
     memory: { start: { rss: number }; end: { rss: number }; sampledPeakRss: number }
+    observations: number
     opens: number
     activeConnections: number
     peakConnections: number
@@ -46,6 +47,7 @@ test('synthetic HTTP benchmark reports measured requests separately and preserve
     assert.ok(row.server!.memory.end.rss > 0)
     assert.ok(row.server!.memory.sampledPeakRss >= row.server!.memory.start.rss)
     assert.equal(row.server!.opens, count)
+    assert.equal(row.server!.observations, count)
     assert.equal(row.server!.activeConnections, 0)
     assert.ok(row.server!.peakConnections >= 1 && row.server!.peakConnections <= 4)
     assert.ok(row.server!.timerDelay.samples > 0)

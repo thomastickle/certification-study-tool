@@ -17,11 +17,15 @@ python3 scripts/compare-study-performance.py \
 ```
 
 The script archives both exact commits into restricted temporary directories,
-overlays the same current benchmark files on both, hashes all measured source,
-retains exact patches, and runs each series sequentially against fresh synthetic
-SQLite files and OS-selected loopback ports. It installs nothing. Run without
-competing tests/benchmarks. Never substitute a personal database. Inspect raw logs
-privately and append sanitized results; do not upload raw profiles or snapshots.
+overlays common workload/parent helpers with revision-appropriate legacy/native or
+Nest/compiled workers, hashes measured source, retains exact patches, and runs
+sequentially against fresh synthetic SQLite files and OS-selected loopback ports.
+It installs nothing. Authentication, service-boundary, compilation, startup and
+manual background-scheduling differences are documented in
+[nest-benchmark-migration.md](nest-benchmark-migration.md). Historical tables below
+remain historical; this migration supplies no new comparative latency claim.
+Run without competing tests/benchmarks. Never substitute a personal database.
+Inspect raw logs privately; do not upload raw profiles or snapshots.
 The printed evidence directory contains source manifests, common-harness patches,
 run order/SHAs and every observation. The benchmark records Node, CPU, memory,
 load, timestamp, HTTP/service distributions, drained timer gaps, sampled RSS,
