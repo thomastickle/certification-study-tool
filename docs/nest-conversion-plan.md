@@ -15,10 +15,17 @@ API behavior, account isolation, OIDC identity/session behavior, and saved histo
 ORM adoption, database replacement, identity-provider changes, new product
 features, and unrelated readability work are outside this conversion.
 
-## Current bounded cutover
+## Current implementation
 
-Production main uses the full Nest HTTP composition, public static/Vite serving
-and sequential startup with owned shutdown. Legacy non-benchmark HTTP tests now
+Production uses the full Nest HTTP composition and built-static serving.
+Development uses a private Nest API and a stock Vite child on the public origin;
+the custom Vite graph is removed. A concrete startup owner handles sequential
+initialization and shutdown while exposing the unmodified Nest application.
+The unused input-metadata rewriter and application-wide proxy are removed;
+guarded body parsing completes before ordinary Nest parameter/pipe resolution.
+The [infrastructure inventory](nest-infrastructure-review.md) records the remaining
+security, storage-lifetime and compatibility exceptions with their necessity tests.
+Legacy non-benchmark HTTP tests now
 exercise compiled Nest controllers or maintained pure helpers; obsolete transport,
 request-handler and authentication dispatch adapters are removed. See
 `nest-http-test-migration.md` for the complete assertion mapping and validation
@@ -26,9 +33,9 @@ limits. The benchmark now uses authenticated compiled Nest API modules and actua
 request-owned storage; the final unused `http-controller` and `concept-routes`
 dispatchers are removed. An inert legacy worker fixture supports pinned pre-Nest
 comparisons only. The [pinned comparison](nest-performance.md) records 24 passing
-fresh-fixture runs and remaining slow paths. Final integrated review remains;
-implementation and measurements do not themselves establish readiness. Issue #81
-stays open.
+fresh-fixture runs and remaining slow paths. Exact reviewed heads, executed checks
+and current readiness are recorded in PR #85; implementation and measurements do
+not themselves authorize merging into master. Issue #81 stays open.
 
 ## Implementation stages
 
