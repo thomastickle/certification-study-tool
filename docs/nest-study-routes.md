@@ -50,3 +50,8 @@ removed. Earlier stage descriptions of retained legacy tests are historical.
 See [the complete assertion mapping](nest-http-test-migration.md). The benchmark
 also uses Nest and the API/concept dispatchers are removed. This route document
 makes no performance or final-review claim.
+
+Resource controllers now separate home, quiz operations, quiz history and reports.
+The module registers static history routes before dynamic quiz IDs. Earned-settings
+expiry is an explicit route interceptor before the guarded body parser; input
+extraction has no domain side effects. Product bodies use ReadJsonBody + Nest Body.

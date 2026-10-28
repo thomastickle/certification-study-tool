@@ -13,6 +13,16 @@ export const PUBLIC_METHOD = Symbol('PublicMethod')
 
 export const STUDY_REQUEST = Symbol('StudyRequest')
 
+export const JOINED_STUDY_INPUTS = Symbol('JoinedStudyInputs')
+
+/** Opt resource-using asynchronous custom parameters into the Nest compatibility adapter. */
+export const JoinedStudyInputs = () => SetMetadata(JOINED_STUDY_INPUTS, true)
+
+export const ORIGINAL_PATH = Symbol('OriginalPath')
+
+/** Constrain the admitted raw target before content authorization or any scoped input work. */
+export const OriginalPath = (pattern: RegExp) => SetMetadata(ORIGINAL_PATH, pattern)
+
 export const LIBRARY_WRITE = Symbol('LibraryWrite')
 
 export type LibraryVisibility = 'shared' | 'private'

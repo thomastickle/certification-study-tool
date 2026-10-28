@@ -1,4 +1,4 @@
-import { Catch, Inject, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Catch, Inject, NotFoundException } from '@nestjs/common'
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { ServerResponse } from 'node:http'
 import { ApplicationError } from '../http/errors.ts'
@@ -21,6 +21,9 @@ export class SecurityExceptionFilter implements ExceptionFilter {
       } catch (denial) {
         error = denial
       }
+    }
+    if (error instanceof BadRequestException) {
+      error = new ApplicationError(error.message)
     }
     try {
       securityFailure(error, request, http.getResponse<ServerResponse>())

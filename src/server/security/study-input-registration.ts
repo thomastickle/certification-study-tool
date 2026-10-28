@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common/constants'
 import { DiscoveryService, MetadataScanner } from '@nestjs/core'
 import type { AdmittedRequest } from './security-context.ts'
-import { STUDY_REQUEST } from './security-context.ts'
+import { JOINED_STUDY_INPUTS } from './security-context.ts'
 
 const OWNED_FACTORY = Symbol('OwnedStudyInputFactory')
 
@@ -23,26 +23,14 @@ type Parameter = {
   schema?: unknown
 }
 
-/** Register ordinary Nest custom parameters before Nest snapshots their execution metadata.
+/** Adapt explicitly joined custom parameters before Nest snapshots execution metadata.
  * Each factory and its parameter-local instance pipes become one awaited input operation.
- * @throws {Error} For inputs/pipes outside this staged study boundary's supported contract.
+ * @throws {Error} For inputs/pipes outside the optional joined-input adapter's supported contract.
  */
-export function registerStudyInputs(discovery: DiscoveryService): void {
+export function registerStudyInputs(discovery: DiscoveryService): boolean {
+  let registeredAny = false
   const providers = discovery.getProviders()
   const modules = new Set(providers.map((provider) => provider.host))
-  // Nest's discovered pipe enhancers include APP_PIPE (also request-scoped) and class pipes.
-  // Instance pipes on a parameter have no separate enhancer provider and are owned below.
-  for (const module of modules) {
-    const enhancers = [
-      ...(module?.providers.values() ?? []),
-      ...(module?.injectables.values() ?? []),
-    ]
-    if (enhancers.some((provider) => provider.subtype === 'pipe')) {
-      throw new Error(
-        'Use parameter-local pipe instances on study inputs; global and class pipes are not supported.',
-      )
-    }
-  }
   const scanner = new MetadataScanner()
   for (const controller of discovery.getControllers()) {
     const type = controller.metatype as Type<object>
@@ -53,10 +41,25 @@ export function registerStudyInputs(discovery: DiscoveryService): void {
     for (const name of scanner.getAllMethodNames(prototype)) {
       const handler = prototype[name] as (...args: unknown[]) => unknown
       const scoped =
-        Reflect.getMetadata(STUDY_REQUEST, handler) ?? Reflect.getMetadata(STUDY_REQUEST, type)
+        Reflect.getMetadata(JOINED_STUDY_INPUTS, handler) ??
+        Reflect.getMetadata(JOINED_STUDY_INPUTS, type)
       if (!scoped) {
         continue
       }
+      // Nest's discovered pipe enhancers include APP_PIPE (also request-scoped) and class pipes.
+      // Instance pipes on a parameter have no separate enhancer provider and are owned below.
+      for (const module of modules) {
+        const enhancers = [
+          ...(module?.providers.values() ?? []),
+          ...(module?.injectables.values() ?? []),
+        ]
+        if (enhancers.some((provider) => provider.subtype === 'pipe')) {
+          throw new Error(
+            'Use parameter-local pipe instances on study inputs; global and class pipes are not supported.',
+          )
+        }
+      }
+      registeredAny = true
       const pipes = [
         ...(Reflect.getMetadata(PIPES_METADATA, type) ?? []),
         ...(Reflect.getMetadata(PIPES_METADATA, handler) ?? []),
@@ -127,4 +130,5 @@ export function registerStudyInputs(discovery: DiscoveryService): void {
       Reflect.defineMetadata(STUDY_INPUTS_REGISTERED, true, handler)
     }
   }
+  return registeredAny
 }

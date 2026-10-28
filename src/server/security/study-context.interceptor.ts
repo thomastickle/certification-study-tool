@@ -9,7 +9,7 @@ import type { AdmittedRequest } from './security-context.ts'
 import { StudyInputWork } from './study-input-work.ts'
 import { STUDY_INPUTS_REGISTERED } from './study-input-registration.ts'
 import type { ServerResponse } from 'node:http'
-import { STUDY_REQUEST } from './security-context.ts'
+import { JOINED_STUDY_INPUTS, STUDY_REQUEST } from './security-context.ts'
 
 /** Retain personal storage through body parameters and the full asynchronous controller operation. */
 @Injectable()
@@ -38,7 +38,11 @@ export class StudyContextInterceptor implements NestInterceptor {
     if (!actor) {
       throw new Error('StudyRequest requires an authenticated actor.')
     }
-    if (!this.reflector.get<boolean>(STUDY_INPUTS_REGISTERED, context.getHandler())) {
+    const joined = this.reflector.getAllAndOverride<boolean>(JOINED_STUDY_INPUTS, [
+      context.getHandler(),
+      context.getClass(),
+    ])
+    if (joined && !this.reflector.get<boolean>(STUDY_INPUTS_REGISTERED, context.getHandler())) {
       throw new Error('StudyRequest input metadata must be registered by createApplication.')
     }
     request.securityWorkOwned = true
@@ -50,8 +54,14 @@ export class StudyContextInterceptor implements NestInterceptor {
 
       const disconnect = () => inputs.cancel(new Error('The request was interrupted.'))
 
+      const responseClosed = () => {
+        if (!response.writableFinished) {
+          disconnect()
+        }
+      }
+
       request.once('aborted', disconnect)
-      response.once('close', disconnect)
+      response.once('close', responseClosed)
       try {
         // A later guard may have awaited past the client's close event before scope entry.
         if (
@@ -84,7 +94,7 @@ export class StudyContextInterceptor implements NestInterceptor {
           await inputs.settle()
         } finally {
           request.off('aborted', disconnect)
-          response.off('close', disconnect)
+          response.off('close', responseClosed)
         }
       }
     })
