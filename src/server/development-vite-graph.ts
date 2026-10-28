@@ -195,6 +195,12 @@ export class DevelopmentViteGraph {
       }
     } finally {
       try {
+        for (const watcher of this.watchers) {
+          // Chokidar's close does not drain pending stat failures. Its removal recovery can call
+          // add after close, which reopens native watches. Close hooks have now drained, so this
+          // permanently disposed graph must reject further additions, including internal recovery.
+          watcher.add = () => watcher
+        }
         await Promise.all([...this.watchers].map((watcher) => watcher.close()))
         // Chokidar resolves before fs.watch's native close callbacks. Cross the close phase before
         // a startup rejection can terminate Node and hide still-closing FSEventWrap resources.

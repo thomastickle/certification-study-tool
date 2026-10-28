@@ -64,6 +64,9 @@ for (const phase of ['buildStart', 'configureServer', 'options', 'factory']) {
     `failed ${phase} replacement retains live HMR ownership and drains every graph`,
     { timeout: 20000 },
     async () => {
+      const nativeBaseline = process
+        .getActiveResourcesInfo()
+        .filter((name) => name === 'FSEventWrap').length
       const directory = mkdtempSync(join(tmpdir(), 'study-vite-reload-'))
       const previousDirectory = process.cwd()
       const globals = globalThis as unknown as Record<string, ReloadFixture>
@@ -160,10 +163,9 @@ for (const phase of ['buildStart', 'configureServer', 'options', 'factory']) {
           'Failed replacement keeps live middleware',
         )
         for (const partial of state.graphs.slice(1)) {
-          assert.deepEqual(
-            partial.watcher.getWatched(),
-            {},
-            'Rejected replacements are disposed immediately',
+          assert.equal((partial.watcher as unknown as { closed: boolean }).closed, true)
+          assert.ok(
+            Object.values(partial.watcher.getWatched()).every((children) => children.length === 0),
           )
         }
         // Retry successfully, then fail again: ownership must follow the completed handoff.
@@ -206,13 +208,18 @@ for (const phase of ['buildStart', 'configureServer', 'options', 'factory']) {
         await within(closing, 'Nest shutdown after rejected replacement')
         await within(connections[1]!.closed, 'Live HMR closure on shutdown')
         for (const graph of state.graphs) {
-          assert.deepEqual(graph.watcher.getWatched(), {})
+          assert.equal((graph.watcher as unknown as { closed: boolean }).closed, true)
+          // Delayed Chokidar stat failures may leave empty directory metadata after close.
+          // Native handle disposal and the controlled stat-tail regression verify resource closure.
+          assert.ok(
+            Object.values(graph.watcher.getWatched()).every((children) => children.length === 0),
+          )
         }
         await nextTurn()
         await nextTurn()
         assert.equal(
           process.getActiveResourcesInfo().filter((name) => name === 'FSEventWrap').length,
-          0,
+          nativeBaseline,
         )
         assert.throws(
           () => runtime.sharedLibrary.quizStore().nextHousekeepingAt(),

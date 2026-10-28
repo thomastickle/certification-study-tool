@@ -110,3 +110,24 @@ retain the request scope until its asynchronous handler/interceptor chain settle
 The current entry point installs both signal listeners during startup, shares one
 shutdown promise, waits for in-progress initialization, removes its listeners after
 closure, and exits through normal event-loop drainage.
+
+### Disposed watcher recovery (CI follow-up)
+
+Vite 7.3.7's bundled Chokidar does not await outstanding filesystem `stat`
+callbacks in `close()`. A missing-file callback delivered afterwards can leave an
+empty parent entry in `getWatched()` while `closed` remains true and no native
+watch exists. A second distinct removal can call Chokidar's public `add()` recovery
+path, which resets `closed` and opens a native watch. Thus exact empty metadata is
+not a reliable resource-disposal contract, and late recovery is a real ownership
+risk. The observed CI failure showed only the empty metadata; it did not establish
+that CI had reopened native resources.
+
+After Vite/environment close hooks finish, graph disposal seals public watcher
+`add()` before its final close. Live watching and late registrations during close
+hooks retain their existing behavior; permanently disposed graphs cannot acquire
+new watches through queued filesystem recovery. Empty late directory metadata may
+remain. Tests assert closed state, no tracked filenames, baseline native-handle
+restoration, and no post-close events. Controlled real filesystem completions
+exercise both the metadata-only case and native reopening, with unmodified Vite as
+a positive leak control. The Nest regression also verifies SQLite root closure.
+Recheck this dependency-specific boundary when upgrading Vite/Chokidar.
