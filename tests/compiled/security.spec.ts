@@ -1071,22 +1071,16 @@ for (const disconnect of [false, true]) {
   )
 }
 
-for (const feature of [UnownedBodyModule, UnownedPipeModule, UnownedClassPipeModule]) {
+for (const [feature, path, method] of [
+  [UnownedBodyModule, 'unowned-input', 'POST'],
+  [UnownedPipeModule, 'unowned-pipe', 'GET'],
+  [UnownedClassPipeModule, 'unowned-class-pipe', 'GET'],
+] as const) {
   test(`native input composition ${feature.name} accepts ordinary Nest metadata`, async () => {
     const f = await fixture(undefined, [feature])
     try {
       const session = await f.login('bob')
-      const path =
-        feature === UnownedBodyModule
-          ? 'unowned-input'
-          : feature === UnownedPipeModule
-            ? 'unowned-pipe'
-            : 'unowned-class-pipe'
-      const response = await f.authorized(
-        `/api/${path}`,
-        session,
-        feature === UnownedBodyModule ? 'POST' : 'GET',
-      )
+      const response = await f.authorized(`/api/${path}`, session, method)
       assert.equal(response.status, feature === UnownedBodyModule ? 201 : 200)
     } finally {
       await f.close()
