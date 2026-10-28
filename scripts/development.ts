@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
-import { watch, type FSWatcher } from 'node:fs'
+import { readFileSync, watch, type FSWatcher } from 'node:fs'
 import { once } from 'node:events'
 
 const watchedDirectories = ['src/server', 'src/shared', 'docs', 'scripts']
 const watchedRootFiles = new Set(['package.json', 'tsconfig.json', 'tsconfig.server.json'])
+const rootContents = new Map([...watchedRootFiles].map((file) => [file, readRootFile(file)]))
 
 type ChildRole = 'build' | 'server'
 
@@ -15,6 +16,15 @@ let debounceTimer: NodeJS.Timeout | undefined
 const changeWaiters = new Set<() => void>()
 const debounceWaiters = new Set<() => void>()
 const watchers: FSWatcher[] = []
+
+/** Treat unavailable configs as a state change; the compiler reports the underlying error. */
+function readRootFile(file: string): string | undefined {
+  try {
+    return readFileSync(file, 'utf8')
+  } catch {
+    return undefined
+  }
+}
 
 /** Build serially and run one server generation at a time. */
 async function runDevelopment(): Promise<void> {
@@ -142,12 +152,16 @@ watchers.push(
   watch('.', (_event, filename) => {
     const changedFile = filename?.toString()
     if (changedFile && watchedRootFiles.has(changedFile)) {
-      requestRestart()
+      const content = readRootFile(changedFile)
+      if (content !== rootContents.get(changedFile)) {
+        rootContents.set(changedFile, content)
+        requestRestart()
+      }
     }
   }),
 )
 
-/** Close every watcher and stop the server; allow an active compiler to finish. */
+/** Close watchers, forward shutdown through the owned phase, and await its descendants. */
 function stop(signal: NodeJS.Signals): void {
   if (stopping) {
     return
@@ -169,9 +183,7 @@ function stop(signal: NodeJS.Signals): void {
     watcher.close()
   }
 
-  if (activeChildRole === 'server') {
-    activeChild?.kill(signal)
-  }
+  activeChild?.kill(signal)
 }
 
 process.once('SIGINT', stop)
