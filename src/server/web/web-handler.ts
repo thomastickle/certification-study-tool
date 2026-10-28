@@ -1,48 +1,82 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { existsSync, statSync, createReadStream } from 'node:fs'
-import { resolve, extname, sep } from 'node:path'
-import { pipeline } from 'node:stream/promises'
+import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { resolve, extname, relative, sep } from 'node:path'
 import type { RoutedHttpHandler } from '../http/routed-http-handler.ts'
 
-/** Serve the built shell and assets within the configured distribution directory. */
+type StaticMiddleware = (
+  request: IncomingMessage,
+  response: ServerResponse,
+  next: (error?: unknown) => void,
+) => void
+
+const express = createRequire(import.meta.url)('express') as {
+  static(root: string, options: Record<string, unknown>): StaticMiddleware
+}
+
+/** Configure standard file serving behind admission, retaining the legacy URL and header policy. */
 export function staticWebHandler(root: string): RoutedHttpHandler {
-  return async (request, response, url) => {
+  const types: Record<string, string> = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+  }
+  const serve = express.static(root, {
+    redirect: false,
+    index: false,
+    dotfiles: 'allow',
+    etag: false,
+    lastModified: false,
+    cacheControl: false,
+    acceptRanges: false,
+    setHeaders(response: ServerResponse, file: string) {
+      response.setHeader('Content-Type', types[extname(file)] ?? 'application/octet-stream')
+      response.setHeader('X-Content-Type-Options', 'nosniff')
+      response.setHeader('Cache-Control', 'no-cache')
+    },
+  })
+  return (request, response, url) => {
+    const notFound = (error?: unknown) => {
+      if (response.destroyed || response.writableEnded) {
+        return
+      }
+      // A failed read may already have a file Content-Length before headers flush.
+      // Abort it rather than frame a short error body with that stale length.
+      if (response.headersSent || (error && response.hasHeader('Content-Length'))) {
+        response.destroy()
+        return
+      }
+      response.writeHead(404)
+      response.end('Not found.')
+    }
+
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       response.writeHead(405)
       response.end()
       return
     }
     try {
-      const pathname = decodeURIComponent(url.pathname)
-      let file = resolve(root, '.' + pathname)
-      if (!file.startsWith(root + sep) && file !== root) throw new Error()
-      if (file === root) file = resolve(root, 'index.html')
-      if (!existsSync(file) && !extname(file)) file = resolve(root, 'index.html')
-      if (!statSync(file).isFile()) throw new Error()
-      const types: Record<string, string> = {
-        '.html': 'text/html',
-        '.js': 'text/javascript',
-        '.css': 'text/css',
-        '.svg': 'image/svg+xml',
-        '.ico': 'image/x-icon',
+      let file = resolve(root, '.' + decodeURIComponent(url.pathname))
+      if (!file.startsWith(root + sep) && file !== root) {
+        throw new Error()
       }
-      response.writeHead(200, {
-        'Content-Type': types[extname(file)] ?? 'application/octet-stream',
-        'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': 'no-cache',
-      })
-      if (request.method === 'HEAD') response.end()
-      else await pipeline(createReadStream(file), response)
+      if (file === root || (!existsSync(file) && !extname(file))) {
+        file = resolve(root, 'index.html')
+      }
+      // A middleware-local view avoids changing admitted headers or exposing the raw target.
+      const admitted = Object.create(request) as IncomingMessage
+      admitted.url = '/' + relative(root, file).split(sep).map(encodeURIComponent).join('/')
+      admitted.headers = { ...request.headers }
+      for (const name of Object.keys(admitted.headers)) {
+        if (name.startsWith('if-')) {
+          delete admitted.headers[name]
+        }
+      }
+      serve(admitted, response, notFound)
     } catch {
-      if (response.destroyed || response.writableEnded) {
-        return
-      }
-      if (response.headersSent) {
-        response.destroy()
-        return
-      }
-      response.writeHead(404)
-      response.end('Not found.')
+      notFound()
     }
   }
 }
