@@ -1,4 +1,8 @@
 import {
+  ReadJsonBody,
+  JsonBodyInterceptor,
+} from '../../src/server/security/json-body.interceptor.ts'
+import {
   Body,
   createParamDecorator,
   Controller,
@@ -7,15 +11,15 @@ import {
   Inject,
   Injectable,
   Module,
+  Param,
   Post,
   Res,
   UseGuards,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common'
 import type { ServerResponse } from 'node:http'
 import {
-  JsonObjectBody,
-  JoinedStudyInputs,
   LibraryWrite,
   NormalizedQuery,
   NormalizedUrl,
@@ -51,6 +55,8 @@ export class ProbeWork {
   inputRelease: Promise<void> = Promise.resolve()
   lateRead = false
   inputControllerCalls = 0
+  businessEntries = 0
+  businessCompletions = 0
   cooperativeCleanup = false
   bodyEntered: (() => void) | undefined
   bodyRequest?: import('../../src/server/security/security-context.ts').AdmittedRequest
@@ -75,97 +81,31 @@ export class ProbeSlowGuard {
   }
 }
 
-/** Deliberately use ordinary Nest custom factories, including an asynchronous instance pipe. */
-const PendingResource = createParamDecorator(
-  async (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context.switchToHttp().getRequest<
-      import('../../src/server/security/security-context.ts').AdmittedRequest & {
-        inputProbe: ProbeWork
-      }
-    >()
-    const work = request.inputProbe
-    work.personal = request.studyContext!.personal
-    work.inputEntered?.()
-    await work.inputRelease
-    work.personal.sources()
-    work.lateRead = true
-    return 'resolved'
-  },
-)
-
-const RejectSibling = createParamDecorator(
-  async (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context.switchToHttp().getRequest<{ inputProbe: ProbeWork }>()
-    await request.inputProbe.beforeFailure
-    request.inputProbe.failureEntered?.()
-    throw new ApplicationError('Synthetic parameter rejection.', 400)
-  },
-)
-
-const PipeResource = createParamDecorator(
-  (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context.switchToHttp().getRequest<
-      import('../../src/server/security/security-context.ts').AdmittedRequest & {
-        inputProbe: ProbeWork
-      }
-    >()
-    request.inputProbe.personal = request.studyContext!.personal
-    return request.inputProbe
-  },
-)
-
-const pendingResourcePipe = {
-  async transform(work: ProbeWork) {
-    work.inputEntered?.()
-    await work.inputRelease
-    work.personal!.sources()
-    work.lateRead = true
-    return 'transformed'
-  },
+/** Test business work remains inside the awaited controller rather than Nest input factories. */
+async function pendingResource(work: ProbeWork, context: StudyRequestContext) {
+  work.personal = context.personal
+  work.inputEntered?.()
+  await work.inputRelease
+  context.personal.sources()
+  work.lateRead = true
+  return 'resolved'
 }
 
-const CaptureBody = createParamDecorator(
-  (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context.switchToHttp().getRequest<
-      import('../../src/server/security/security-context.ts').AdmittedRequest & {
-        inputProbe: ProbeWork
-      }
-    >()
-    const work = request.inputProbe
-    work.personal = request.studyContext!.personal
-    work.bodyRequest = request
-    const read = request.read.bind(request)
-    request.read = (...args: Parameters<typeof read>) => {
-      work.bodyEntered?.()
-      return read(...args)
-    }
-    return null
-  },
-)
-
-const CooperativeResource = createParamDecorator(
-  (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context.switchToHttp().getRequest<
-      import('../../src/server/security/security-context.ts').AdmittedRequest & {
-        inputProbe: ProbeWork
-      }
-    >()
-    const work = request.inputProbe
-    work.personal = request.studyContext!.personal
-    return new Promise((resolve) => {
-      request.studyContext!.inputSignal.addEventListener(
-        'abort',
-        () => {
-          work.personal!.sources()
-          work.cooperativeCleanup = true
-          resolve('cancelled')
-        },
-        { once: true },
-      )
-      work.inputEntered?.()
-    })
-  },
-)
+async function rejectedBusinessWork(work: ProbeWork, context: StudyRequestContext) {
+  const pending = pendingResource(work, context)
+  const failure = (async () => {
+    await work.beforeFailure
+    work.failureEntered?.()
+    throw new ApplicationError('Synthetic parameter rejection.', 400)
+  })()
+  // The business operation explicitly drains both branches before propagating failure.
+  const [result] = await Promise.allSettled([failure, pending])
+  work.businessCompletions++
+  if (result.status === 'rejected') {
+    throw result.reason
+  }
+  throw new Error('Synthetic failure unexpectedly resolved.')
+}
 
 const ParameterValue = createParamDecorator((data: string) => data)
 
@@ -187,10 +127,35 @@ const secondParameterPipe = {
   },
 }
 
+/** Inject cancellation at the actual guarded body-read boundary, without parameter siblings. */
+@Injectable()
+class CancelBodyInterceptor {
+  constructor(@Inject(ProbeWork) private readonly work: ProbeWork) {}
+
+  intercept(
+    context: import('@nestjs/common').ExecutionContext,
+    next: import('@nestjs/common').CallHandler,
+  ) {
+    const request = context
+      .switchToHttp()
+      .getRequest<import('../../src/server/security/security-context.ts').AdmittedRequest>()
+    this.work.personal = request.studyContext!.personal
+    this.work.bodyRequest = request
+    const read = request.read.bind(request)
+    request.read = (...args: Parameters<typeof read>) => {
+      this.work.bodyEntered?.()
+      queueMicrotask(() =>
+        request.inputWork!.cancel(new ApplicationError('Synthetic parameter rejection.', 400)),
+      )
+      return read(...args)
+    }
+    return next.handle()
+  }
+}
+
 /** Test-only controllers exercise the public stage-four API on real compiled Nest routing. */
 @Controller('api/probe')
 @StudyRequest()
-@JoinedStudyInputs()
 export class ProbeController {
   constructor(@Inject(ProbeWork) private readonly work: ProbeWork) {}
 
@@ -213,7 +178,8 @@ export class ProbeController {
   @Post('shared')
   @HttpCode(200)
   @LibraryWrite('shared')
-  shared(@JsonObjectBody() body: Record<string, unknown>) {
+  @ReadJsonBody()
+  shared(@Body() body: Record<string, unknown>) {
     this.work.bodyRead++
     return body
   }
@@ -221,8 +187,9 @@ export class ProbeController {
   @Post('private')
   @HttpCode(200)
   @LibraryWrite('private')
+  @ReadJsonBody()
   privateWrite(
-    @JsonObjectBody() body: Record<string, unknown>,
+    @Body() body: Record<string, unknown>,
     @StudyContext() context: StudyRequestContext,
   ) {
     this.work.bodyRead++
@@ -231,17 +198,16 @@ export class ProbeController {
 
   @Post('bank')
   @LibraryWrite('private')
-  bank(
-    @JsonObjectBody() body: Record<string, unknown>,
-    @StudyContext() context: StudyRequestContext,
-  ) {
+  @ReadJsonBody()
+  bank(@Body() body: Record<string, unknown>, @StudyContext() context: StudyRequestContext) {
     const service = new ImportService(context.personal)
     return service.confirm(body.bank, service.preview(body.bank).token, false)
   }
 
   @Post('pause')
   @HttpCode(200)
-  pause(@JsonObjectBody(true) body: Record<string, unknown>) {
+  @ReadJsonBody(true)
+  pause(@Body() body: Record<string, unknown>) {
     return body
   }
 
@@ -255,36 +221,30 @@ export class ProbeController {
   }
 
   @Get('input-factory')
-  inputFactory(@PendingResource() _pending: unknown, @RejectSibling() _failure: unknown) {
-    this.work.inputControllerCalls++
-    return 'must not execute'
+  inputFactory(@StudyContext() context: StudyRequestContext) {
+    this.work.businessEntries++
+    return rejectedBusinessWork(this.work, context)
   }
 
   @Get('input-pipe')
-  inputPipe(
-    @PipeResource(pendingResourcePipe) _pending: unknown,
-    @RejectSibling() _failure: unknown,
-  ) {
-    this.work.inputControllerCalls++
-    return 'must not execute'
+  inputPipe(@StudyContext() context: StudyRequestContext) {
+    this.work.businessEntries++
+    return rejectedBusinessWork(this.work, context)
+  }
+
+  @Post('pipeline/:id')
+  @HttpCode(200)
+  @ReadJsonBody()
+  pipeline(@Body('value') value: string, @Param('id') id: string) {
+    return { value, id }
   }
 
   @Post('input-body')
-  inputBody(
-    @JsonObjectBody() _body: Record<string, unknown>,
-    @RejectSibling() _failure: unknown,
-    @CaptureBody() _capture: unknown,
-    @StudyContext() context: StudyRequestContext,
-  ) {
-    this.work.personal = context.personal
+  @ReadJsonBody()
+  @UseInterceptors(CancelBodyInterceptor)
+  inputBody(@Body() body: unknown) {
     this.work.inputControllerCalls++
-    return 'must not execute'
-  }
-
-  @Get('input-cooperative')
-  cooperative(@CooperativeResource() _pending: unknown, @RejectSibling() _failure: unknown) {
-    this.work.inputControllerCalls++
-    return 'must not execute'
+    return body
   }
 
   @Get('input-metadata')
@@ -293,7 +253,8 @@ export class ProbeController {
   }
 
   @Get('input-success')
-  inputSuccess(@PendingResource() value: unknown) {
+  async inputSuccess(@StudyContext() context: StudyRequestContext) {
+    const value = await pendingResource(this.work, context)
     this.work.inputControllerCalls++
     return { value }
   }
@@ -306,9 +267,10 @@ export class ProbeController {
 
   @Get('guard-cooperative')
   @UseGuards(ProbeSlowGuard)
-  guardedCooperative(@CooperativeResource() value: unknown) {
+  guardedCooperative(@StudyContext() context: StudyRequestContext) {
+    context.inputSignal.throwIfAborted()
     this.work.inputControllerCalls++
-    return value
+    return context.personal.sources()
   }
 
   @Get('item/:id')
@@ -357,7 +319,7 @@ export class OtherFeatureModule {}
 @Module({
   imports: [OtherFeatureModule],
   controllers: [ProbeController],
-  providers: [ProbeWork, ProbeSlowGuard],
+  providers: [ProbeWork, ProbeSlowGuard, JsonBodyInterceptor, CancelBodyInterceptor],
 })
 export class ProbeModule {}
 
@@ -366,7 +328,6 @@ export class FailureModule {}
 
 @Controller('api/unowned-input')
 @StudyRequest()
-@JoinedStudyInputs()
 export class UnownedBodyController {
   @Post()
   read(@Body() value: unknown) {
@@ -376,7 +337,6 @@ export class UnownedBodyController {
 
 @Controller('api/unowned-pipe')
 @StudyRequest()
-@JoinedStudyInputs()
 export class UnownedPipeController {
   @Get()
   @UsePipes({
@@ -392,7 +352,8 @@ export class UnownedPipeController {
 @Controller('api/unscoped-body')
 export class UnscopedBodyController {
   @Post()
-  read(@JsonObjectBody() value: unknown) {
+  @ReadJsonBody()
+  read(@Body() value: unknown) {
     return value
   }
 }
@@ -403,7 +364,7 @@ export class UnownedBodyModule {}
 @Module({ controllers: [UnownedPipeController] })
 export class UnownedPipeModule {}
 
-@Module({ controllers: [UnscopedBodyController] })
+@Module({ controllers: [UnscopedBodyController], providers: [JsonBodyInterceptor] })
 export class UnscopedBodyModule {}
 
 @Injectable()
@@ -415,7 +376,6 @@ class UnownedClassPipe {
 
 @Controller('api/unowned-class-pipe')
 @StudyRequest()
-@JoinedStudyInputs()
 class UnownedClassPipeController {
   @Get()
   read(@StudyContext(UnownedClassPipe) context: StudyRequestContext) {
@@ -430,7 +390,6 @@ export class UnownedClassPipeModule {}
 export function inheritedInputModule(reverse: boolean) {
   @Controller('api/inherited-base')
   @StudyRequest()
-  @JoinedStudyInputs()
   class Base {
     @Get()
     read(

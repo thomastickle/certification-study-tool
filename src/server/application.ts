@@ -1,6 +1,5 @@
-import { ownApplicationLifecycle } from './runtime/application-lifecycle.ts'
 import 'reflect-metadata'
-import { DiscoveryService, NestFactory } from '@nestjs/core'
+import { NestFactory } from '@nestjs/core'
 import { SecurityExpressAdapter } from './security/security-express-adapter.ts'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { DynamicModule } from '@nestjs/common'
@@ -13,12 +12,11 @@ import { ApplicationAuthentication } from './auth/application-authentication.ts'
 import { SecurityRequestLifetime } from './security/security-lifetime.ts'
 import { securityFailure } from './security/security.filter.ts'
 import type { AdmittedRequest } from './security/security-context.ts'
-import { registerStudyInputs } from './security/study-input-registration.ts'
 import { ApplicationError } from './http/errors.ts'
 import type { PublicWeb } from './web/public-web.ts'
 
 /** Create one configured Nest transport with focused feature modules and optional public serving.
- * @throws Rejects initialization/listen failures after cleaning the acquired resource graph.
+ * @throws Rejects creation/setup failures after cleaning the acquired resource graph.
  */
 export async function createApplication(
   configuration: RuntimeConfiguration,
@@ -36,7 +34,6 @@ export async function createApplication(
     throw error
   })
   try {
-    const joinedStudyInputs = registerStudyInputs(app.get(DiscoveryService))
     const authentication = app.get(ApplicationAuthentication)
     const lifetime = app.get(SecurityRequestLifetime)
     app.get(ApplicationRuntime).attachTransport(async () => {
@@ -82,7 +79,7 @@ export async function createApplication(
       }
     })
     await publicWeb?.initialize(app.getHttpServer() as Server, configuration)
-    return ownApplicationLifecycle(app, lifetime, joinedStudyInputs)
+    return app
   } catch (error) {
     // A cleanup failure must not replace the setup error that caused this unwind.
     try {

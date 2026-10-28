@@ -102,25 +102,14 @@ is the owned private repository; `context.shared` is borrowed; `context.content(
 composes the selected verified view. Pure domain services are composed explicitly
 from these views, without request-scoped domain providers or a service locator.
 
-### Optional asynchronous-input compatibility adapter
+### Native parameter boundary
 
-Only endpoints explicitly marked `@JoinedStudyInputs()` use
-`security/study-input-registration.ts`. This is a compatibility adapter for custom
-parameter factories that perform asynchronous resource I/O. It is not the default
-endpoint pattern. The adversarial probes in `compiled/security.spec.ts` opt in
-explicitly and retain all sibling-failure, inherited metadata, cancellation and
-storage-lifetime assertions. Run these tests on every Nest upgrade.
-
-Nest resolves parameters concurrently and can reject before an unfinished sibling
-factory/pipe releases its resources. The adapter registers those operations with
-StudyInputWork and joins them before closing storage. Such inputs must await all
-work and honor cancellation where possible; detached work is unsupported. Within
-this opt-in boundary only parameter-local pipe instances are supported. Class,
-method, global pipes and schemas are rejected rather than pretending to own them.
-Applications containing joined-input endpoints retain the global-pipe restriction;
-ordinary product compositions do not. The legacy custom `JsonObjectBody` decorator
-is available only for these compatibility inputs. Both paths use the same mandatory
-cancellable parser; the obsolete unowned iterator branch has been deleted.
+There is no joined-input extension, private parameter-metadata rewrite, Discovery
+scan, or application-wide proxy. ReadJsonBody fully awaits parsing before native
+Body/Param/Query and ordinary local/class/DI/global pipes run. Parameter factories
+and pipes may coerce and validate; resource I/O belongs in awaited controllers,
+services or interceptors. Native Nest does not join fail-fast parameter siblings.
+See the assertion map in nest-http-test-migration.md for retired adapter contracts.
 
 The global filter emits authentication `{error}`, workspace
 `{code: 'workspace_changed', error}`, and admitted study `{error, details}` schemas.
@@ -147,19 +136,14 @@ deliberately keep shutdown pending; controllers must return/await their work. Th
 to both the core factory and full production composition; public work additionally
 joins response completion and returned handler promises.
 
-The factory contains provider construction, init and listen failures. Its public
-lifecycle wrapper joins in-flight init/listen and shares a single close promise; it does not assign methods onto
-NestFactory's proxy or separately call `server.close`. This tracks startup for
-shutdown. R1-N1 is now resolved by rejecting overlapping `init()`/`listen()`
-calls with an explicit startup-in-progress error. Callers await startup sequentially;
-controlled init-hook gates verify that duplicate initialization cannot enter.
+The factory owns provider construction and post-create setup failure cleanup and
+returns the exact native Nest object. ApplicationOwner explicitly sequences
+init/listen, joins startup before close, memoizes shutdown and preserves the startup
+error if cleanup fails. Main and DevelopmentApplication use this concrete owner;
+callers using the native app directly must await methods sequentially and close in
+finally. No methods are patched or rebound. Startup/port collision/late-provider
+and controlled-init gates exercise these separate responsibilities.
 
-`tests/compiled/security.spec.ts` uses the actual factory, compiled decorators,
-raw Node HTTP, the existing synthetic issuer and test-only probe controllers.
-It covers OIDC/roles/workspaces, URL/method/origin negatives, body contracts,
-private imports, feature DI aliases, and suspended controller/guard/token-exchange,
-partial-body, disconnect, late-response and startup-failure cleanup. Sibling-input
-regressions cover pending custom factories and pipes, late database reads, retained
-400 responses, actual partial-body cancellation before observation, cooperative
-cleanup, shutdown drainage and rejected unowned input/pipe configuration. Probe routes
-exist only under `tests/compiled`; do not import them into product modules.
+The real HTTP suites retain OIDC/roles/workspaces, raw URL/method/origin negatives,
+body contracts, SQLite isolation and late controller/guard/token-exchange work.
+Test-only resource I/O uses awaited operations, not asynchronous parameter siblings.

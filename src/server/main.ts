@@ -1,3 +1,4 @@
+import { ApplicationOwner } from './runtime/application-owner.ts'
 import 'reflect-metadata'
 import { runtimeConfiguration } from './runtime/runtime-configuration.ts'
 import { createProductionApplication } from './production-application.ts'
@@ -8,6 +9,7 @@ const development = configuration.production ? undefined : new DevelopmentApplic
 const contextStarting = development
   ? development.backend
   : createProductionApplication(configuration)
+const owner = development ? undefined : new ApplicationOwner(contextStarting)
 if (development) {
   void development.failed
     .then(async (error) => {
@@ -29,9 +31,8 @@ function shutdown(): Promise<void> {
   closing ??= (async () => {
     // A signal during initialization waits for acquired web resources to become drainable.
     await development?.close()
+    await owner?.close()
     await startingTransport?.catch(() => undefined)
-    const context = await contextStarting.catch(() => undefined)
-    await context?.close()
   })().finally(() => {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
@@ -52,17 +53,14 @@ process.on('SIGINT', onSignal)
 process.on('SIGTERM', onSignal)
 
 try {
-  const context = await contextStarting
+  await contextStarting
   if (!closing) {
     startingTransport = (async () => {
       if (development) {
         await development.start()
         return
       }
-      await context.init()
-      if (!closing) {
-        await context.listen(configuration.port, configuration.host)
-      }
+      await owner!.start(configuration.port, configuration.host)
     })()
     await startingTransport
   }
@@ -72,7 +70,11 @@ try {
     console.log(`Certification Study Tool: ${configuration.origin.origin}`)
   }
 } catch (error) {
-  await shutdown()
+  try {
+    await shutdown()
+  } catch {
+    console.error('Application shutdown failed.')
+  }
   if (!interrupted) {
     throw error
   }

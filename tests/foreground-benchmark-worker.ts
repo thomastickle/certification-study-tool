@@ -301,7 +301,13 @@ for (const [index, id] of owners.entries()) {
     personal.close()
   }
 }
-await app.listen(0, '127.0.0.1')
+try {
+  await app.init()
+  await app.listen(0, '127.0.0.1')
+} catch (error) {
+  await shutdown().catch(() => undefined)
+  throw error
+}
 const address = (app.getHttpServer() as Server).address()
 assert.ok(address && typeof address !== 'string')
 configuration.origin.port = String(address.port)

@@ -1,3 +1,4 @@
+import { NestFactory } from '@nestjs/core'
 import { StudyHttpModule } from '../../src/server/study-http/study.module.ts'
 import { QuizService } from '../../src/server/quizzes/quiz-service.ts'
 import { populate } from '../quiz-fixtures.ts'
@@ -120,12 +121,20 @@ test('a normally finished manual response does not cancel its still-owned study 
   }
 })
 
-test('the lifecycle adapter preserves fluent Nest APIs and the acquired provider graph', async () => {
+test('the native Nest application preserves fluent APIs and the acquired provider graph', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-api-contract-'))
+  const create = NestFactory.create.bind(NestFactory)
+  let native: unknown
+  const capture = mock.method(NestFactory, 'create', async (...args: Parameters<typeof create>) => {
+    native = await create(...args)
+    return native as Awaited<ReturnType<typeof create>>
+  })
   const app = await createApplication(
     runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') }),
   )
+  capture.mock.restore()
   try {
+    assert.equal(app, native, 'The factory exposes the exact Nest-created object')
     const runtime = app.get(ApplicationRuntime)
     assert.ok(app.setGlobalPrefix('v1') === app, 'Fluent configuration returns the owner')
     assert.ok((await app.init()) === app, 'Initialization returns the owner')
@@ -157,7 +166,6 @@ class OrdinaryInputModule {}
 test('ordinary study endpoints support Nest Body and pipes without the joined-input metadata adapter', async () => {
   const fixture = await libraryFixture(undefined, [OrdinaryInputModule])
   try {
-    assert.equal(fixture.app.useGlobalPipes({ transform: (value: unknown) => value }), fixture.app)
     const actor = await fixture.login('alice')
     const valid = await fixture.authorized(
       '/api/ordinary-input',
@@ -287,3 +295,42 @@ test(
     }
   },
 )
+
+test('startup owner preserves init failure when cleanup fails and shares shutdown rejection', async () => {
+  const { ApplicationOwner } = await import('../../src/server/runtime/application-owner.ts')
+  const directory = mkdtempSync(join(tmpdir(), 'nest-owner-failure-'))
+  const failure = new Error('Synthetic initialization failure')
+  const cleanupFailure = new Error('Synthetic disposal failure')
+  const app = await createApplication(
+    runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') }),
+    [
+      {
+        module: OrdinaryInputModule,
+        providers: [
+          {
+            provide: 'FailInit',
+            useValue: {
+              onModuleInit() {
+                throw failure
+              },
+            },
+          },
+        ],
+      },
+    ],
+  )
+  const owner = new ApplicationOwner(Promise.resolve(app))
+  const adapter = app.getHttpAdapter()
+  const disposal = mock.method(adapter, 'close', async () => {
+    throw cleanupFailure
+  })
+  try {
+    await assert.rejects(owner.start(0, '127.0.0.1'), (error) => error === failure)
+    assert.equal(owner.close(), owner.close())
+    await assert.rejects(owner.close(), (error) => error === cleanupFailure)
+  } finally {
+    disposal.mock.restore()
+    await app.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})

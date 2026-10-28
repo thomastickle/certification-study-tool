@@ -4,7 +4,7 @@ Nest transport layout follows feature ownership. Only `main.ts`, `application.ts
 `application.module.ts`, and `production-application.ts` remain at `src/server/`:
 
 - `runtime/` owns configuration, startup acquisition/unwind, runtime aliases and study scope.
-- `security/` owns admission, global guards/filter/interceptor and joined request input/lifetime.
+- `security/` owns admission, global guards/filter/interceptor and guarded body parsing and request lifetime.
 - `auth/` owns authentication/session controllers and workflows; its module borrows the
   runtime-owned authentication singleton. `health/` owns its controller and service.
 - `library-http/` and `study-http/` keep controllers, route guards and private feature
@@ -105,3 +105,7 @@ factory, security controllers/guard metadata, normalized input decorators,
 after-guard body parsing, personal/shared context and request lifetime API.
 Production now uses the full Nest composition described above. The stage-three
 notes describe the focused core factory, not a separate production runtime.
+
+The factory returns the native Nest object. `ApplicationOwner` owns sequential
+init/listen and one joined close for main/development startup; it does not expose
+an app-shaped facade. Native parameter metadata and pipes are unmodified.

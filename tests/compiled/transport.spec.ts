@@ -1,3 +1,4 @@
+import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
@@ -129,8 +130,8 @@ test('listen and missing-static failures can close their already initialized Nes
       try {
         await assert.rejects(
           (async () => {
-            const app = await createProductionApplication(configuration)
-            await app.listen(configuration.port, configuration.host)
+            const owner = new ApplicationOwner(createProductionApplication(configuration))
+            await owner.start(configuration.port, configuration.host)
           })(),
           missingStatic ? /npm run build/ : /EADDRINUSE/,
         )
