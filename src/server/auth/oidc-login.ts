@@ -5,20 +5,27 @@ export type LoginTransaction = { state: string; verifier: string; nonce: string 
 
 export type OidcSettings = { issuer: string; clientId: string; clientSecret?: string; origin: URL }
 
+/** Validate local protocol settings without discovery, network access, or database allocation.
+ * @throws {Error} For unsafe transports, non-origin callback bases, or an empty client identifier.
+ */
+export function validateOidcSettings(settings: OidcSettings): void {
+  requireSafeTransport(new URL(settings.issuer))
+  requireSafeTransport(settings.origin)
+  if (settings.origin.pathname !== '/' || settings.origin.search || settings.origin.hash) {
+    throw new Error('STUDY_ORIGIN must be an origin without a path, query, or fragment.')
+  }
+  if (!settings.clientId.trim()) {
+    throw new Error('An OIDC client ID is required.')
+  }
+}
+
 /** Keep protocol details behind the standard OIDC client boundary. */
 export class OidcLogin {
   private settings: OidcSettings
   private configuration?: Promise<oidc.Configuration>
 
   constructor(settings: OidcSettings) {
-    requireSafeTransport(new URL(settings.issuer))
-    requireSafeTransport(settings.origin)
-    if (settings.origin.pathname !== '/' || settings.origin.search || settings.origin.hash) {
-      throw new Error('STUDY_ORIGIN must be an origin without a path, query, or fragment.')
-    }
-    if (!settings.clientId.trim()) {
-      throw new Error('An OIDC client ID is required.')
-    }
+    validateOidcSettings(settings)
     this.settings = settings
   }
 

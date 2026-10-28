@@ -2,16 +2,23 @@ import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { ExpressAdapter } from '@nestjs/platform-express'
 import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { RuntimeConfiguration } from './runtime-configuration.ts'
 import { ApplicationModule } from './application.module.ts'
 
 /** Create an unbound Nest application for composition and loopback HTTP tests.
  * @throws Rejects on initialization failure instead of terminating the caller's process.
  */
-export function createApplication(): Promise<NestExpressApplication> {
+export function createApplication(
+  configuration: RuntimeConfiguration,
+): Promise<NestExpressApplication> {
   // Authorization must precede streaming body reads when feature guards are introduced.
-  return NestFactory.create<NestExpressApplication>(ApplicationModule, new ExpressAdapter(), {
-    bodyParser: false,
-    abortOnError: false,
-    logger: false,
-  })
+  return NestFactory.create<NestExpressApplication>(
+    ApplicationModule.register(configuration),
+    new ExpressAdapter(),
+    {
+      bodyParser: false,
+      abortOnError: false,
+      logger: false,
+    },
+  )
 }

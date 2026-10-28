@@ -53,7 +53,10 @@ async function createFixture(
   if (options.runtimeFailure) {
     const main = join(directory, 'src/server/main.ts')
     const source = readFileSync(main, 'utf8')
-    writeFileSync(main, source.replace('const host =', `${runtimeFailureProbe}const host =`))
+    writeFileSync(
+      main,
+      source.replace('const configuration =', `${runtimeFailureProbe}const configuration =`),
+    )
   }
 
   const reservation = createServer()
