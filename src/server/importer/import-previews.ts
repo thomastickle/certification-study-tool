@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 
 type PendingPreview = {
   accountId: string

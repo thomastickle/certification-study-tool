@@ -1,20 +1,9 @@
 import { Controller, Get, Inject, Post, Req, Res } from '@nestjs/common'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { ApplicationAuthentication } from './auth/application-authentication.ts'
-import { NormalizedUrl, PublicMethod } from './security-context.ts'
-import type { AdmittedRequest } from './security-context.ts'
-import type { RequestUrl } from './request-url.ts'
+import { ApplicationAuthentication } from './application-authentication.ts'
+import { NormalizedUrl, PublicMethod } from '../security/security-context.ts'
 
-/** Purposeful session endpoint; no client account selector participates in identity lookup. */
-@Controller('api/session')
-export class SessionController {
-  /** Report a verified session without requiring a workspace header. */
-  @Get()
-  @PublicMethod('GET')
-  session(@Req() request: AdmittedRequest) {
-    return { user: request.admission.user ?? null }
-  }
-}
+import type { RequestUrl } from '../http/request-url.ts'
 
 /** Reuse the single protocol/workflow owner without dispatching on legacy route pathnames. */
 @Controller('auth')

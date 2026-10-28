@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { NestFactory } from '@nestjs/core'
 import type { LibraryRepository } from '../../src/server/questions/library-repository.ts'
 import type { SessionUser } from '../../src/shared/auth-contracts.ts'
-import { StudyLibraryScope } from '../../src/server/study-library-scope.ts'
+import { StudyLibraryScope } from '../../src/server/runtime/study-library-scope.ts'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -24,11 +24,11 @@ import {
   UnownedClassPipeModule,
   inheritedInputModule,
 } from './security-probes.ts'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { RuntimeStartup } from '../../src/server/runtime.module.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
+import { RuntimeStartup } from '../../src/server/runtime/runtime-startup.ts'
 import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
 import { bank } from '../fixtures.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 /** Exercise admission with raw targets; fetch would normalize away the attack. */
 async function fixture(

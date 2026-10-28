@@ -1,7 +1,9 @@
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
+import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 import assert from 'node:assert/strict'
 import type { Server } from 'node:http'
 import { request } from 'node:http'
@@ -18,6 +20,12 @@ test('compiled Nest decorators serve health through DI and close the listening a
     const address = server.address()
     assert.ok(address && typeof address !== 'string')
     configuration.origin.port = String(address.port)
+    assert.equal(app.get(ApplicationAuthentication), app.get(ApplicationRuntime).authentication)
+    const session = await fetch(`http://127.0.0.1:${address.port}/api/session`, {
+      headers: { Host: configuration.origin.host },
+    })
+    assert.equal(session.status, 200)
+    assert.deepEqual(await session.json(), { user: null })
     const response = await fetch(`http://127.0.0.1:${address.port}/api/health`, {
       headers: { Host: configuration.origin.host },
     })

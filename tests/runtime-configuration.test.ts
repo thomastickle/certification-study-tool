@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { resolve, join } from 'node:path'
 import { test } from 'node:test'
-import { runtimeConfiguration } from '../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../src/server/runtime/runtime-configuration.ts'
 
 test('explicit environment derives isolated paths without reading the ambient environment', () => {
   const configuration = runtimeConfiguration({

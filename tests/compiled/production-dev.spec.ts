@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { createProductionApplication } from '../../src/server/production-application.ts'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 test('production development composition serves Vite SSR and releases its runtime', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-dev-ssr-'))

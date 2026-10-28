@@ -1,5 +1,5 @@
 import type { QuizOptions } from '../../shared/quiz-contracts.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 
 export type CertificationScope = Pick<QuizOptions, 'provider' | 'certification'>
 

@@ -1,7 +1,7 @@
 import { createProductionApplication } from '../../src/server/production-application.ts'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
-import type { RequestUrl } from '../../src/server/request-url.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
+import type { RequestUrl } from '../../src/server/http/request-url.ts'
 import type { SessionUser } from '../../src/shared/auth-contracts.ts'
 
 import assert from 'node:assert/strict'

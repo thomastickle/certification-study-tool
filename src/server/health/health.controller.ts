@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common'
-import { PublicMethod } from './security-context.ts'
+import { PublicMethod } from '../security/security-context.ts'
 import { HealthService } from './health.service.ts'
 
 /** Public, method-specific liveness boundary for the staged Nest application. */

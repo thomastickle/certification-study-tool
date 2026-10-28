@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mock, test } from 'node:test'
-import { StudyLibraryScope } from '../src/server/study-library-scope.ts'
+import { StudyLibraryScope } from '../src/server/runtime/study-library-scope.ts'
 import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import type { LibraryRepository } from '../src/server/questions/library-repository.ts'
 

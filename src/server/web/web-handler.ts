@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { existsSync, statSync, createReadStream } from 'node:fs'
 import { resolve, extname, sep } from 'node:path'
 import { pipeline } from 'node:stream/promises'
-import type { RoutedHttpHandler } from './routed-http-handler.ts'
+import type { RoutedHttpHandler } from '../http/routed-http-handler.ts'
 
 /** Serve the built shell and assets within the configured distribution directory. */
 export function staticWebHandler(root: string): RoutedHttpHandler {

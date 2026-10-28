@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 test('full production composition serves public assets and keeps APIs behind Nest guards', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-production-'))
@@ -66,9 +66,9 @@ test('full production composition serves public assets and keeps APIs behind Nes
 })
 
 test('shutdown rejects admission while web disposal is gated and roots remain owned', async () => {
-  const { PublicWeb } = await import('../../src/server/public-web.ts')
+  const { PublicWeb } = await import('../../src/server/web/public-web.ts')
   const { createApplication } = await import('../../src/server/application.ts')
-  const { ApplicationRuntime } = await import('../../src/server/application-runtime.ts')
+  const { ApplicationRuntime } = await import('../../src/server/runtime/application-runtime.ts')
   let enter!: () => void
   let release!: () => void
   const entered = new Promise<void>((resolve) => {

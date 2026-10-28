@@ -1,6 +1,6 @@
 import type { JsonObject, Preview } from '../../shared/contracts.ts'
 import type { LibraryView } from '../questions/library-repository.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import { validateBank } from './validate-bank.ts'
 import { answerKey, canonical, digest, fingerprint, reference } from './bank-tools.ts'
 

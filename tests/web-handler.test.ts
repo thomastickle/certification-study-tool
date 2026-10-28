@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { staticWebHandler, developmentWebHandler } from '../src/server/web-handler.ts'
+import { staticWebHandler, developmentWebHandler } from '../src/server/web/web-handler.ts'
 import { closeServer } from './oidc-fixture.ts'
 
 for (const mode of ['static', 'development'] as const) {

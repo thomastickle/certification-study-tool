@@ -5,17 +5,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mock, test } from 'node:test'
 import { NestFactory } from '@nestjs/core'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
 import { ImportPreviews } from '../../src/server/importer/import-previews.ts'
 import { PrivateLibraries } from '../../src/server/questions/private-libraries.ts'
 import { StudyHousekeeping } from '../../src/server/questions/study-housekeeping.ts'
-import { StudyLibraryScope } from '../../src/server/study-library-scope.ts'
+import { StudyLibraryScope } from '../../src/server/runtime/study-library-scope.ts'
 import {
   runtimeConfiguration,
   RUNTIME_CONFIGURATION,
-} from '../../src/server/runtime-configuration.ts'
-import { RuntimeModule, SHARED_LIBRARY_REPOSITORY } from '../../src/server/runtime.module.ts'
+} from '../../src/server/runtime/runtime-configuration.ts'
+import {
+  RuntimeModule,
+  SHARED_LIBRARY_REPOSITORY,
+} from '../../src/server/runtime/runtime.module.ts'
 
 /** All implicit account/private paths must derive from the fixture shared path. */
 function fixture() {

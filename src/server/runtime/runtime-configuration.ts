@@ -1,6 +1,6 @@
 import { dirname, resolve } from 'node:path'
-import { validateOidcSettings } from './auth/oidc-login.ts'
-import type { AuthenticationOptions } from './auth/application-authentication.ts'
+import { validateOidcSettings } from '../auth/oidc-login.ts'
+import type { AuthenticationOptions } from '../auth/application-authentication.ts'
 
 export const RUNTIME_CONFIGURATION = Symbol('RuntimeConfiguration')
 

@@ -6,13 +6,13 @@ import { createServer, request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mock, test } from 'node:test'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { libraryFixture } from './library-http-fixture.ts'
 import { StudyHttpModule } from '../../src/server/study-http/study.module.ts'
 import { createProductionApplication } from '../../src/server/production-application.ts'
 import { observeRuntime } from './runtime-observation.ts'
 import type { LibraryRepository } from '../../src/server/questions/library-repository.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 for (const disconnect of [false, true]) {
   test(

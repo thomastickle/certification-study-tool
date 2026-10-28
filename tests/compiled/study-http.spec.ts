@@ -1,4 +1,4 @@
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { QuizService } from '../../src/server/quizzes/quiz-service.ts'
 import { populate } from '../quiz-fixtures.ts'
 import assert from 'node:assert/strict'

@@ -8,9 +8,9 @@ import { join } from 'node:path'
 import { setImmediate as nextTurn, setTimeout as delay } from 'node:timers/promises'
 import { test } from 'node:test'
 import type { ViteDevServer } from 'vite'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { createProductionApplication } from '../../src/server/production-application.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 type StatTail = { path: string; deliver: () => void }
 

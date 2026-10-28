@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mock } from 'node:test'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 
 /** Observe the real factory's root owner even when public initialization rejects before return. */
 export function observeRuntime() {

@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { createServer, request } from 'node:http'
 import { once } from 'node:events'
 import { test } from 'node:test'
-import { PublicWeb } from '../../src/server/public-web.ts'
-import { requestUrl } from '../../src/server/request-url.ts'
+import { PublicWeb } from '../../src/server/web/public-web.ts'
+import { requestUrl } from '../../src/server/http/request-url.ts'
 
 for (const finished of [false, true]) {
   test(`public drain retains returned work after response termination (finished=${finished})`, async () => {

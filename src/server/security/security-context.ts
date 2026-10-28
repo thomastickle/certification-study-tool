@@ -1,13 +1,13 @@
 import type { IncomingMessage } from 'node:http'
 import { createParamDecorator, SetMetadata } from '@nestjs/common'
 import type { ExecutionContext } from '@nestjs/common'
-import type { SessionUser } from '../shared/auth-contracts.ts'
-import type { RequestUrl } from './request-url.ts'
-import type { LibraryView } from './questions/library-repository.ts'
-import type { StudyLibrary } from './questions/study-library.ts'
-import type { LibraryRepository } from './questions/library-repository.ts'
+import type { SessionUser } from '../../shared/auth-contracts.ts'
+import type { RequestUrl } from '../http/request-url.ts'
+import type { LibraryView } from '../questions/library-repository.ts'
+import type { StudyLibrary } from '../questions/study-library.ts'
+import type { LibraryRepository } from '../questions/library-repository.ts'
 import type { StudyInputWork } from './study-input-work.ts'
-import { jsonObjectBody } from './json-object-body.ts'
+import { jsonObjectBody } from '../http/json-object-body.ts'
 
 export const PUBLIC_METHOD = Symbol('PublicMethod')
 

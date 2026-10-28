@@ -4,7 +4,7 @@ import { completedEvidence, masteryHistory } from '../quizzes/mastery-history.ts
 import { quizTiming } from '../../shared/quiz-timing.ts'
 import type { QuizQuestion } from '../../shared/quiz-contracts.ts'
 import type { StudyReport, ReportCounts, ReportBreakdown } from '../../shared/report-contracts.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import { domainNames } from '../quizzes/domain-mapping.ts'
 import type { StudyRepository } from '../questions/study-library.ts'
 
