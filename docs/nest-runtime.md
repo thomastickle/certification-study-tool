@@ -56,17 +56,36 @@ initialization resources are owned before `configureServer`, including the R1
 failure-only `name`/`init` carrier for a rejected environment factory. Parallel
 initialization drains before partial environments, HMR and watchers close.
 
-The live graph is retained until its replacement fully initializes. Failed
-replacement creation disposes only that attempt, logs Vite's usual restart failure
-and leaves the live middleware/HMR available; initial startup failure still
-rejects with the original error. A successful handoff closes the previous graph
-and selects the replacement. A stable public server view follows that selection;
-its `close()` closes the application-owned set of graphs. Successfully disposed
-attempts are released from the owner's set. Shutdown joins in-progress creation
-before closing every remaining graph and rejects new reload work.
+Replacement creation and activation are separate. For replacements, the public
+`createServer` call invokes a deferred environment `listen` wrapper, so it finishes
+construction, `init`, configure hooks and buildStart without activating endpoints.
+The coordinator fully closes the previous graph, selects the replacement, then
+calls the public environment `listen` methods through `activate()`. This preserves
+Vite's documented **new init → previous close → new listen** contract, including
+custom environments that reuse an endpoint from `previousInstance`. Initial boot
+retains ordinary public `createServer` activation. Force-optimization and previous
+environment propagation are unchanged.
+
+A construction failure disposes only that attempt, logs Vite's usual restart
+failure and leaves the previous middleware/HMR graph live. Activation failure is
+different: the predecessor has already closed, just as in Vite's own restart.
+The public restart rejects with the original activation error after parallel
+listen work drains. As in Vite, the failed, potentially partially activated
+selection stays owned and watched, allowing a real config-file edit or public
+restart to recover. There is no live predecessor fallback. A retry receives the
+failed selection's environments as predecessors, fully closes that selection,
+then activates its replacement. Shutdown also closes every remaining watcher,
+WebSocket, environment and endpoint in that failed selection.
+
+A stable public server view follows selection; its `close()` closes the
+application-owned set of graphs. Successfully disposed attempts leave the owner's
+set. Shutdown rejects new reload work, joins in-progress init or activation, and
+then closes every remaining graph. If shutdown arrives before replacement
+activation, that unactivated attempt is disposed instead of starting listeners.
+Initial startup errors still reject with the original error after cleanup.
 
 Each graph's HMR server is an unbound HTTP bridge, with no listening port. One
-upgrade route on the actual listener dispatches exclusively to the live graph.
+upgrade route on the actual listener dispatches exclusively to the selected graph.
 A partial/replacement graph therefore cannot accept live HMR connections or remove
 another graph's upgrade listeners during cleanup. Public-file scanning failure
 can safely clear its own bridge even before Vite exposes environment handles.
@@ -79,7 +98,7 @@ After Vite's hooks drain, close its watcher once more: Vite closes watchers in
 parallel with those hooks, and a late watch registration can reopen Chokidar.
 Disposal also crosses Node's native watcher close phase before rethrowing a startup
 error, so fatal exit cannot hide pending `FSEventWrap` cleanup. These adapters are
-covered against the installed Vite 7.3.7 public environment/init and plugin hooks;
+covered against installed Vite 7.3.7 public environment init/listen and plugin hooks;
 keep those regression tests when upgrading Vite.
 `onApplicationShutdown` closes shared/accounts roots after transport disposal.
 These methods are idempotent; aliases have no competing disposal responsibility.

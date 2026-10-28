@@ -6,7 +6,7 @@ import { DevelopmentViteGraph } from './development-vite-graph.ts'
 /** Serialize startup/reload handoffs while retaining every live and partial Vite graph until disposal. */
 export class DevelopmentVite {
   private graphs = new Set<DevelopmentViteGraph>()
-  private live: { graph: DevelopmentViteGraph; server: ViteDevServer } | undefined
+  private selected: { graph: DevelopmentViteGraph; server: ViteDevServer } | undefined
   private starting: Promise<ViteDevServer> | undefined
   private reloading: Promise<void> | undefined
   private closing: Promise<void> | undefined
@@ -19,7 +19,7 @@ export class DevelopmentVite {
   initialize(http: Server): Promise<ViteDevServer> {
     this.http = http
     this.upgrade = (request, socket, head) => {
-      if (!this.live?.graph.upgrade(request, socket, head)) {
+      if (!this.selected?.graph.upgrade(request, socket, head)) {
         socket.destroy()
       }
     }
@@ -28,15 +28,16 @@ export class DevelopmentVite {
     this.starting = graph
       .initialize((force) => this.restart(force))
       .then((server) => {
-        this.live = { graph, server }
+        this.selected = { graph, server }
 
         // Vite normally mutates one server during restart. Keep that stable public view without
         // overwriting the independent close handles for live/partial graphs.
         const close = () => this.close()
 
         return new Proxy(server, {
-          get: (_target, key) => (key === 'close' ? close : Reflect.get(this.live!.server, key)),
-          set: (_target, key, value) => Reflect.set(this.live!.server, key, value),
+          get: (_target, key) =>
+            key === 'close' ? close : Reflect.get(this.selected!.server, key),
+          set: (_target, key, value) => Reflect.set(this.selected!.server, key, value),
         })
       })
     return this.starting
@@ -67,7 +68,7 @@ export class DevelopmentVite {
     if (this.closing) {
       return
     }
-    const previous = this.live!
+    const previous = this.selected!
     const graph = this.acquireGraph()
     let server: ViteDevServer
     try {
@@ -95,7 +96,14 @@ export class DevelopmentVite {
       return
     }
     await this.releaseGraph(previous.graph)
-    this.live = { graph, server }
+    if (this.closing) {
+      await this.releaseGraph(graph)
+      return
+    }
+    // Like Vite, select before listen. If activation fails the predecessor is already closed;
+    // keep the failed selection owned and watched for recovery, and propagate its original error.
+    this.selected = { graph, server }
+    await graph.activate()
     server.config.logger.info('server restarted.', { timestamp: true })
   }
 

@@ -17,7 +17,8 @@ export class DevelopmentViteGraph {
   private watchers = new Set<FSWatcher>()
   private sockets = new Set<WebSocketServer>()
   private environments = new Set<DevEnvironment>()
-  private initializing = new Set<Promise<unknown>>()
+  private environmentWork = new Set<Promise<unknown>>()
+  private activationDeferred = false
   private closing: Promise<void> | undefined
   // This unbound server routes HMR upgrades only when the application selects this graph.
   private http = createServer()
@@ -30,6 +31,7 @@ export class DevelopmentViteGraph {
     previous?: ViteDevServer['environments'],
     forceOptimizeDeps = false,
   ): Promise<ViteDevServer> {
+    this.activationDeferred = previous !== undefined
     const { createServer, resolveConfig } = await import('vite')
     const ownership: Plugin = {
       name: 'study-vite-ownership',
@@ -82,6 +84,26 @@ export class DevelopmentViteGraph {
     }
   }
 
+  /** Activate a constructed replacement only after its predecessor has fully closed.
+   * @throws Preserves the first listen failure after peers drain; selection stays owned for retry/close.
+   */
+  async activate(): Promise<void> {
+    const vite = this.vite
+    if (!vite) {
+      throw new Error('Initialize the Vite graph before activating its environments.')
+    }
+    this.activationDeferred = false
+    const listening = Object.values(vite.environments).map((environment) =>
+      environment.listen(vite),
+    )
+    try {
+      await Promise.all(listening)
+    } catch (error) {
+      await Promise.allSettled(listening)
+      throw error
+    }
+  }
+
   /** Route an actual HTTP upgrade to this graph's Vite-owned WebSocket server. */
   upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): boolean {
     return this.http.emit('upgrade', request, socket, head)
@@ -98,6 +120,15 @@ export class DevelopmentViteGraph {
           .then(
             (environment) => {
               this.environments.add(environment)
+              const listen = environment.listen.bind(environment)
+              environment.listen = (server) => {
+                // Public createServer activates middleware environments before returning. Defer
+                // replacement activation until the owner has finished closing the previous graph.
+                if (this.activationDeferred) {
+                  return Promise.resolve()
+                }
+                return this.track(Promise.resolve().then(() => listen(server)))
+              }
               const init = environment.init.bind(environment)
               environment.init = (options) => {
                 if (options?.watcher) {
@@ -128,12 +159,12 @@ export class DevelopmentViteGraph {
     }
   }
 
-  /** Wait for parallel environment initialization before releasing resources from a rejected factory. */
+  /** Retain public init/listen promises so close can drain peers after one operation rejects. */
   private track<T>(pending: Promise<T>): Promise<T> {
-    this.initializing.add(pending)
+    this.environmentWork.add(pending)
     void pending.then(
-      () => this.initializing.delete(pending),
-      () => this.initializing.delete(pending),
+      () => this.environmentWork.delete(pending),
+      () => this.environmentWork.delete(pending),
     )
     return pending
   }
@@ -147,8 +178,8 @@ export class DevelopmentViteGraph {
   /** Release partial environment resources even when Vite has not yet exposed its full server. */
   private async dispose(): Promise<void> {
     try {
-      while (this.initializing.size) {
-        await Promise.allSettled([...this.initializing])
+      while (this.environmentWork.size) {
+        await Promise.allSettled([...this.environmentWork])
       }
       if (this.vite) {
         await this.vite.close()
