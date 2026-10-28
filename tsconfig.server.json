@@ -8,5 +8,5 @@
     "rewriteRelativeImportExtensions": true,
     "sourceMap": true
   },
-  "include": ["src/server", "src/shared", "tests/compiled"]
+  "include": ["src/server", "src/shared", "tests/compiled", "tests/foreground-benchmark-worker.ts"]
 }

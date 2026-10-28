@@ -5,6 +5,8 @@ import type { AuthenticationOptions } from './auth/application-authentication.ts
 export const RUNTIME_CONFIGURATION = Symbol('RuntimeConfiguration')
 
 export type RuntimeConfiguration = {
+  /** Explicit app-local benchmark scheduling; omitted in production. */
+  housekeepingSchedule?: { intervalMs: number; monotonicNow: () => number }
   host: string
   port: number
   origin: URL

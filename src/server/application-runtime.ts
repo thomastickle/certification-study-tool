@@ -26,11 +26,16 @@ export class ApplicationRuntime {
     authentication: ApplicationAuthentication,
     sharedLibrary: LibraryRepository,
     privateLibraries: PrivateLibraries,
+    schedule: RuntimeConfiguration['housekeepingSchedule'],
   ) {
     this.authentication = authentication
     this.sharedLibrary = sharedLibrary
     this.privateLibraries = privateLibraries
-    this.housekeeping = new StudyHousekeeping(sharedLibrary, privateLibraries)
+    this.housekeeping = new StudyHousekeeping(
+      sharedLibrary,
+      privateLibraries,
+      schedule?.monotonicNow,
+    )
     this.studyLibraries = new StudyLibraryScope(privateLibraries, this.housekeeping)
   }
 
@@ -48,15 +53,22 @@ export class ApplicationRuntime {
       shared = new LibraryRepository(configuration.databasePath, 'local', { legacyOwnerId })
       chmodSync(configuration.databasePath, 0o600)
       const libraries = new PrivateLibraries(configuration.privateLibrariesDirectory)
-      runtime = new ApplicationRuntime(authentication, shared, libraries)
+      runtime = new ApplicationRuntime(
+        authentication,
+        shared,
+        libraries,
+        configuration.housekeepingSchedule,
+      )
       libraries.migrateFrom(shared)
       await runtime.housekeeping.tick()
-      runtime.timer = setInterval(() => {
-        void runtime!.housekeeping.tick().catch(() => {
-          console.error('Study upkeep failed; it will be retried.')
-        })
-      }, 1000)
-      runtime.timer.unref()
+      if (configuration.housekeepingSchedule?.intervalMs !== 0) {
+        runtime.timer = setInterval(() => {
+          void runtime!.housekeeping.tick().catch(() => {
+            console.error('Study upkeep failed; it will be retried.')
+          })
+        }, configuration.housekeepingSchedule?.intervalMs ?? 1000)
+        runtime.timer.unref()
+      }
       return runtime
     } catch (error) {
       try {
