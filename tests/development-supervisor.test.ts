@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
   renameSync,
+  unlinkSync,
 } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -28,6 +29,37 @@ type DevelopmentFixture = {
   output(): string
   port: number
 }
+
+test(
+  'development survives a root config removal gap and rebuilds after recreation',
+  { skip: !linuxOnly },
+  async () => {
+    const fixture = await createFixture()
+    try {
+      await waitFor(fixture, () => healthIsReady(fixture.port), 'Initial server')
+      const configuration = join(fixture.directory, 'tsconfig.server.json')
+      const original = readFileSync(configuration)
+      const starts = countMatches(fixture.output(), /Certification Study Tool:/g)
+      unlinkSync(configuration)
+      await waitFor(
+        fixture,
+        () => fixture.output().includes('Waiting for a source change.'),
+        'Missing config build failure',
+      )
+      assert.equal(fixture.child.exitCode, null)
+      writeFileSync(configuration, original)
+      await waitFor(
+        fixture,
+        async () =>
+          countMatches(fixture.output(), /Certification Study Tool:/g) > starts &&
+          (await healthIsReady(fixture.port)),
+        'Recreated config rebuild',
+      )
+    } finally {
+      await cleanup(fixture)
+    }
+  },
+)
 
 /** Make a disposable project with the real build and dev scripts. */
 async function createFixture(

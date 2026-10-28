@@ -6,11 +6,10 @@ import {
   Inject,
   Post,
   Put,
-  Res,
+  Header,
   UseGuards,
 } from '@nestjs/common'
 
-import type { ServerResponse } from 'node:http'
 import { ApplicationError } from '../http/errors.ts'
 import { ConceptService } from '../concepts/concept-service.ts'
 import { ImportService } from '../importer/import-service.ts'
@@ -142,16 +141,20 @@ export class LibraryController {
 
   /** Explicitly serialize JSON null: Nest otherwise treats null as an empty response. */
   @Delete('concepts/:id')
-  removeConcept(@StudyContext() context: StudyRequestContext, @Res() response: ServerResponse) {
+  @HttpCode(200)
+  @Header('Content-Type', 'application/json')
+  removeConcept(@StudyContext() context: StudyRequestContext) {
     this.conceptService(context).remove(route(context.url.pathname).split('/')[1]!)
-    this.sendNull(response)
+    return 'null'
   }
 
   /** Dismiss only the selected library's exact lowercase digest. */
   @Post('concept-suggestions/:digest/dismiss')
-  dismiss(@StudyContext() context: StudyRequestContext, @Res() response: ServerResponse) {
+  @HttpCode(200)
+  @Header('Content-Type', 'application/json')
+  dismiss(@StudyContext() context: StudyRequestContext) {
     this.conceptService(context).dismiss(route(context.url.pathname).split('/')[1]!)
-    this.sendNull(response)
+    return 'null'
   }
 
   /** Borrow the selected repository without retaining or closing its owner. */
@@ -162,15 +165,5 @@ export class LibraryController {
   /** Bind concept operations to the verified actor within the selected library. */
   private conceptService(context: StudyRequestContext) {
     return new ConceptService(context.content(visibility(context)))
-  }
-
-  /** Preserve the legacy JSON null body and cache/security headers. */
-  private sendNull(response: ServerResponse): void {
-    response.writeHead(200, {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    })
-    response.end('null')
   }
 }

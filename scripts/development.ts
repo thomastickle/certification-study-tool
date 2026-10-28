@@ -130,8 +130,17 @@ function requestRestart(): void {
 
 /** Follow editor saves that replace a root configuration file with a new inode. */
 function watchRootFile(fileName: string): void {
-  rootFileWatchers.get(fileName)?.close()
-  rootFileWatchers.set(fileName, watch(fileName, requestRestart))
+  try {
+    // Keep the previous handle until a replacement is acquired. The directory
+    // watcher observes recreation after an editor's unlink/write save sequence.
+    const replacement = watch(fileName, requestRestart)
+    rootFileWatchers.get(fileName)?.close()
+    rootFileWatchers.set(fileName, replacement)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error
+    }
+  }
 }
 
 for (const directory of watchedDirectories) {

@@ -50,15 +50,19 @@ export class StudyContextInterceptor implements NestInterceptor {
 
       const disconnect = () => inputs.cancel(new Error('The request was interrupted.'))
 
+      const responseClosed = () => {
+        if (!response.writableFinished) {
+          disconnect()
+        }
+      }
+
       request.once('aborted', disconnect)
-      response.once('close', disconnect)
+      response.once('close', responseClosed)
       try {
         // A later guard may have awaited past the client's close event before scope entry.
         if (
           request.aborted ||
-          response.destroyed ||
-          response.writableEnded ||
-          request.socket.destroyed
+          (!response.writableFinished && (response.destroyed || request.socket.destroyed))
         ) {
           disconnect()
         }
@@ -84,7 +88,7 @@ export class StudyContextInterceptor implements NestInterceptor {
           await inputs.settle()
         } finally {
           request.off('aborted', disconnect)
-          response.off('close', disconnect)
+          response.off('close', responseClosed)
         }
       }
     })

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { LibraryHttpModule } from '../../src/server/library-http/library-http.module.ts'
 import { bank } from '../fixtures.ts'
-import { test } from 'node:test'
+import { mock, test } from 'node:test'
+import { setImmediate } from 'node:timers/promises'
+import { StudyInputWork } from '../../src/server/security/study-input-work.ts'
 import { libraryFixture } from './library-http-fixture.ts'
 
 test('compiled library lists authenticate and expose normalized first-value queries', async () => {
@@ -156,6 +158,18 @@ test('real OIDC users isolate colliding content, ticket ownership and namespace 
 
 test('concept create/update/removal and dismissal retain scoped JSON null responses', async () => {
   const f = await libraryFixture(undefined, [LibraryHttpModule])
+  const cancellations: boolean[] = []
+  const settle = StudyInputWork.prototype.settle
+  const observation = mock.method(
+    StudyInputWork.prototype,
+    'settle',
+    async function (this: StudyInputWork) {
+      // A completed response can close before asynchronous resource work finishes.
+      await setImmediate()
+      cancellations.push(this.signal.aborted)
+      return settle.call(this)
+    },
+  )
   try {
     const admin = await f.login('alice')
     const student = await f.login('bob')
@@ -229,7 +243,15 @@ test('concept create/update/removal and dismissal retain scoped JSON null respon
       assert.equal(dismissed.status, 200)
       assert.equal(dismissed.body, 'null')
     }
+    await f.app.close()
+    assert.ok(cancellations.length >= 6)
+    assert.equal(
+      cancellations.filter(Boolean).length,
+      0,
+      'Successful mutations must settle without cancellation',
+    )
   } finally {
     await f.close()
+    observation.mock.restore()
   }
 })
