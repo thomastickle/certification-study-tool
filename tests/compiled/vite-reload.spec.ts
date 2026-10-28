@@ -6,11 +6,9 @@ import { join } from 'node:path'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { test } from 'node:test'
 import type { ViteDevServer } from 'vite'
-import { NestFactory } from '@nestjs/core'
 import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
-import { startLegacyTransport } from '../../src/server/legacy-transport.ts'
+import { createProductionApplication } from '../../src/server/production-application.ts'
 import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
-import { RuntimeModule } from '../../src/server/runtime.module.ts'
 
 type ReloadFixture = {
   graphs: ViteDevServer[]
@@ -109,11 +107,7 @@ for (const phase of ['buildStart', 'configureServer', 'options', 'factory']) {
         STUDY_DB_PATH: join(directory, 'library.sqlite3'),
       })
       configuration.port = 0
-      const app = await NestFactory.createApplicationContext(
-        RuntimeModule.register(configuration),
-        { logger: false, abortOnError: false },
-      )
-      const runtime = app.get(ApplicationRuntime)
+      let app: Awaited<ReturnType<typeof createProductionApplication>> | undefined
       const connections: Awaited<ReturnType<typeof hmr>>[] = []
       let closing: Promise<void> | undefined
 
@@ -121,7 +115,10 @@ for (const phase of ['buildStart', 'configureServer', 'options', 'factory']) {
 
       try {
         process.chdir(directory)
-        const http = await startLegacyTransport(runtime, configuration)
+        app = await createProductionApplication(configuration)
+        await app.listen(0, '127.0.0.1')
+        const runtime = app.get(ApplicationRuntime)
+        const http = app.getHttpServer() as import('node:http').Server
         const address = http.address()
         assert.ok(address && typeof address !== 'string')
         const origin = `http://127.0.0.1:${address.port}`
@@ -238,7 +235,7 @@ for (const phase of ['buildStart', 'configureServer', 'options', 'factory']) {
           await graph.watcher.close()
         }
         await closing
-        await app.close()
+        await app?.close()
         delete globals.__studyReload
         process.chdir(previousDirectory)
         rmSync(directory, { recursive: true, force: true })

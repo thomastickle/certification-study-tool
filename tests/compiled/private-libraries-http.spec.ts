@@ -1,54 +1,50 @@
+import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { LibraryHttpModule } from '../../src/server/library-http/library-http.module.ts'
+import { libraryFixture } from './library-http-fixture.ts'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { createServer } from 'node:http'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { test } from 'node:test'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { ImportService } from '../src/server/importer/import-service.ts'
-import { ImportPreviews } from '../src/server/importer/import-previews.ts'
-import { bank } from './fixtures.ts'
-import { closeServer } from './oidc-fixture.ts'
+import { ImportService } from '../../src/server/importer/import-service.ts'
+import { bank } from '../fixtures.ts'
 
-/** Keep colliding local IDs in genuinely separate files while exercising the HTTP boundary. */
+/** Exercise both actors against one Nest graph and separate owned personal files. */
 async function fixture(aliceRole: 'admin' | 'student' = 'student') {
-  const directory = mkdtempSync(join(tmpdir(), 'study-private-banks-'))
-  const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
-  const previews = new ImportPreviews()
+  const f = await libraryFixture(undefined, [LibraryHttpModule])
+  if (aliceRole === 'student') {
+    f.administrators.delete('alice')
+  }
+  const runtime = f.app.get(ApplicationRuntime)
+  const users: {
+    id: string
+    library: ReturnType<typeof runtime.privateLibraries.open>
+    call: (path: string, data?: unknown, method?: string) => Promise<Response>
+  }[] = []
+  for (const subject of ['alice', 'bob']) {
+    const cookie = await f.login(subject)
+    const id = f.sessions.get(cookie)!
+    const library = runtime.privateLibraries.open(id)
 
-  const users = await Promise.all(
-    ['alice', 'bob'].map(async (id) => {
-      const library = new LibraryRepository(join(directory, `${id}.sqlite3`))
-      const actor = { id, role: id === 'alice' ? aliceRole : ('student' as const) }
-      const server = createServer(apiTestHandler(shared, actor, undefined, previews, library))
-      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-      const address = server.address()
-      assert.ok(address && typeof address !== 'string')
-      const origin = `http://127.0.0.1:${address.port}`
+    const call = async (path: string, data?: unknown, method = 'POST') => {
+      const result = await f.authorized(
+        path,
+        cookie,
+        method,
+        { 'Content-Type': 'application/json' },
+        data === undefined ? undefined : JSON.stringify(data),
+      )
+      return new Response(result.body || null, { status: result.status })
+    }
 
-      const call = (path: string, data?: unknown, method = 'POST') =>
-        fetch(origin + path, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-        })
-
-      return { id, library, server, call }
-    }),
-  )
-
+    users.push({ id: subject, library, call })
+  }
   return {
-    shared,
+    shared: runtime.sharedLibrary,
     alice: users[0]!,
     bob: users[1]!,
     close: async () => {
       for (const user of users) {
-        await closeServer(user.server)
         user.library.close()
       }
-      shared.close()
-      rmSync(directory, { recursive: true, force: true })
+      await f.close()
     },
   }
 }

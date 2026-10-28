@@ -1,17 +1,16 @@
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
 import { test } from 'node:test'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { QuizService } from '../src/server/quizzes/quiz-service.ts'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { studyReportMarkdown } from '../src/shared/report-export.ts'
-import { quizTiming } from '../src/shared/quiz-timing.ts'
-import { populate } from './quiz-fixtures.ts'
+import { QuizService } from '../../src/server/quizzes/quiz-service.ts'
+import { compatibilityFixture } from './compatibility-fixture.ts'
+import { studyReportMarkdown } from '../../src/shared/report-export.ts'
+import { quizTiming } from '../../src/shared/quiz-timing.ts'
+import { populate } from '../quiz-fixtures.ts'
 
 for (const mode of ['quiz', 'exam'] as const) {
   test(`${mode} HTTP keeps overdue paused work out of every report and grades eventual completion once`, async () => {
-    const repository = new LibraryRepository(':memory:')
-    populate(repository, 24)
+    const fixture = await compatibilityFixture()
+    const { repository, fetch } = fixture
+    populate(fixture.shared, 24)
     let now = Date.now() - 24 * 60 * 60000
     const service = new QuizService(repository, () => now)
     const quiz = service.start({ mode, sourceFilter: 'mixed', questionType: 'mixed' })
@@ -25,11 +24,7 @@ for (const mode of ['quiz', 'exam'] as const) {
     service.save(quiz.id, { answers })
     now += 1234
     service.pause(quiz.id, { cause: 'navigation' })
-    const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const address = server.address()
-    assert.ok(address && typeof address !== 'string')
-    const base = `http://127.0.0.1:${address.port}`
+    const base = fixture.base + ''
 
     const post = (action: string, input?: unknown) =>
       fetch(`${base}/api/quizzes/${quiz.id}/${action}`, {
@@ -94,8 +89,7 @@ for (const mode of ['quiz', 'exam'] as const) {
           .questions.every((q) => q.correct),
       )
     } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()))
-      repository.close()
+      await fixture.close()
     }
   })
 }

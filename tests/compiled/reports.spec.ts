@@ -1,30 +1,29 @@
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
 import { test } from 'node:test'
-import type { StoredQuiz } from '../src/server/quizzes/quiz-repository.ts'
-import { ReportService } from '../src/server/reports/report-service.ts'
-import { apiTestHandler } from './support/api-test-handler.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
+import type { StoredQuiz } from '../../src/server/quizzes/quiz-repository.ts'
+import { ReportService } from '../../src/server/reports/report-service.ts'
+import { compatibilityFixture } from './compatibility-fixture.ts'
+import { LibraryRepository } from '../../src/server/questions/library-repository.ts'
 
-/** Exercises the report through the same local HTTP boundary as the dashboard. */
-async function withReports(work: (base: string, repository: LibraryRepository) => Promise<void>) {
-  const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
+/** Exercise reports through authenticated Nest controllers with real account persistence. */
+async function withReports(
+  work: (
+    base: string,
+    repository: import('../../src/server/questions/study-library.ts').StudyLibrary,
+    fetch: (input: string, init?: RequestInit) => Promise<Response>,
+    shared: LibraryRepository,
+  ) => Promise<void>,
+) {
+  const fixture = await compatibilityFixture()
   try {
-    await work(`http://127.0.0.1:${address.port}`, repository)
+    await work(fixture.base, fixture.repository, fixture.fetch, fixture.shared)
   } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    )
-    repository.close()
+    await fixture.close()
   }
 }
 
 test('reports return an honest empty state and enforce local access', async () => {
-  await withReports(async (base) => {
+  await withReports(async (base, _repository, fetch) => {
     const response = await fetch(`${base}/api/reports`)
     assert.equal(response.status, 200)
     const report = await response.json()
@@ -134,7 +133,7 @@ test('reports weight question outcomes, retain skipped questions, and group hist
 })
 
 test('mode, certification and rolling time filters apply to all report sections and reject invalid input', async () => {
-  await withReports(async (base, repository) => {
+  await withReports(async (base, repository, fetch) => {
     const now = Date.now()
     repository.quizStore().save(attempt('legacy-quiz', now - 8 * 86400000))
     repository.quizStore().save(attempt('recent-exam', now - 86400000, 'exam'))
@@ -161,7 +160,7 @@ test('mode, certification and rolling time filters apply to all report sections 
 })
 
 test('master export records scope, skipped outcomes, domain evidence and individual attempts', async () => {
-  const { studyReportMarkdown } = await import('../src/shared/report-export.ts')
+  const { studyReportMarkdown } = await import('../../src/shared/report-export.ts')
   const repository = new LibraryRepository(':memory:')
   try {
     const now = Date.UTC(2026, 9, 19)
@@ -184,11 +183,11 @@ test('master export records scope, skipped outcomes, domain evidence and individ
 })
 
 test('report reads score expired attempts and remain stable after source deletion', async () => {
-  const { populate } = await import('./quiz-fixtures.ts')
-  const { QuizService } = await import('../src/server/quizzes/quiz-service.ts')
-  const { LibraryService } = await import('../src/server/questions/library-service.ts')
-  await withReports(async (base, repository) => {
-    populate(repository)
+  const { populate } = await import('../quiz-fixtures.ts')
+  const { QuizService } = await import('../../src/server/quizzes/quiz-service.ts')
+  const { LibraryService } = await import('../../src/server/questions/library-service.ts')
+  await withReports(async (base, repository, fetch, shared) => {
+    populate(shared)
     const service = new QuizService(repository, () => Date.now() - 25 * 60000)
     const quiz = service.start({ sourceFilter: 'mixed', questionType: 'mixed' })
     const stored = repository.quizStore().find(quiz.id)!
@@ -205,8 +204,8 @@ test('report reads score expired attempts and remain stable after source deletio
     assert.equal(report.counts.correct, 1)
     assert.equal(report.counts.skipped, 19)
     assert.equal(repository.quizStore().find(quiz.id)!.status, 'completed')
-    for (const source of repository.sources()) {
-      new LibraryService(repository).deleteSource(source.id)
+    for (const source of shared.sources()) {
+      new LibraryService(shared).deleteSource(source.id)
     }
     const after = await (await fetch(`${base}/api/reports`)).json()
     assert.deepEqual(after.counts, report.counts)
@@ -215,7 +214,7 @@ test('report reads score expired attempts and remain stable after source deletio
 })
 
 test('score-first exports and aggregates include skips, unequal sizes, domains and filtered days', async () => {
-  const { studyReportMarkdown } = await import('../src/shared/report-export.ts')
+  const { studyReportMarkdown } = await import('../../src/shared/report-export.ts')
   const repository = new LibraryRepository(':memory:')
   try {
     const now = Date.UTC(2026, 9, 19, 12)
@@ -280,7 +279,7 @@ test('score-first exports and aggregates include skips, unequal sizes, domains a
 })
 
 test('empty and all-skipped master exports distinguish no measured score from zero', async () => {
-  const { studyReportMarkdown } = await import('../src/shared/report-export.ts')
+  const { studyReportMarkdown } = await import('../../src/shared/report-export.ts')
   const repository = new LibraryRepository(':memory:')
   try {
     const now = Date.UTC(2026, 9, 19)
