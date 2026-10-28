@@ -53,6 +53,15 @@ export class StudyContextInterceptor implements NestInterceptor {
       request.once('aborted', disconnect)
       response.once('close', disconnect)
       try {
+        // A later guard may have awaited past the client's close event before scope entry.
+        if (
+          request.aborted ||
+          response.destroyed ||
+          response.writableEnded ||
+          request.socket.destroyed
+        ) {
+          disconnect()
+        }
         const study = this.shared.forAccount(actor.id, personal)
         study.synchronizeDeletions()
         request.studyContext = {

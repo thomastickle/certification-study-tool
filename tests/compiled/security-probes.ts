@@ -42,6 +42,8 @@ export class ProbeWork {
   release: Promise<void> = Promise.resolve()
   personal: LibraryRepository | undefined
   bodyRead = 0
+  guardRequest?: import('../../src/server/security-context.ts').AdmittedRequest
+  guardClosed: (() => void) | undefined
   inputEntered: (() => void) | undefined
   failureEntered: (() => void) | undefined
   beforeFailure: Promise<void> = Promise.resolve()
@@ -58,7 +60,14 @@ export class ProbeWork {
 export class ProbeSlowGuard {
   constructor(@Inject(ProbeWork) private readonly work: ProbeWork) {}
 
-  async canActivate(): Promise<boolean> {
+  async canActivate(context: import('@nestjs/common').ExecutionContext): Promise<boolean> {
+    this.work.guardRequest = context.switchToHttp().getRequest()
+    context
+      .switchToHttp()
+      .getResponse<ServerResponse>()
+      .once('close', () => {
+        this.work.guardClosed?.()
+      })
     this.work.entered?.()
     await this.work.release
     return true
@@ -293,6 +302,13 @@ export class ProbeController {
     return context.personal.sources()
   }
 
+  @Get('guard-cooperative')
+  @UseGuards(ProbeSlowGuard)
+  guardedCooperative(@CooperativeResource() value: unknown) {
+    this.work.inputControllerCalls++
+    return value
+  }
+
   @Get('item/:id')
   item(@NormalizedUrl() url: RequestUrl) {
     return { path: url.pathname }
@@ -404,3 +420,30 @@ class UnownedClassPipeController {
 
 @Module({ controllers: [UnownedClassPipeController] })
 export class UnownedClassPipeModule {}
+
+/** Use emitted concrete-handler types while inheriting the base parameter decorators. */
+export function inheritedInputModule(reverse: boolean) {
+  @Controller('api/inherited-base')
+  @StudyRequest()
+  class Base {
+    @Get()
+    read(
+      @ParameterValue('inherited', parameterMetadataPipe, secondParameterPipe) value: unknown,
+    ): unknown {
+      return value
+    }
+  }
+
+  @Controller('api/inherited-derived')
+  class Derived extends Base {
+    @Get()
+    override read(value: string): unknown {
+      return value
+    }
+  }
+
+  @Module({ controllers: reverse ? [Derived, Base] : [Base, Derived] })
+  class InheritedInputModule {}
+
+  return InheritedInputModule
+}

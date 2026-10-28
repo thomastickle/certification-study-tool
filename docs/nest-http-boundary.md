@@ -126,7 +126,9 @@ It does not replace routing, patch Nest core, or infer completion from a respons
 Existing `@StudyContext`, `@VerifiedActor`, normalized query/URL and JSON-body
 parameters keep their call syntax. Ordinary `createParamDecorator` factories are
 also registered automatically; they may return asynchronous resource-using work.
-The wrapper preserves custom pipe data/metatype and parameter order.
+The wrapper preserves custom pipe data/metatype and parameter order. It retains
+original factory/pipe metadata separately, deriving metatypes from each concrete
+handler even when parameter decorators are inherited or an app is composed again.
 
 A first input failure cancels cooperative siblings through
 `context.inputSignal`, retains that original error, and joins **all** input
@@ -136,7 +138,9 @@ Consequently the HTTP error itself waits for that input, even if another input
 already rejected. Tests release controlled gates before awaiting the 400; awaiting
 the HTTP response before releasing a non-cooperative input would deadlock by
 contract. `app.close()` also waits. A response finish or client disconnect does
-not dispose storage while non-cooperative resource work remains pending.
+not dispose storage while non-cooperative resource work remains pending. When
+scope ownership starts, cancellation listeners also reconcile an already closed
+request/response/socket: a client disconnect during an awaited guard cannot be lost.
 
 Custom factories may use `context.inputSignal` for cooperative cancellation, but
 must return/await their entire operation and cleanup. Racing a cancellation promise

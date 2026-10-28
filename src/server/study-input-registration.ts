@@ -69,7 +69,7 @@ export function registerStudyInputs(discovery: DiscoveryService): void {
       const owned = { ...parameters }
       const types = Reflect.getMetadata(PARAMTYPES_METADATA, prototype, name) as
         Type<unknown>[] | undefined
-      for (const [key, parameter] of Object.entries(owned)) {
+      for (const [key, registered] of Object.entries(owned)) {
         if (!key.includes(CUSTOM_ROUTE_ARGS_METADATA)) {
           const kind = Number(key.split(':')[0])
           if (
@@ -83,6 +83,11 @@ export function registerStudyInputs(discovery: DiscoveryService): void {
           }
           continue
         }
+        // Inherited metadata may already be owned by another concrete controller. Rebuild
+        // from its original input so this handler supplies its own emitted parameter types.
+        const original = Reflect.getMetadata(OWNED_FACTORY, registered.factory!) as
+          Parameter | undefined
+        const parameter = original ?? registered
         const factory = parameter.factory!
         const inputPipes = parameter.pipes ?? []
         if (
@@ -94,9 +99,6 @@ export function registerStudyInputs(discovery: DiscoveryService): void {
           throw new Error(
             'Study inputs support parameter-local pipe instances; validate domain DTOs in services.',
           )
-        }
-        if (Reflect.getMetadata(OWNED_FACTORY, factory)) {
-          continue
         }
 
         const ownedFactory: CustomParamFactory<unknown, unknown> = (data, context) => {
@@ -118,7 +120,7 @@ export function registerStudyInputs(discovery: DiscoveryService): void {
           })
         }
 
-        Reflect.defineMetadata(OWNED_FACTORY, true, ownedFactory)
+        Reflect.defineMetadata(OWNED_FACTORY, parameter, ownedFactory)
         owned[key] = { ...parameter, factory: ownedFactory, pipes: [] }
       }
       Reflect.defineMetadata(ROUTE_ARGS_METADATA, owned, type, name)

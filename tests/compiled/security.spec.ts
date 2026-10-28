@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict'
+import { NestFactory } from '@nestjs/core'
+import type { LibraryRepository } from '../../src/server/questions/library-repository.ts'
+import type { SessionUser } from '../../src/shared/auth-contracts.ts'
+import { StudyLibraryScope } from '../../src/server/study-library-scope.ts'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,6 +22,7 @@ import {
   UnownedPipeModule,
   UnscopedBodyModule,
   UnownedClassPipeModule,
+  inheritedInputModule,
 } from './security-probes.ts'
 import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
 import { RuntimeStartup } from '../../src/server/runtime.module.ts'
@@ -1205,3 +1210,128 @@ test('owned ordinary Nest custom parameters preserve data, metatype and ordered 
     await f.close()
   }
 })
+
+test(
+  'a disconnect during a later guard cancels inputs before the personal scope takes ownership',
+  { timeout: 15000 },
+  async () => {
+    const f = await fixture()
+    const entered = deferred()
+    const disconnected = deferred()
+    const release = deferred()
+    const scoped = deferred()
+    const work = f.app.get(ProbeWork)
+    work.entered = entered.resolve
+    work.guardClosed = disconnected.resolve
+    work.release = release.promise
+    const scope = f.app.get(StudyLibraryScope)
+    const withLibrary = scope.withLibrary.bind(scope)
+    let personal: LibraryRepository | undefined
+    const capture = mock.method(
+      scope,
+      'withLibrary',
+      <T>(
+        actor: SessionUser,
+        method: string | undefined,
+        run: (library: LibraryRepository) => Promise<T>,
+      ): Promise<T> =>
+        withLibrary(actor, method, (library) => {
+          personal = library
+          const operation = run(library)
+          scoped.resolve()
+          return operation
+        }),
+    )
+    let req: ReturnType<typeof request> | undefined
+    let calling: Promise<void> | undefined
+    try {
+      const session = await f.login('bob')
+      calling = new Promise<void>((resolve) => {
+        req = request({
+          host: '127.0.0.1',
+          port: f.port,
+          path: '/api/probe/guard-cooperative',
+          headers: {
+            Host: f.config.origin.host,
+            Origin: f.config.origin.origin,
+            Cookie: session,
+            'X-Study-Account': f.sessions.get(session)!,
+          },
+        })
+        req.on('error', () => resolve())
+        req.end()
+      })
+      await entered.promise
+      req!.destroy()
+      await disconnected.promise
+      assert.equal(work.guardRequest!.aborted, true)
+      release.resolve()
+      await scoped.promise
+      assert.equal(
+        work.guardRequest!.inputWork!.signal.aborted,
+        true,
+        'scope admission must reconcile a disconnect already acknowledged by the guard',
+      )
+      await f.app.close()
+      await calling
+      assert.equal(work.inputControllerCalls, 0)
+      assert.throws(() => personal!.sources(), /closed|not open/)
+      const runtime = f.app.get(ApplicationRuntime)
+      assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
+      assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+    } finally {
+      release.resolve()
+      // Release a broken baseline's cooperative input so a failing regression still cleans up.
+      work.guardRequest?.inputWork?.cancel(new Error('Test cleanup.'))
+      req?.destroy()
+      await calling
+      await f.close()
+      capture.mock.restore()
+    }
+  },
+)
+
+for (const reverse of [false, true]) {
+  test(`inherited local pipes use concrete handler metadata across compositions (reverse=${reverse})`, async () => {
+    const feature = inheritedInputModule(reverse)
+    const native = await NestFactory.create(feature, { logger: false })
+    let expected: unknown[]
+    try {
+      await native.listen(0, '127.0.0.1')
+      const address = (native.getHttpServer() as Server).address()
+      assert.ok(address && typeof address !== 'string')
+      expected = await Promise.all(
+        ['base', 'derived'].map(async (name) => {
+          const response = await fetch(`http://127.0.0.1:${address.port}/api/inherited-${name}`)
+          assert.equal(response.status, 200)
+          return response.json()
+        }),
+      )
+      assert.deepEqual(
+        expected.map((value) => (value as { metatype: string }).metatype),
+        ['Object', 'String'],
+      )
+    } finally {
+      await native.close()
+    }
+    for (let composition = 0; composition < 2; composition++) {
+      const f = await fixture(undefined, [feature])
+      try {
+        const session = await f.login('bob')
+        const actual = []
+        for (const name of ['base', 'derived']) {
+          const response = await f.authorized(`/api/inherited-${name}`, session)
+          assert.equal(response.status, 200)
+          actual.push(JSON.parse(response.body))
+        }
+        assert.deepEqual(
+          actual,
+          expected,
+          `composition ${composition} must match native Nest exactly`,
+        )
+      } finally {
+        await f.close()
+      }
+    }
+  })
+}
