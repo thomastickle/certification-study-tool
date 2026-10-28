@@ -1,0 +1,37 @@
+# Focused study HTTP module
+
+Compose with `createApplication(config, [StudyHttpModule])`, importing
+`StudyHttpModule` from `src/server/study-http/study.module.ts`. The module
+borrows the globally configured runtime and request-owned study context; it
+does not register another runtime or close storage. Production retains the
+complete legacy dispatcher until the parent's atomic cutover.
+
+Explicit routes cover home, earned settings, reports, quiz recent/current/due/
+deleted/start/read/answers/submit/pause/resume/abandon/restore/delete. No visibility
+prefix aliases are introduced. Dynamic route guards validate the admitted,
+still-encoded pathname against the legacy permissive 36-character lowercase
+hex/hyphen pattern before parameters or bodies. Global authentication/workspace
+policy runs first. Services retain DTO validation and all domain behavior.
+Earned settings use a custom owned input to preserve expiry before body parsing.
+Nullable current/abandon results explicitly serialize JSON null, since Nest
+otherwise emits an empty response.
+
+## Retained and migrated tests
+
+All legacy tests remain unchanged while production uses their dispatcher.
+
+| Existing coverage                                        | New compiled Nest coverage in study-http.spec.ts                                                                                                      |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| home-http.test.ts                                        | earned validation, readiness independence, actor isolation and restart persistence                                                                    |
+| quiz-deletion-http.test.ts                               | soft-delete privacy/48-hour window, lists, restore, permanent option, foreign actor denials, purge                                                    |
+| pause-history-http.test.ts                               | quiz/exam overdue paused snapshots, saved flags, no report grading, repeat pause/history and resume deadline                                          |
+| application-authentication.test.ts study isolation cases | two real OIDC actors, colliding private/shared content, foreign read/answer/submit/restore, current/report/deleted/earned isolation                   |
+| dispatcher URL/body contracts                            | malformed/encoded IDs before body, first query values, HEAD/OPTIONS/unknown methods, aliases, media/object validation, workspace/auth/origin ordering |
+
+The owned fixture starts/listens sequentially, seeds synthetic content via existing
+repository/ImportService seams, and closes only its app/issuer/temp directory.
+Broad history/performance and complete expiry timing suites remain at their existing
+domain/legacy seams for the parent's final migration. Shared security tests retain
+their existing body size/cancellation and lifecycle coverage. Docker/Keycloak
+packaging is unchanged; no fresh Docker or live Keycloak run is claimed here.
+Independent review, CI monitoring and integration belong to the parent.
