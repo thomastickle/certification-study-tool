@@ -8,7 +8,7 @@
     "node": ">=24.14.0 <25"
   },
   "scripts": {
-    "test": "npm run build:server && node --import ./tests/svg-loader.ts --test \"tests/**/*.test.ts\" \"src/web/**/*.test.ts\" && node --test \"build/tests/compiled/**/*.spec.js\"",
+    "test": "npm run build:server && node --import ./tests/svg-loader.ts --test --test-concurrency=2 \"tests/**/*.test.ts\" \"src/web/**/*.test.ts\" && node --test \"build/tests/compiled/**/*.spec.js\"",
     "typecheck": "node node_modules/@typescript/native/bin/tsc --noEmit",
     "dev": "node --env-file-if-exists=.env scripts/development.ts",
     "start": "node --env-file-if-exists=.env build/src/server/main.js",

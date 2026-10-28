@@ -31,6 +31,12 @@ deadline plus file-stream closure.
 Lookup failures without a selected file length still return the legacy 404 body,
 including a symlink loop inside the owned static fixture.
 
+The native test runner caps independent files at two: process-level development
+tests launch their own compilers and servers, so CPU-based default parallelism
+can exhaust their startup budgets on a shared machine. Tests, deadlines and
+test-internal concurrency assertions remain unchanged. This scheduling bound
+does not guarantee that unrelated timing failures cannot occur.
+
 This bounded replacement does not complete PR85's deletion-first work: Vite,
 proxy/input internals and application lifetime machinery are separate concerns.
 The policy bridge can be longer than the former file server despite deleting
