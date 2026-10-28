@@ -6,9 +6,8 @@ import type { OidcSettings } from './oidc-login.ts'
 import { OidcLogin } from './oidc-login.ts'
 import type { LoginTransaction } from './oidc-login.ts'
 import { AccountRepository } from './account-repository.ts'
-import { checkLocalRequest } from '../http/local-request.ts'
+import { admitRequest } from '../http/admit-request.ts'
 import { ApplicationError } from '../http/errors.ts'
-import { requestUrl } from '../http/request-url.ts'
 import type { RequestUrl } from '../http/request-url.ts'
 import type { SessionUser } from '../../shared/auth-contracts.ts'
 
@@ -58,16 +57,7 @@ export class ApplicationAuthentication {
 
   /** Permit provider return documents while retaining origin checks on auth and study operations. */
   admit(request: IncomingMessage): RequestUrl {
-    const url = new URL(request.url ?? '/', this.options.origin)
-    // Cross-site redirects from an issuer must reach both the callback and the public shell.
-    const callback = url.pathname === '/auth/callback'
-    const publicPage = !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/auth/')
-    const publicNavigation = request.method === 'GET' && (callback || publicPage)
-    checkLocalRequest(request, this.options.origin, publicNavigation)
-    if (url.origin !== this.options.origin.origin) {
-      throw new ApplicationError('Invalid request URL.', 403)
-    }
-    return requestUrl(url)
+    return admitRequest(request, this.options.origin)
   }
 
   /** Resolve only the durable, issuer-verified session; headers never select an account. */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -145,14 +145,14 @@ for (const production of [true, false]) {
 }
 
 test(
-  'early repeated signals wait for acquired Vite initialization without listening',
+  'early repeated signals cancel the acquired frontend process without listening',
   { timeout: 15000 },
   async () => {
     const directory = mkdtempSync(join(tmpdir(), 'nest-main-early-'))
     writeFileSync(join(directory, 'index.html'), '<title>fixture</title>')
     writeFileSync(
       join(directory, 'vite.config.mjs'),
-      `export default { plugins: [{ name: 'gated-startup', async configureServer() { process.once('SIGTERM', () => console.log('SIGNAL-OBSERVED')); console.log('VITE-GATED'); await new Promise(resolve => process.stdin.once('data', resolve)) } }] }`,
+      `export default { plugins: [{ name: 'gated-startup', async configureServer(server) { await new Promise(resolve => server.watcher.once('ready', resolve)); console.log('VITE-GATED'); await new Promise(() => {}) } }] }`,
     )
     const portProbe = createServer()
     await new Promise<void>((resolve) => portProbe.listen(0, '127.0.0.1', resolve))
@@ -182,21 +182,18 @@ test(
         })
         child.once('exit', () => reject(new Error('Exited before gated Vite initialization')))
       })
-      const signalled = new Promise<void>((resolve) => {
-        child.stdout.on('data', (chunk) => {
-          if (String(chunk).includes('SIGNAL-OBSERVED')) {
-            resolve()
-          }
-        })
-      })
+      // The Vite handle/stdin no longer live in main; own the pending child through process exit.
+      const frontendPid = Number(
+        readFileSync(`/proc/${child.pid}/task/${child.pid}/children`, 'utf8').trim(),
+      )
+      assert.ok(Number.isInteger(frontendPid) && frontendPid > 0)
       child.kill('SIGTERM')
-      await signalled
       child.kill('SIGINT')
-      child.stdin.end('release')
       const [code, signal] = await exit
       assert.equal(code, 0)
       assert.equal(signal, null)
       assert.doesNotMatch(output, /Certification Study Tool:/)
+      assert.throws(() => process.kill(-frontendPid, 0), { code: 'ESRCH' })
     } finally {
       child.stdin.end()
       if (child.exitCode === null && child.signalCode === null) {

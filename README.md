@@ -156,7 +156,9 @@ commands continue to run native TypeScript without decorators.
 
 `npm run dev` rebuilds the server before starting it and restarts on backend,
 shared, schema, build-script, or TypeScript configuration changes. Vite handles
-frontend HMR. After a build or server startup failure, the watcher stays alive and
+frontend HMR. Development main now owns a stock Vite child and private Nest API;
+see [process ownership and transitional test limits](docs/development-process.md).
+After a build or server startup failure, the watcher stays alive and
 waits for a source change before trying again. `npm test` builds first, retains
 native TypeScript/Node tests and the SVG loader, then runs
 `tests/compiled/**/*.spec.ts` from emitted JavaScript. Put tests that import
