@@ -166,7 +166,6 @@ class OrdinaryInputModule {}
 test('ordinary study endpoints support Nest Body and pipes without the joined-input metadata adapter', async () => {
   const fixture = await libraryFixture(undefined, [OrdinaryInputModule])
   try {
-    assert.equal(fixture.app.useGlobalPipes({ transform: (value: unknown) => value }), fixture.app)
     const actor = await fixture.login('alice')
     const valid = await fixture.authorized(
       '/api/ordinary-input',

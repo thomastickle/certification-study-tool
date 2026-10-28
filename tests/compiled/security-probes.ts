@@ -11,6 +11,7 @@ import {
   Inject,
   Injectable,
   Module,
+  Param,
   Post,
   Res,
   UseGuards,
@@ -54,6 +55,8 @@ export class ProbeWork {
   inputRelease: Promise<void> = Promise.resolve()
   lateRead = false
   inputControllerCalls = 0
+  businessEntries = 0
+  businessCompletions = 0
   cooperativeCleanup = false
   bodyEntered: (() => void) | undefined
   bodyRequest?: import('../../src/server/security/security-context.ts').AdmittedRequest
@@ -97,6 +100,7 @@ async function rejectedBusinessWork(work: ProbeWork, context: StudyRequestContex
   })()
   // The business operation explicitly drains both branches before propagating failure.
   const [result] = await Promise.allSettled([failure, pending])
+  work.businessCompletions++
   if (result.status === 'rejected') {
     throw result.reason
   }
@@ -218,12 +222,21 @@ export class ProbeController {
 
   @Get('input-factory')
   inputFactory(@StudyContext() context: StudyRequestContext) {
+    this.work.businessEntries++
     return rejectedBusinessWork(this.work, context)
   }
 
   @Get('input-pipe')
   inputPipe(@StudyContext() context: StudyRequestContext) {
+    this.work.businessEntries++
     return rejectedBusinessWork(this.work, context)
+  }
+
+  @Post('pipeline/:id')
+  @HttpCode(200)
+  @ReadJsonBody()
+  pipeline(@Body('value') value: string, @Param('id') id: string) {
+    return { value, id }
   }
 
   @Post('input-body')

@@ -88,6 +88,8 @@ remain ordinary native parameter/DI/class/global pipe work.
   business work in the controller. Their suspended-work, late SQLite read,
   shutdown lease, original status/envelope/header and storage-close assertions remain.
   These no longer assert sibling parameter ownership.
+  Entry is observed once at the actual controller boundary; completion remains
+  zero while work is suspended and becomes one only after both business branches settle.
 - The partial-body probe injects cancellation before the real guarded reader,
   rather than using a sibling parameter failure. The same 15-second deadline,
   original 400 delivery, readable-listener cleanup before housekeeping, and root
@@ -98,7 +100,8 @@ remain ordinary native parameter/DI/class/global pipe work.
   cancellation is retired; manual-response lifetime tests and guard-disconnect
   probes cover cooperative cancellation in awaited operations.
 - Body/method/class-pipe rejection probes now positively accept native metadata.
-  Global-pipe restriction assertions become positive fluent global-pipe acceptance.
+  Global-pipe restriction assertions become pre-init global and injected APP_PIPE
+  transformations over actual Body/Param HTTP inputs, with per-type execution checks.
   Ordered asynchronous local pipes, emitted data/types and inherited concrete
   metadata still compare with an independent native Nest composition.
 - Public proxy identity/fluent assertions now include exact identity with the

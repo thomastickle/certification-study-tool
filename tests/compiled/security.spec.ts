@@ -1,6 +1,7 @@
 import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import assert from 'node:assert/strict'
-import { NestFactory } from '@nestjs/core'
+import { APP_PIPE, NestFactory } from '@nestjs/core'
+import type { ArgumentMetadata } from '@nestjs/common'
 import type { LibraryRepository } from '../../src/server/questions/library-repository.ts'
 import type { SessionUser } from '../../src/shared/auth-contracts.ts'
 import { StudyLibraryScope } from '../../src/server/runtime/study-library-scope.ts'
@@ -35,6 +36,7 @@ import { runtimeConfiguration } from '../../src/server/runtime/runtime-configura
 async function fixture(
   beforeTokenExchange?: () => Promise<void>,
   features: import('@nestjs/common').DynamicModule['imports'] = [],
+  configureApplication?: (app: Awaited<ReturnType<typeof createApplication>>) => void,
 ) {
   const directory = mkdtempSync(join(tmpdir(), 'nest-security-'))
   const administrators = new Set(['alice'])
@@ -50,6 +52,7 @@ async function fixture(
   let now = Date.now()
   config.authentication.now = () => now
   const app = await createApplication(config, [ProbeModule, ...features])
+  configureApplication?.(app)
   await app.listen(0, '127.0.0.1')
   const server = app.getHttpServer() as Server
   const address = server.address()
@@ -851,7 +854,8 @@ for (const input of ['factory', 'pipe']) {
         for (let i = 0; i < 5; i++) {
           await setImmediate()
         }
-        assert.equal(work.inputControllerCalls, 0)
+        assert.equal(work.businessEntries, 1)
+        assert.equal(work.businessCompletions, 0)
         assert.equal(responded, false, 'HTTP error waits for awaited non-cancellable business work')
         work.personal!.sources()
         let closed = false
@@ -867,6 +871,8 @@ for (const input of ['factory', 'pipe']) {
         await closing
         await calling
         assert.equal(work.lateRead, true, 'late business DB work completes before storage closes')
+        assert.equal(work.businessEntries, 1)
+        assert.equal(work.businessCompletions, 1)
         assert.throws(() => work.personal!.sources(), /closed|not open/)
       } finally {
         release.resolve()
@@ -900,6 +906,8 @@ for (const input of ['factory', 'pipe']) {
           await setImmediate()
         }
         work.personal!.sources()
+        assert.equal(work.businessEntries, 1)
+        assert.equal(work.businessCompletions, 0)
         release.resolve()
         const response = await calling
         assert.equal(response.status, 400)
@@ -910,7 +918,8 @@ for (const input of ['factory', 'pipe']) {
         assert.equal(response.headers['cache-control'], 'no-store')
         assert.equal(response.headers['x-content-type-options'], 'nosniff')
         assert.equal(work.lateRead, true)
-        assert.equal(work.inputControllerCalls, 0)
+        assert.equal(work.businessEntries, 1)
+        assert.equal(work.businessCompletions, 1)
         assert.throws(() => work.personal!.sources(), /closed|not open/)
       } finally {
         release.resolve()
@@ -1108,11 +1117,57 @@ test('JSON body parameters outside the registered personal scope fail without re
   }
 })
 
-test('ordinary parameters accept global Nest pipes', async () => {
-  const f = await fixture()
+test('pre-init global and injected APP_PIPE transform native Body and Param inputs after guards', async () => {
+  const calls: Array<{ label: string; type: string }> = []
+
+  const pipe = (label: string) => ({
+    transform(value: unknown, metadata: ArgumentMetadata) {
+      if (metadata.type !== 'body' && metadata.type !== 'param') {
+        return value
+      }
+      calls.push({ label, type: metadata.type })
+      return `${String(value)}|${label}`
+    },
+  })
+
+  const label = Symbol('GlobalPipeLabel')
+  const feature = {
+    module: FailureModule,
+    providers: [
+      { provide: label, useValue: 'injected' },
+      { provide: APP_PIPE, inject: [label], useFactory: (value: string) => pipe(value) },
+    ],
+  }
+  const f = await fixture(undefined, [feature], (app) => {
+    assert.equal(app.useGlobalPipes(pipe('global')), app)
+  })
   try {
-    assert.equal(f.app.useGlobalPipes({ transform: (value: unknown) => value }), f.app)
-    assert.equal((await f.call('/api/health')).status, 200)
+    const path = '/api/probe/pipeline/item'
+    const headers = { 'Content-Type': 'application/json' }
+    assert.equal((await f.call(path, 'POST', headers, 'INVALID')).status, 401)
+    assert.equal(calls.length, 0, 'Guards reject before native input validation')
+    const session = await f.login('bob')
+    calls.length = 0
+    assert.equal((await f.authorized(path, session, 'POST', headers, 'INVALID')).status, 400)
+    assert.equal(calls.length, 0, 'The guarded reader finishes before native pipes')
+    const response = await f.authorized(
+      path,
+      session,
+      'POST',
+      headers,
+      JSON.stringify({ value: 'body' }),
+    )
+    assert.equal(response.status, 200)
+    assert.deepEqual(JSON.parse(response.body), {
+      value: 'body|injected|global',
+      id: 'item|injected|global',
+    })
+    for (const type of ['body', 'param']) {
+      assert.deepEqual(
+        calls.filter((call) => call.type === type).map((call) => call.label),
+        ['injected', 'global'],
+      )
+    }
   } finally {
     await f.close()
   }
