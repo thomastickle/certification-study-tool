@@ -6,6 +6,7 @@ import type { RequestUrl } from './request-url.ts'
 import type { LibraryView } from './questions/library-repository.ts'
 import type { StudyLibrary } from './questions/study-library.ts'
 import type { LibraryRepository } from './questions/library-repository.ts'
+import type { StudyInputWork } from './study-input-work.ts'
 import { jsonObjectBody } from './json-object-body.ts'
 
 export const PUBLIC_METHOD = Symbol('PublicMethod')
@@ -17,6 +18,7 @@ export const LIBRARY_WRITE = Symbol('LibraryWrite')
 export type LibraryVisibility = 'shared' | 'private'
 
 export type StudyRequestContext = {
+  inputSignal: AbortSignal
   actor: SessionUser
   url: RequestUrl
   query: URLSearchParams
@@ -29,6 +31,8 @@ export type StudyRequestContext = {
 export type AdmittedRequest = IncomingMessage & {
   admission: { url: RequestUrl; user: SessionUser | undefined }
   studyContext?: StudyRequestContext
+  inputWork?: StudyInputWork
+  securityWorkOwned?: boolean
   studyErrors?: boolean
   finishSecurityWork?: () => void
 }
@@ -74,9 +78,9 @@ export const StudyContext = createParamDecorator((_data: unknown, context: Execu
 export const JsonObjectBody = createParamDecorator(
   (allowEmpty: boolean | undefined, context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest<AdmittedRequest>()
-    if (!request.studyContext) {
+    if (!request.studyContext || !request.inputWork) {
       throw new Error('JsonObjectBody requires @StudyRequest().')
     }
-    return jsonObjectBody(request, allowEmpty)
+    return jsonObjectBody(request, allowEmpty, request.inputWork.signal)
   },
 )

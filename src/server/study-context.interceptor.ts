@@ -6,6 +6,9 @@ import { StudyLibraryScope } from './study-library-scope.ts'
 import { SHARED_LIBRARY_REPOSITORY } from './runtime.module.ts'
 import { LibraryRepository } from './questions/library-repository.ts'
 import type { AdmittedRequest } from './security-context.ts'
+import { StudyInputWork } from './study-input-work.ts'
+import { STUDY_INPUTS_REGISTERED } from './study-input-registration.ts'
+import type { ServerResponse } from 'node:http'
 import { STUDY_REQUEST } from './security-context.ts'
 
 /** Retain personal storage through body parameters and the full asynchronous controller operation. */
@@ -25,30 +28,58 @@ export class StudyContextInterceptor implements NestInterceptor {
       context.getClass(),
     ])
 
-    const execute = () => lastValueFrom(next.handle())
+    const execute = () => Promise.resolve().then(() => lastValueFrom(next.handle()))
 
     if (!scoped) {
+      request.securityWorkOwned = true
       return from(execute().finally(request.finishSecurityWork))
     }
     const actor = request.admission.user
     if (!actor) {
       throw new Error('StudyRequest requires an authenticated actor.')
     }
+    if (!this.reflector.get<boolean>(STUDY_INPUTS_REGISTERED, context.getHandler())) {
+      throw new Error('StudyRequest input metadata must be registered by createApplication.')
+    }
+    request.securityWorkOwned = true
+
     const operation = this.scope.withLibrary(actor, request.method, async (personal) => {
-      const study = this.shared.forAccount(actor.id, personal)
-      study.synchronizeDeletions()
-      request.studyContext = {
-        actor,
-        url: request.admission.url,
-        query: new URLSearchParams(request.admission.url.search),
-        personal,
-        shared: this.shared,
-        study,
-        content: (visibility) =>
-          (visibility === 'private' ? personal : this.shared).forAccount(actor.id),
+      const inputs = new StudyInputWork()
+      request.inputWork = inputs
+      const response = context.switchToHttp().getResponse<ServerResponse>()
+
+      const disconnect = () => inputs.cancel(new Error('The request was interrupted.'))
+
+      request.once('aborted', disconnect)
+      response.once('close', disconnect)
+      try {
+        const study = this.shared.forAccount(actor.id, personal)
+        study.synchronizeDeletions()
+        request.studyContext = {
+          inputSignal: inputs.signal,
+          actor,
+          url: request.admission.url,
+          query: new URLSearchParams(request.admission.url.search),
+          personal,
+          shared: this.shared,
+          study,
+          content: (visibility) =>
+            (visibility === 'private' ? personal : this.shared).forAccount(actor.id),
+        }
+        return await execute()
+      } catch (error) {
+        inputs.cancel(error)
+        throw error
+      } finally {
+        try {
+          await inputs.settle()
+        } finally {
+          request.off('aborted', disconnect)
+          response.off('close', disconnect)
+        }
       }
-      return execute()
     })
+
     return from(operation.finally(request.finishSecurityWork))
   }
 }

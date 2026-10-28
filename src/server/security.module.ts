@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common'
-import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core'
 import { AuthenticationController, SessionController } from './security.controller.ts'
 import { SecurityGuard } from './security.guard.ts'
 import { SecurityExceptionFilter } from './security.filter.ts'
@@ -10,6 +10,7 @@ import { HealthService } from './health.service.ts'
 
 /** Compose the security boundary once; runtime providers come from the configured global graph. */
 @Module({
+  imports: [DiscoveryModule],
   controllers: [AuthenticationController, SessionController, HealthController],
   providers: [
     HealthService,

@@ -61,9 +61,11 @@ and revocation. `handle` remains the transitional adapter for production/core te
 Each study controller or handler uses `@StudyRequest()`. Guards run first. The
 scope interceptor then opens the actor's personal library with the approved
 `StudyLibraryScope.withLibrary`, synchronizes shared deletions and enters parameter
-resolution/controller work. This scope encloses body streaming, asynchronous
-services, errors and disconnects, observes the attempted operation, then closes the
-personal connection. It never closes the shared root.
+resolution/controller work. The factory registers owned input metadata before Nest
+snapshots its parameter pipeline. This scope encloses every registered custom
+factory and its parameter-local pipe chain, body streaming, awaited controller
+services, errors and disconnects. Only after those operations settle does it observe
+the attempted operation and close the personal connection. It never closes the shared root.
 
 ```ts
 @Controller('api/quizzes')
@@ -112,12 +114,70 @@ previewShared(
 }
 ```
 
+### Owned input resolution
+
+Installed Nest 12.3.2 resolves parameters concurrently with fail-fast `Promise.all`.
+Rejection of `next.handle()` is therefore **not** proof that sibling factories or
+pipes finished. `registerStudyInputs` uses Nest's discovery and parameter metadata
+at factory composition, before routing initialization. For `@StudyRequest()`
+handlers it wraps **every ordinary Nest custom parameter factory and its complete
+ordered parameter-local instance-pipe chain** as one `StudyInputWork` operation.
+It does not replace routing, patch Nest core, or infer completion from a response.
+Existing `@StudyContext`, `@VerifiedActor`, normalized query/URL and JSON-body
+parameters keep their call syntax. Ordinary `createParamDecorator` factories are
+also registered automatically; they may return asynchronous resource-using work.
+The wrapper preserves custom pipe data/metatype and parameter order.
+
+A first input failure cancels cooperative siblings through
+`context.inputSignal`, retains that original error, and joins **all** input
+operations inside `withLibrary` before observation, connection closure or lease
+release. A non-cooperative factory/pipe must settle with its database still usable.
+Consequently the HTTP error itself waits for that input, even if another input
+already rejected. Tests release controlled gates before awaiting the 400; awaiting
+the HTTP response before releasing a non-cooperative input would deadlock by
+contract. `app.close()` also waits. A response finish or client disconnect does
+not dispose storage while non-cooperative resource work remains pending.
+
+Custom factories may use `context.inputSignal` for cooperative cancellation, but
+must return/await their entire operation and cleanup. Racing a cancellation promise
+against work that continues in the background does not establish ownership. Pipes
+may be asynchronous, but must be **instances attached to the parameter**:
+
+```ts
+@Get()
+read(
+  @NormalizedQuery({
+    transform(query: URLSearchParams) {
+      return { provider: query.get('provider') ?? undefined }
+    },
+  }) scope: { provider?: string },
+  @StudyContext() context: StudyRequestContext,
+) {
+  return new QuizService(context.study).recent(scope)
+}
+```
+
+This staged boundary deliberately rejects `@UsePipes`, class-based pipe tokens,
+`APP_PIPE`, `useGlobalPipes`, and parameter schemas rather than leaving work outside
+its ownership. Instantiate parameter pipes explicitly or keep domain validation in
+the existing services. No new validation framework is introduced. Built-in study
+`@Body`/`@Query`/`@Param` and other unregistered extraction modes are rejected during
+composition; use the normalized/custom decorators above. Raw `@Req`, `@Res` and
+`@Next` extraction is allowed, but must not start asynchronous input work.
+Registration validation fails startup and closes acquired roots. JSON-body/context
+parameters used without the registered personal scope fail before body consumption.
+Do not mutate route/pipe metadata or install controllers after factory composition.
+
 `@JsonObjectBody()` requires `@StudyRequest()` and reads only after guards and
-scope acquisition. The shared body reader preserves the exact case-sensitive
-`application/json` prefix, 10 MiB limit, non-null object-only JSON, and existing
-400/413/415 messages. Its non-destroying stream iterator allows a 413 JSON response
-instead of destroying the socket before that response can be sent. Use
-`@JsonObjectBody(true)` **only for pause**: no transfer-encoding and zero/missing
+scope acquisition. It preserves the exact case-sensitive `application/json`
+prefix, 10 MiB limit, non-null object-only JSON, and existing 400/413/415 messages.
+The Nest reader uses cancellable readable-stream waits. A failed sibling removes
+those waits and cancels the pending body operation without destroying the response
+or waiting for the client to send the remainder of a declared body. Its cancellation
+is joined before storage observation/closure. The production legacy call path
+retains the non-destroying iterator introduced in stage three; it is unchanged by
+this correction. Both readers permit the intended JSON 413 response.
+Use `@JsonObjectBody(true)` **only for pause**: no transfer-encoding and zero/missing
 content-length permits `{}` without a content type. DTO/service validation stays
 in existing services. Body-free routes should not add this decorator.
 
@@ -133,23 +193,33 @@ are destroyed on failure.
 ## Shutdown and tests
 
 The first global guard synchronously acquires a request-lifetime lease, before Nest
-can await subsequent guards. The filter releases denied work; the interceptor
-releases successful work only after its native promise settles and personal scope
-cleanup finishes. Response finish/disconnect never independently releases pending
+can await subsequent guards. The filter releases guard-denied work only when an
+interceptor has not taken ownership. Once the interceptor owns the lease, its
+native promise releases it only after input settlement, controller settlement and
+personal scope cleanup, including failures. The exception filter cannot release
+that lease early. Response finish/disconnect never independently releases pending
 work. `beforeApplicationShutdown` rejects new admissions, disconnects HTTP sockets
 to unblock partial bodies, and joins every lease while roots are open. Nest then
 disposes HTTP once; `onApplicationShutdown` closes shared/accounts roots. There is
-no asynchronous RxJS finalizer. Non-cooperative controller promises deliberately
-keep shutdown pending; controllers must return/await their work. This seam applies
+no asynchronous RxJS finalizer. Non-cooperative input and controller promises
+deliberately keep shutdown pending; controllers must return/await their work. This seam applies
 to the staged Nest factory; production retains its existing transport drain.
 
 The factory contains provider construction, init and listen failures. Its public
 lifecycle wrapper joins in-flight init/listen and shares a single close promise; it does not assign methods onto
-NestFactory's proxy or separately call `server.close`.
+NestFactory's proxy or separately call `server.close`. This tracks startup for
+shutdown; it **does not serialize or deduplicate concurrent `init()`/`listen()`
+calls**. R1-N1 remains a documented inherited Nest limitation: parallel startup can
+run init hooks twice. Callers must await startup sequentially, and stage four must
+serialize startup before supporting concurrent callers. No startup rearchitecture
+is part of the R1-B1 correction.
 
 `tests/compiled/security.spec.ts` uses the actual factory, compiled decorators,
 raw Node HTTP, the existing synthetic issuer and test-only probe controllers.
 It covers OIDC/roles/workspaces, URL/method/origin negatives, body contracts,
 private imports, feature DI aliases, and suspended controller/guard/token-exchange,
-partial-body, disconnect, late-response and startup-failure cleanup. Probe routes
+partial-body, disconnect, late-response and startup-failure cleanup. Sibling-input
+regressions cover pending custom factories and pipes, late database reads, retained
+400 responses, actual partial-body cancellation before observation, cooperative
+cleanup, shutdown drainage and rejected unowned input/pipe configuration. Probe routes
 exist only under `tests/compiled`; do not import them into product modules.

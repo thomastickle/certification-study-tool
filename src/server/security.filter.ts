@@ -25,7 +25,9 @@ export class SecurityExceptionFilter implements ExceptionFilter {
     try {
       securityFailure(error, request, http.getResponse<ServerResponse>())
     } finally {
-      request.finishSecurityWork?.()
+      if (!request.securityWorkOwned) {
+        request.finishSecurityWork?.()
+      }
     }
   }
 }

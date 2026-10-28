@@ -9,7 +9,16 @@ import { mock, test } from 'node:test'
 import { setImmediate } from 'node:timers/promises'
 import { createApplication } from '../../src/server/application.ts'
 import { oidcFixture, closeServer } from '../oidc-fixture.ts'
-import { ProbeModule, ProbeWork, FeatureAliases, FailureModule } from './security-probes.ts'
+import {
+  ProbeModule,
+  ProbeWork,
+  FeatureAliases,
+  FailureModule,
+  UnownedBodyModule,
+  UnownedPipeModule,
+  UnscopedBodyModule,
+  UnownedClassPipeModule,
+} from './security-probes.ts'
 import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
 import { RuntimeStartup } from '../../src/server/runtime.module.ts'
 import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
@@ -17,7 +26,10 @@ import { bank } from '../fixtures.ts'
 import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
 
 /** Exercise admission with raw targets; fetch would normalize away the attack. */
-async function fixture(beforeTokenExchange?: () => Promise<void>) {
+async function fixture(
+  beforeTokenExchange?: () => Promise<void>,
+  features: import('@nestjs/common').DynamicModule['imports'] = [],
+) {
   const directory = mkdtempSync(join(tmpdir(), 'nest-security-'))
   const administrators = new Set(['alice'])
   const provider = await oidcFixture(
@@ -31,7 +43,11 @@ async function fixture(beforeTokenExchange?: () => Promise<void>) {
   })
   let now = Date.now()
   config.authentication.now = () => now
-  const app = await createApplication(config, [ProbeModule])
+  const app = await createApplication(config, [ProbeModule, ...features])
+  app.use((req: { inputProbe?: ProbeWork }, _res: unknown, next: () => void) => {
+    req.inputProbe = app.get(ProbeWork)
+    next()
+  })
   await app.listen(0, '127.0.0.1')
   const server = app.getHttpServer() as Server
   const address = server.address()
@@ -798,5 +814,394 @@ test('failed startup refuses delayed DI acquisition after another provider has a
     await assert.rejects(startup.acquire(config), /already failed/)
   } finally {
     rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+for (const input of ['factory', 'pipe']) {
+  test(
+    `a rejecting sibling retains pending resource ${input} work and the shutdown lease`,
+    { timeout: 15000 },
+    async () => {
+      const f = await fixture()
+      const entered = deferred()
+      const rejected = deferred()
+      const release = deferred()
+      const work = f.app.get(ProbeWork)
+      work.inputEntered = entered.resolve
+      work.failureEntered = rejected.resolve
+      work.beforeFailure = entered.promise
+      work.inputRelease = release.promise
+      let calling: Promise<unknown> | undefined
+      try {
+        const session = await f.login('bob')
+        let responded = false
+        calling = f.authorized(`/api/probe/input-${input}`, session).then(
+          (response) => {
+            responded = true
+            return response
+          },
+          () => undefined,
+        )
+        await rejected.promise
+        for (let i = 0; i < 5; i++) {
+          await setImmediate()
+        }
+        assert.equal(work.inputControllerCalls, 0)
+        assert.equal(responded, false, 'HTTP error waits for owned non-cancellable input work')
+        work.personal!.sources()
+        let closed = false
+        const closing = f.app.close().then(() => {
+          closed = true
+        })
+        for (let i = 0; i < 5; i++) {
+          await setImmediate()
+        }
+        assert.equal(closed, false)
+        work.personal!.sources()
+        release.resolve()
+        await closing
+        await calling
+        assert.equal(work.lateRead, true, 'late parameter DB work completes before storage closes')
+        assert.throws(() => work.personal!.sources(), /closed|not open/)
+      } finally {
+        release.resolve()
+        await calling
+        await f.close()
+      }
+    },
+  )
+}
+
+for (const input of ['factory', 'pipe']) {
+  test(
+    `owned ${input} work settles before returning the original sibling 400`,
+    { timeout: 15000 },
+    async () => {
+      const f = await fixture()
+      const entered = deferred()
+      const rejected = deferred()
+      const release = deferred()
+      const work = f.app.get(ProbeWork)
+      work.inputEntered = entered.resolve
+      work.failureEntered = rejected.resolve
+      work.beforeFailure = entered.promise
+      work.inputRelease = release.promise
+      let calling: ReturnType<typeof f.authorized> | undefined
+      try {
+        const session = await f.login('bob')
+        calling = f.authorized(`/api/probe/input-${input}`, session)
+        await rejected.promise
+        for (let i = 0; i < 5; i++) {
+          await setImmediate()
+        }
+        work.personal!.sources()
+        release.resolve()
+        const response = await calling
+        assert.equal(response.status, 400)
+        assert.deepEqual(JSON.parse(response.body), {
+          error: 'Synthetic parameter rejection.',
+          details: [],
+        })
+        assert.equal(response.headers['cache-control'], 'no-store')
+        assert.equal(response.headers['x-content-type-options'], 'nosniff')
+        assert.equal(work.lateRead, true)
+        assert.equal(work.inputControllerCalls, 0)
+        assert.throws(() => work.personal!.sources(), /closed|not open/)
+      } finally {
+        release.resolve()
+        await calling
+        await f.close()
+      }
+    },
+  )
+}
+
+test(
+  'a rejecting sibling cancels the actual partial JSON body before observation and the original 400',
+  { timeout: 15000 },
+  async () => {
+    const f = await fixture()
+    const work = f.app.get(ProbeWork)
+    const entered = deferred()
+    work.bodyEntered = entered.resolve
+    work.beforeFailure = entered.promise
+    const runtime = f.app.get(ApplicationRuntime)
+    const observeRequest = runtime.housekeeping.observeRequest.bind(runtime.housekeeping)
+    let observed = false
+    const observe = mock.method(
+      runtime.housekeeping,
+      'observeRequest',
+      (...args: Parameters<typeof observeRequest>) => {
+        args[2].sources()
+        assert.equal(work.bodyRequest!.inputWork!.signal.aborted, true)
+        assert.equal(
+          work.bodyRequest!.listenerCount('readable'),
+          0,
+          'cancelled reader removes its pending stream wait before storage closes',
+        )
+        observeRequest(...args)
+        observed = true
+      },
+    )
+    let req: ReturnType<typeof request> | undefined
+    try {
+      const session = await f.login('bob')
+      const response = await new Promise<{
+        status: number
+        body: string
+        headers: import('node:http').IncomingHttpHeaders
+      }>((resolve, reject) => {
+        req = request(
+          {
+            host: '127.0.0.1',
+            port: f.port,
+            path: '/api/probe/input-body',
+            method: 'POST',
+            headers: {
+              Host: f.config.origin.host,
+              Origin: f.config.origin.origin,
+              Cookie: session,
+              'X-Study-Account': f.sessions.get(session)!,
+              'Content-Type': 'application/json',
+              'Content-Length': 100,
+            },
+          },
+          (res) => {
+            let body = ''
+            res.on('error', reject)
+            res.on('data', (chunk) => {
+              body += chunk
+            })
+            res.on('end', () => resolve({ status: res.statusCode!, body, headers: res.headers }))
+          },
+        )
+        req.on('error', reject)
+        req.write('{')
+      })
+      assert.equal(
+        response.status,
+        400,
+        'partial body is cancelled without waiting for the remaining 99 bytes',
+      )
+      assert.deepEqual(JSON.parse(response.body), {
+        error: 'Synthetic parameter rejection.',
+        details: [],
+      })
+      assert.equal(response.headers['cache-control'], 'no-store')
+      assert.equal(response.headers['x-content-type-options'], 'nosniff')
+      assert.equal(observed, true)
+      assert.equal(work.inputControllerCalls, 0)
+      assert.throws(() => work.personal!.sources(), /closed|not open/)
+      await f.app.close()
+      assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
+    } finally {
+      req?.destroy()
+      observe.mock.restore()
+      await f.close()
+    }
+  },
+)
+
+for (const disconnect of [false, true]) {
+  test(
+    `owned successful input work remains usable through ${disconnect ? 'disconnect' : 'resolution'}`,
+    { timeout: 15000 },
+    async () => {
+      const f = await fixture()
+      const work = f.app.get(ProbeWork)
+      const entered = deferred()
+      const release = deferred()
+      work.inputEntered = entered.resolve
+      work.inputRelease = release.promise
+      let req: ReturnType<typeof request> | undefined
+      let calling: Promise<{ status: number; body: string } | undefined> | undefined
+      try {
+        const session = await f.login('bob')
+        calling = new Promise<{ status: number; body: string }>((resolve, reject) => {
+          req = request(
+            {
+              host: '127.0.0.1',
+              port: f.port,
+              path: '/api/probe/input-success',
+              headers: {
+                Host: f.config.origin.host,
+                Origin: f.config.origin.origin,
+                Cookie: session,
+                'X-Study-Account': f.sessions.get(session)!,
+              },
+            },
+            (res) => {
+              let body = ''
+              res.on('data', (chunk) => {
+                body += chunk
+              })
+              res.on('error', reject)
+              res.on('end', () => resolve({ status: res.statusCode!, body }))
+            },
+          )
+          req.on('error', reject)
+          req.end()
+        }).catch(() => undefined)
+        await entered.promise
+        if (disconnect) {
+          req!.destroy()
+        }
+        work.personal!.sources()
+        release.resolve()
+        const response = await calling
+        if (!disconnect) {
+          assert.equal(response!.status, 200)
+          assert.deepEqual(JSON.parse(response!.body), { value: 'resolved' })
+        }
+        await f.app.close()
+        assert.equal(work.lateRead, true)
+        assert.throws(() => work.personal!.sources(), /closed|not open/)
+      } finally {
+        release.resolve()
+        req?.destroy()
+        await calling
+        await f.close()
+      }
+    },
+  )
+}
+
+for (const invalid of [UnownedBodyModule, UnownedPipeModule, UnownedClassPipeModule]) {
+  test(`invalid unowned input composition ${invalid.name} is rejected before any request work`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'nest-unowned-input-'))
+    let runtime: ApplicationRuntime | undefined
+    try {
+      const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+      const capture = {
+        module: FailureModule,
+        providers: [
+          {
+            provide: 'CapturedRuntime',
+            inject: [ApplicationRuntime],
+            useFactory: (value: ApplicationRuntime) => {
+              runtime = value
+              return value
+            },
+          },
+        ],
+      }
+      await assert.rejects(
+        createApplication(config, [invalid, capture]),
+        /(StudyRequest.*(inputs|parameter-local)|parameter-local pipe instances)/,
+      )
+      assert.ok(runtime)
+      assert.throws(() => runtime!.sharedLibrary.sources(), /closed|not open/)
+      assert.throws(() => runtime!.authentication.legacyOwnerId('closed'), /closed|not open/)
+    } finally {
+      await runtime?.onModuleDestroy()
+      runtime?.onApplicationShutdown()
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+test('JSON body parameters outside the registered personal scope fail without reading the body', async () => {
+  const f = await fixture(undefined, [UnscopedBodyModule])
+  try {
+    const session = await f.login('bob')
+    const response = await f.authorized(
+      '/api/unscoped-body',
+      session,
+      'POST',
+      { 'Content-Type': 'application/json' },
+      '{',
+    )
+    assert.equal(response.status, 500)
+    assert.deepEqual(JSON.parse(response.body), {
+      error: 'The local operation failed. No partial import was saved.',
+    })
+  } finally {
+    await f.close()
+  }
+})
+
+test('cooperative input cancellation finishes its resource cleanup before the original sibling 400', async () => {
+  const f = await fixture()
+  try {
+    const entered = deferred()
+    const work = f.app.get(ProbeWork)
+    work.inputEntered = entered.resolve
+    work.beforeFailure = entered.promise
+    const session = await f.login('bob')
+    const response = await f.authorized('/api/probe/input-cooperative', session)
+    assert.equal(response.status, 400)
+    assert.deepEqual(JSON.parse(response.body), {
+      error: 'Synthetic parameter rejection.',
+      details: [],
+    })
+    assert.equal(work.cooperativeCleanup, true)
+    assert.equal(work.inputControllerCalls, 0)
+    assert.throws(() => work.personal!.sources(), /closed|not open/)
+  } finally {
+    await f.close()
+  }
+})
+
+test('global pipes are explicitly rejected through both the Nest provider and public factory APIs', async () => {
+  const { APP_PIPE } = await import('@nestjs/core')
+  const { Scope } = await import('@nestjs/common')
+  for (const scope of [Scope.DEFAULT, Scope.REQUEST]) {
+    const directory = mkdtempSync(join(tmpdir(), 'nest-global-pipe-'))
+    try {
+      const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+      const feature = {
+        module: FailureModule,
+        providers: [
+          {
+            provide: APP_PIPE,
+            scope,
+            useFactory: () => ({
+              transform(value: unknown) {
+                return value
+              },
+            }),
+          },
+        ],
+      }
+      await assert.rejects(
+        createApplication(config, [feature]),
+        /global and class pipes are not supported/,
+      )
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+  const f = await fixture()
+  try {
+    assert.throws(
+      () =>
+        f.app.useGlobalPipes({
+          transform(value: unknown) {
+            return value
+          },
+        }),
+      /global pipes are not supported/,
+    )
+    assert.equal((await f.call('/api/health')).status, 200)
+  } finally {
+    await f.close()
+  }
+})
+
+test('owned ordinary Nest custom parameters preserve data, metatype and ordered asynchronous instance pipes', async () => {
+  const f = await fixture()
+  try {
+    const session = await f.login('bob')
+    const response = await f.authorized('/api/probe/input-metadata', session)
+    assert.equal(response.status, 200)
+    assert.deepEqual(JSON.parse(response.body), {
+      value: 'selection',
+      data: 'selection',
+      type: 'custom',
+      metatype: 'String',
+      order: ['first', 'second'],
+    })
+  } finally {
+    await f.close()
   }
 })

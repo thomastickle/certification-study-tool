@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { NestFactory } from '@nestjs/core'
+import { DiscoveryService, NestFactory } from '@nestjs/core'
 import { SecurityExpressAdapter } from './security-express-adapter.ts'
 import type { NestExpressApplication } from '@nestjs/platform-express'
 import type { DynamicModule } from '@nestjs/common'
@@ -12,6 +12,7 @@ import { ApplicationAuthentication } from './auth/application-authentication.ts'
 import { SecurityRequestLifetime } from './security-lifetime.ts'
 import { securityFailure } from './security.filter.ts'
 import type { AdmittedRequest } from './security-context.ts'
+import { registerStudyInputs } from './study-input-registration.ts'
 import { ApplicationError } from './errors.ts'
 
 /** Create the staged Nest transport; production retains the complete legacy router until stage four.
@@ -31,6 +32,12 @@ export async function createApplication(
     await startup.closeFailedStartup()
     throw error
   })
+  try {
+    registerStudyInputs(app.get(DiscoveryService))
+  } catch (error) {
+    await app.close()
+    throw error
+  }
   const authentication = app.get(ApplicationAuthentication)
   const lifetime = app.get(SecurityRequestLifetime)
   app.get(ApplicationRuntime).attachTransport(() => lifetime.drain(app.getHttpServer() as Server))
@@ -84,7 +91,8 @@ export async function createApplication(
     const operation = initialize()
     starting.add(operation)
     try {
-      return await operation
+      await operation
+      return application
     } catch (error) {
       await closeApplication()
       throw error
@@ -118,8 +126,15 @@ export async function createApplication(
 
   // NestFactory returns its own proxy; assigning methods on it does not replace the target.
   // Keep failure ownership at this public factory boundary without changing Nest internals.
-  return new Proxy(app, {
+  const application = new Proxy(app, {
     get(target, property) {
+      if (property === 'useGlobalPipes') {
+        return () => {
+          throw new Error(
+            'Use parameter-local pipe instances on study inputs; global pipes are not supported.',
+          )
+        }
+      }
       if (property === 'init') {
         return initializeApplication
       }
@@ -129,7 +144,15 @@ export async function createApplication(
       if (property === 'close') {
         return closeApplication
       }
-      return Reflect.get(target, property)
+      const value = Reflect.get(target, property)
+      if (typeof value !== 'function') {
+        return value
+      }
+      return (...args: unknown[]) => {
+        const result = value(...args)
+        return result === app ? application : result
+      }
     },
   })
+  return application
 }

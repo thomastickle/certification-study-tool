@@ -1,4 +1,6 @@
 import {
+  Body,
+  createParamDecorator,
   Controller,
   Get,
   HttpCode,
@@ -8,6 +10,7 @@ import {
   Post,
   Res,
   UseGuards,
+  UsePipes,
 } from '@nestjs/common'
 import type { ServerResponse } from 'node:http'
 import {
@@ -39,6 +42,15 @@ export class ProbeWork {
   release: Promise<void> = Promise.resolve()
   personal: LibraryRepository | undefined
   bodyRead = 0
+  inputEntered: (() => void) | undefined
+  failureEntered: (() => void) | undefined
+  beforeFailure: Promise<void> = Promise.resolve()
+  inputRelease: Promise<void> = Promise.resolve()
+  lateRead = false
+  inputControllerCalls = 0
+  cooperativeCleanup = false
+  bodyEntered: (() => void) | undefined
+  bodyRequest?: import('../../src/server/security-context.ts').AdmittedRequest
 }
 
 /** Suspend a later guard to prove shutdown owns the gap before scope interception starts. */
@@ -51,6 +63,118 @@ export class ProbeSlowGuard {
     await this.work.release
     return true
   }
+}
+
+/** Deliberately use ordinary Nest custom factories, including an asynchronous instance pipe. */
+const PendingResource = createParamDecorator(
+  async (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
+    const request = context
+      .switchToHttp()
+      .getRequest<
+        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
+      >()
+    const work = request.inputProbe
+    work.personal = request.studyContext!.personal
+    work.inputEntered?.()
+    await work.inputRelease
+    work.personal.sources()
+    work.lateRead = true
+    return 'resolved'
+  },
+)
+
+const RejectSibling = createParamDecorator(
+  async (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
+    const request = context.switchToHttp().getRequest<{ inputProbe: ProbeWork }>()
+    await request.inputProbe.beforeFailure
+    request.inputProbe.failureEntered?.()
+    throw new ApplicationError('Synthetic parameter rejection.', 400)
+  },
+)
+
+const PipeResource = createParamDecorator(
+  (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
+    const request = context
+      .switchToHttp()
+      .getRequest<
+        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
+      >()
+    request.inputProbe.personal = request.studyContext!.personal
+    return request.inputProbe
+  },
+)
+
+const pendingResourcePipe = {
+  async transform(work: ProbeWork) {
+    work.inputEntered?.()
+    await work.inputRelease
+    work.personal!.sources()
+    work.lateRead = true
+    return 'transformed'
+  },
+}
+
+const CaptureBody = createParamDecorator(
+  (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
+    const request = context
+      .switchToHttp()
+      .getRequest<
+        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
+      >()
+    const work = request.inputProbe
+    work.personal = request.studyContext!.personal
+    work.bodyRequest = request
+    const read = request.read.bind(request)
+    request.read = (...args: Parameters<typeof read>) => {
+      work.bodyEntered?.()
+      return read(...args)
+    }
+    return null
+  },
+)
+
+const CooperativeResource = createParamDecorator(
+  (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
+    const request = context
+      .switchToHttp()
+      .getRequest<
+        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
+      >()
+    const work = request.inputProbe
+    work.personal = request.studyContext!.personal
+    return new Promise((resolve) => {
+      request.studyContext!.inputSignal.addEventListener(
+        'abort',
+        () => {
+          work.personal!.sources()
+          work.cooperativeCleanup = true
+          resolve('cancelled')
+        },
+        { once: true },
+      )
+      work.inputEntered?.()
+    })
+  },
+)
+
+const ParameterValue = createParamDecorator((data: string) => data)
+
+const parameterMetadataPipe = {
+  transform(value: unknown, metadata: import('@nestjs/common').ArgumentMetadata) {
+    return {
+      value,
+      data: metadata.data,
+      type: metadata.type,
+      metatype: metadata.metatype?.name,
+      order: ['first'],
+    }
+  },
+}
+
+const secondParameterPipe = {
+  async transform(value: { order: string[] }) {
+    return { ...value, order: [...value.order, 'second'] }
+  },
 }
 
 /** Test-only controllers exercise the public stage-four API on real compiled Nest routing. */
@@ -119,6 +243,50 @@ export class ProbeController {
     return { ok: true }
   }
 
+  @Get('input-factory')
+  inputFactory(@PendingResource() _pending: unknown, @RejectSibling() _failure: unknown) {
+    this.work.inputControllerCalls++
+    return 'must not execute'
+  }
+
+  @Get('input-pipe')
+  inputPipe(
+    @PipeResource(pendingResourcePipe) _pending: unknown,
+    @RejectSibling() _failure: unknown,
+  ) {
+    this.work.inputControllerCalls++
+    return 'must not execute'
+  }
+
+  @Post('input-body')
+  inputBody(
+    @JsonObjectBody() _body: Record<string, unknown>,
+    @RejectSibling() _failure: unknown,
+    @CaptureBody() _capture: unknown,
+    @StudyContext() context: StudyRequestContext,
+  ) {
+    this.work.personal = context.personal
+    this.work.inputControllerCalls++
+    return 'must not execute'
+  }
+
+  @Get('input-cooperative')
+  cooperative(@CooperativeResource() _pending: unknown, @RejectSibling() _failure: unknown) {
+    this.work.inputControllerCalls++
+    return 'must not execute'
+  }
+
+  @Get('input-metadata')
+  metadata(@ParameterValue('selection', parameterMetadataPipe, secondParameterPipe) value: string) {
+    return value
+  }
+
+  @Get('input-success')
+  inputSuccess(@PendingResource() value: unknown) {
+    this.work.inputControllerCalls++
+    return { value }
+  }
+
   @Get('guard-wait')
   @UseGuards(ProbeSlowGuard)
   guarded(@StudyContext() context: StudyRequestContext) {
@@ -177,3 +345,62 @@ export class ProbeModule {}
 
 @Module({})
 export class FailureModule {}
+
+@Controller('api/unowned-input')
+@StudyRequest()
+export class UnownedBodyController {
+  @Post()
+  read(@Body() value: unknown) {
+    return value
+  }
+}
+
+@Controller('api/unowned-pipe')
+@StudyRequest()
+export class UnownedPipeController {
+  @Get()
+  @UsePipes({
+    transform(value: unknown) {
+      return value
+    },
+  })
+  read(@StudyContext() context: StudyRequestContext) {
+    return context.actor.id
+  }
+}
+
+@Controller('api/unscoped-body')
+export class UnscopedBodyController {
+  @Post()
+  read(@JsonObjectBody() value: unknown) {
+    return value
+  }
+}
+
+@Module({ controllers: [UnownedBodyController] })
+export class UnownedBodyModule {}
+
+@Module({ controllers: [UnownedPipeController] })
+export class UnownedPipeModule {}
+
+@Module({ controllers: [UnscopedBodyController] })
+export class UnscopedBodyModule {}
+
+@Injectable()
+class UnownedClassPipe {
+  transform(value: unknown) {
+    return value
+  }
+}
+
+@Controller('api/unowned-class-pipe')
+@StudyRequest()
+class UnownedClassPipeController {
+  @Get()
+  read(@StudyContext(UnownedClassPipe) context: StudyRequestContext) {
+    return context.actor.id
+  }
+}
+
+@Module({ controllers: [UnownedClassPipeController] })
+export class UnownedClassPipeModule {}
