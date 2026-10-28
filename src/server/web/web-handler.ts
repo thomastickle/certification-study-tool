@@ -38,11 +38,13 @@ export function staticWebHandler(root: string): RoutedHttpHandler {
     },
   })
   return (request, response, url) => {
-    const notFound = () => {
+    const notFound = (error?: unknown) => {
       if (response.destroyed || response.writableEnded) {
         return
       }
-      if (response.headersSent) {
+      // A failed read may already have a file Content-Length before headers flush.
+      // Abort it rather than frame a short error body with that stale length.
+      if (response.headersSent || (error && response.hasHeader('Content-Length'))) {
         response.destroy()
         return
       }

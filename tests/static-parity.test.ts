@@ -14,6 +14,7 @@ test('static policy preserves MIME, fallback, symlinks and unconditional full re
   mkdirSync(join(root, 'folder'))
   writeFileSync(join(directory, 'outside'), 'owned outside fixture')
   symlinkSync(join(directory, 'outside'), join(root, 'link'))
+  symlinkSync('cycle.js', join(root, 'cycle.js'))
   const files = {
     'index.html': ['shell', 'text/html'],
     'asset.js': ['javascript', 'text/javascript'],
@@ -66,7 +67,14 @@ test('static policy preserves MIME, fallback, symlinks and unconditional full re
         assert.equal(response.headers.get('content-range'), null)
       }
     }
-    for (const path of ['/folder', '/folder/', '/missing.json', '/%ZZ', '/..%2Foutside']) {
+    for (const path of [
+      '/folder',
+      '/folder/',
+      '/missing.json',
+      '/cycle.js',
+      '/%ZZ',
+      '/..%2Foutside',
+    ]) {
       const response = await fetch(origin + path)
       assert.equal(response.status, 404, path)
       assert.equal(await response.text(), 'Not found.')
@@ -80,38 +88,54 @@ test('static policy preserves MIME, fallback, symlinks and unconditional full re
   }
 })
 
-test('standard static streaming closes its file after an error following headers', async () => {
-  const { createRequire } = await import('node:module')
-  const { mock } = await import('node:test')
-  const fs = createRequire(import.meta.url)('node:fs') as typeof import('node:fs')
-  const directory = mkdtempSync(join(tmpdir(), 'study-static-error-'))
-  const file = join(directory, 'large.js')
-  writeFileSync(file, Buffer.alloc(1024 * 1024, 120))
-  const original = fs.createReadStream
-  let closed!: Promise<unknown>
-  const mocked = mock.method(fs, 'createReadStream', (...args: Parameters<typeof original>) => {
-    const stream = original(...args)
-    closed = new Promise<void>((resolve) => stream.once('close', resolve))
-    stream.once('data', () =>
-      queueMicrotask(() => stream.destroy(new Error('synthetic read failure'))),
-    )
-    return stream
+for (const failureAt of ['open', 'data']) {
+  test(`standard static streaming closes its file after an error at ${failureAt}`, async () => {
+    const { createRequire } = await import('node:module')
+    const { mock } = await import('node:test')
+    const fs = createRequire(import.meta.url)('node:fs') as typeof import('node:fs')
+    const directory = mkdtempSync(join(tmpdir(), 'study-static-error-'))
+    const file = join(directory, 'large.js')
+    writeFileSync(file, Buffer.alloc(1024 * 1024, 120))
+    const original = fs.createReadStream
+    let closed!: Promise<unknown>
+    const mocked = mock.method(fs, 'createReadStream', (...args: Parameters<typeof original>) => {
+      const stream = original(...args)
+      closed = new Promise<void>((resolve) => stream.once('close', resolve))
+      stream.once(failureAt, () =>
+        queueMicrotask(() => stream.destroy(new Error('synthetic read failure'))),
+      )
+      return stream
+    })
+    const web = staticWebHandler(directory)
+    const server = createServer((request, response) => {
+      void web(request, response, { pathname: '/large.js', search: '' })
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    assert.ok(address && typeof address !== 'string')
+    try {
+      const signal = AbortSignal.timeout(2000)
+      if (failureAt === 'open') {
+        await assert.rejects(async () => {
+          const response = await fetch(`http://127.0.0.1:${address.port}/`, { signal })
+          await response.text()
+        })
+        assert.equal(
+          signal.aborted,
+          false,
+          'Read failure must terminate the response, not wait for a client timeout',
+        )
+      } else {
+        const response = await fetch(`http://127.0.0.1:${address.port}/`, { signal })
+        assert.equal(response.status, 200)
+        await assert.rejects(response.text())
+        assert.equal(signal.aborted, false)
+      }
+      await closed
+    } finally {
+      mocked.mock.restore()
+      await closeServer(server)
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
-  const web = staticWebHandler(directory)
-  const server = createServer((request, response) => {
-    void web(request, response, { pathname: '/large.js', search: '' })
-  })
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  try {
-    const response = await fetch(`http://127.0.0.1:${address.port}/`)
-    assert.equal(response.status, 200)
-    await assert.rejects(response.text())
-    await closed
-  } finally {
-    mocked.mock.restore()
-    await closeServer(server)
-    rmSync(directory, { recursive: true, force: true })
-  }
-})
+}
