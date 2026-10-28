@@ -15,7 +15,6 @@ let debounceTimer: NodeJS.Timeout | undefined
 const changeWaiters = new Set<() => void>()
 const debounceWaiters = new Set<() => void>()
 const watchers: FSWatcher[] = []
-const rootFileWatchers = new Map<string, FSWatcher>()
 
 /** Build serially and run one server generation at a time. */
 async function runDevelopment(): Promise<void> {
@@ -128,12 +127,6 @@ function requestRestart(): void {
   }, 100)
 }
 
-/** Follow editor saves that replace a root configuration file with a new inode. */
-function watchRootFile(fileName: string): void {
-  rootFileWatchers.get(fileName)?.close()
-  rootFileWatchers.set(fileName, watch(fileName, requestRestart))
-}
-
 for (const directory of watchedDirectories) {
   watchers.push(
     watch(directory, { recursive: true }, (_event, filename) => {
@@ -144,18 +137,15 @@ for (const directory of watchedDirectories) {
   )
 }
 
+// The directory watch covers both in-place edits and replacement gaps without binding an inode.
 watchers.push(
   watch('.', (_event, filename) => {
     const changedFile = filename?.toString()
     if (changedFile && watchedRootFiles.has(changedFile)) {
       requestRestart()
-      watchRootFile(changedFile)
     }
   }),
 )
-for (const fileName of watchedRootFiles) {
-  watchRootFile(fileName)
-}
 
 /** Close every watcher and stop the server; allow an active compiler to finish. */
 function stop(signal: NodeJS.Signals): void {
@@ -176,9 +166,6 @@ function stop(signal: NodeJS.Signals): void {
   debounceWaiters.clear()
 
   for (const watcher of watchers) {
-    watcher.close()
-  }
-  for (const watcher of rootFileWatchers.values()) {
     watcher.close()
   }
 

@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
   renameSync,
+  unlinkSync,
 } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -344,6 +345,36 @@ test(
       const result = await Promise.race([fixture.exit, delay(8000).then(() => undefined)])
       assert.deepEqual(result, { code: 0, signal: null })
       await waitForGroupToExit(groupId)
+    } finally {
+      await cleanup(fixture)
+    }
+  },
+)
+
+test(
+  'development survives a root config deletion gap and rebuilds after recreation',
+  { skip: !linuxOnly },
+  async () => {
+    const fixture = await createFixture()
+    try {
+      await waitFor(fixture, () => healthIsReady(fixture.port), 'Initial server')
+      const config = join(fixture.directory, 'tsconfig.server.json')
+      const original = readFileSync(config)
+      const starts = countMatches(fixture.output(), /Certification Study Tool:/g)
+      unlinkSync(config)
+      await waitFor(
+        fixture,
+        () => fixture.output().includes('Server build exited with status'),
+        'Missing config build',
+      )
+      assert.equal(fixture.child.exitCode, null)
+      writeFileSync(config, original)
+      await waitFor(
+        fixture,
+        () => countMatches(fixture.output(), /Certification Study Tool:/g) > starts,
+        'Recreated config restart',
+      )
+      assert.equal(await healthIsReady(fixture.port), true)
     } finally {
       await cleanup(fixture)
     }
