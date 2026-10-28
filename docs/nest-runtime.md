@@ -1,4 +1,4 @@
-# Stage two runtime boundary
+# Staged Nest runtime boundary
 
 Production creates one `RuntimeModule.register(configuration)` application context.
 The complete existing router remains in `startLegacyTransport`; the foundation
@@ -12,14 +12,15 @@ No default configuration is registered at import time.
 
 ## Provider interfaces for controller work
 
-Import the same configured `RuntimeModule` instance through the application root;
+The configured `RuntimeModule` exports its providers globally through the application root;
 do not register it independently in each feature module. It exports:
 
 - `RUNTIME_CONFIGURATION`: resolved `RuntimeConfiguration`, including origin,
   listener, shared/private paths, authentication options, legacy subject, production
   mode and static root.
 - `ApplicationAuthentication`: the singleton verified-session/OIDC/accounts owner.
-  Its existing `handle` result supplies the verified `SessionUser` to the router.
+  Its transitional `handle` result supplies the verified `SessionUser` to the legacy router.
+  The staged Nest transport calls its admission/session/workflow methods directly.
 - `SHARED_LIBRARY_REPOSITORY`: the singleton shared `LibraryRepository`. Consumers
   borrow it; they must never close it or substitute a private root.
 - `ImportPreviews`, `PrivateLibraries`, and `StudyHousekeeping`: the same singleton
@@ -104,9 +105,9 @@ keep those regression tests when upgrading Vite.
 These methods are idempotent; aliases have no competing disposal responsibility.
 Nest 12 reports hook exceptions and continues its remaining shutdown phases.
 
-When HTTP moves to Nest, remove the legacy transport attachment rather than moving
-root disposal into `onModuleDestroy`. Keep body parsing after authorization and
-retain the request scope until its asynchronous handler/interceptor chain settles.
+When HTTP moves to Nest, replace the legacy transport attachment with the Nest
+request-lifetime drain rather than moving root disposal into `onModuleDestroy`.
+Keep body parsing after authorization and retain the request scope until its asynchronous handler/interceptor chain settles.
 The current entry point installs both signal listeners during startup, shares one
 shutdown promise, waits for in-progress initialization, removes its listeners after
 closure, and exits through normal event-loop drainage.
@@ -131,3 +132,12 @@ restoration, and no post-close events. Controlled real filesystem completions
 exercise both the metadata-only case and native reopening, with unmodified Vite as
 a positive leak control. The Nest regression also verifies SQLite root closure.
 Recheck this dependency-specific boundary when upgrading Vite/Chokidar.
+
+## Stage three controller handoff
+
+See [the HTTP boundary handoff](nest-http-boundary.md) for the compiled Nest app
+factory, security controllers/guard metadata, normalized input decorators,
+after-guard body parsing, personal/shared context and request lifetime API.
+Production still uses the complete legacy router. The staged Nest app is tested
+through real OIDC/HTTP but has no product feature controllers or SPA transport;
+atomic routing cutover remains stage four.

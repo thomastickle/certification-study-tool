@@ -72,7 +72,7 @@ export class ApplicationRuntime {
     }
   }
 
-  /** Register the intermediate legacy transport before its fallible web initialization/listen. */
+  /** Attach the selected transport drain before its fallible initialization/listen. */
   attachTransport(drain: () => Promise<void>): void {
     if (this.transport || this.stopping) {
       throw new Error('The runtime transport is already attached or stopping.')
@@ -90,7 +90,7 @@ export class ApplicationRuntime {
     return this.stopping
   }
 
-  /** Drain the legacy transport before Nest disposal; later Nest HTTP needs no attached callback. */
+  /** Drain attached work before Nest HTTP disposal; account/shared roots remain usable until it settles. */
   beforeApplicationShutdown(): Promise<void> {
     this.draining ??= this.drainTransport()
     return this.draining

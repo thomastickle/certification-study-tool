@@ -1,7 +1,8 @@
 import { Controller, Get } from '@nestjs/common'
+import { PublicMethod } from './security-context.ts'
 import { HealthService } from './health.service.ts'
 
-/** Minimal reusable HTTP boundary for the staged Nest application. */
+/** Public, method-specific liveness boundary for the staged Nest application. */
 @Controller('api/health')
 export class HealthController {
   private readonly healthService: HealthService
@@ -12,6 +13,7 @@ export class HealthController {
 
   /** Resolve liveness through Nest's injected service. */
   @Get()
+  @PublicMethod('GET')
   health() {
     return this.healthService.health()
   }

@@ -17,7 +17,10 @@ test('compiled Nest decorators serve health through DI and close the listening a
     await app.listen(0, '127.0.0.1')
     const address = server.address()
     assert.ok(address && typeof address !== 'string')
-    const response = await fetch(`http://127.0.0.1:${address.port}/api/health`)
+    configuration.origin.port = String(address.port)
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/health`, {
+      headers: { Host: configuration.origin.host },
+    })
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { status: 'ok' })
 
@@ -25,7 +28,15 @@ test('compiled Nest decorators serve health through DI and close the listening a
     const status = await new Promise<number | undefined>((done, reject) => {
       const req = request(
         `http://127.0.0.1:${address.port}/api/health`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': 1 } },
+        {
+          method: 'POST',
+          headers: {
+            Host: configuration.origin.host,
+            Origin: configuration.origin.origin,
+            'Content-Type': 'application/json',
+            'Content-Length': 1,
+          },
+        },
         (response) => {
           response.resume()
           response.on('end', () => done(response.statusCode))
@@ -34,7 +45,7 @@ test('compiled Nest decorators serve health through DI and close the listening a
       req.on('error', reject)
       req.end('{')
     })
-    assert.equal(status, 404, 'The foundation must leave JSON parsing to later authorized routes')
+    assert.equal(status, 401, 'Security must deny anonymous APIs before JSON parsing')
   } finally {
     await app.close()
     rmSync(directory, { recursive: true, force: true })
