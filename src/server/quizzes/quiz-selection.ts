@@ -5,7 +5,7 @@ import type { Source } from '../../shared/contracts.ts'
 import type { ReviewedConcept } from '../concepts/concept-repository.ts'
 import { preferVariation } from '../concepts/concept-variations.ts'
 import { currentQuestionIdentity } from './question-identity.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import { domainQuotas, examDomain, examDomainQuotas } from './domain-mapping.ts'
 
 export function shuffled<T>(values: readonly T[], random = Math.random): T[] {

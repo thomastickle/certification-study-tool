@@ -1,4 +1,4 @@
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { LibraryHttpModule } from '../../src/server/library-http/library-http.module.ts'
 import { StudyHttpModule } from '../../src/server/study-http/study.module.ts'
 import { fixture as libraryFixture } from './study-http-fixture.ts'

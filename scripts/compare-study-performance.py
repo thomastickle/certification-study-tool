@@ -64,7 +64,12 @@ def main():
             destination = source / 'tests' / name
             originals[f'tests/{name}'] = destination.read_text() if destination.exists() else None
             snapshot = name + '.fixture' if name == 'foreground-benchmark-legacy-worker.ts' else name
-            destination.write_bytes((repository / 'tests' / snapshot).read_bytes())
+            content = (repository / 'tests' / snapshot).read_text()
+            # Adapt only common-harness imports to the archived revision's layout.
+            # Record these exact bytes in the measured patch and reconstruction manifest.
+            if not (source / 'src/server/runtime').is_dir():
+                content = content.replace('server/runtime/', 'server/')
+            destination.write_text(content)
         if nest:
             config_path = source / 'tsconfig.server.json'
             originals['tsconfig.server.json'] = config_path.read_text()

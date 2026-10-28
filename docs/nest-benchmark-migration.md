@@ -92,3 +92,8 @@ umask 077
 For reconstruction correctness only use `--profiles small --repetitions 1`.
 Shared-host smoke times are not comparative evidence. Final timing, CI,
 independent review, integration and readiness belong to the parent.
+
+The comparison script detects the archived runtime directory before overlaying the
+common worker. For flat revisions it rewrites only `server/runtime/` imports to
+`server/`. The measured patch and SHA-256 reconstruction manifests record the
+adapted bytes. The legacy worker fixture and pinned timing evidence stay unchanged.

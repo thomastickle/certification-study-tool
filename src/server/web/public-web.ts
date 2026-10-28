@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { resolve } from 'node:path'
-import { securityFailure } from './security.filter.ts'
-import type { AdmittedRequest } from './security-context.ts'
+import { securityFailure } from '../security/security.filter.ts'
+import type { AdmittedRequest } from '../security/security-context.ts'
 import { DevelopmentVite } from './development-vite.ts'
-import type { RuntimeConfiguration } from './runtime-configuration.ts'
-import type { RequestUrl } from './request-url.ts'
+import type { RuntimeConfiguration } from '../runtime/runtime-configuration.ts'
+import type { RequestUrl } from '../http/request-url.ts'
 import { developmentWebHandler, staticWebHandler } from './web-handler.ts'
 
 /** Own public assets and Vite before any fallible initialization hook runs. */

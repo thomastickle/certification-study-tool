@@ -1,8 +1,8 @@
 import { Catch, Inject, NotFoundException } from '@nestjs/common'
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
 import type { ServerResponse } from 'node:http'
-import { ApplicationError } from './errors.ts'
-import { WorkspaceChangedError } from './auth/application-authentication.ts'
+import { ApplicationError } from '../http/errors.ts'
+import { WorkspaceChangedError } from '../auth/application-authentication.ts'
 import type { AdmittedRequest } from './security-context.ts'
 import { SecurityGuard } from './security.guard.ts'
 

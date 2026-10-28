@@ -1,7 +1,7 @@
-import type { SessionUser } from '../shared/auth-contracts.ts'
-import type { LibraryRepository } from './questions/library-repository.ts'
-import type { PrivateLibraries } from './questions/private-libraries.ts'
-import type { StudyHousekeeping } from './questions/study-housekeeping.ts'
+import type { SessionUser } from '../../shared/auth-contracts.ts'
+import type { LibraryRepository } from '../questions/library-repository.ts'
+import type { PrivateLibraries } from '../questions/private-libraries.ts'
+import type { StudyHousekeeping } from '../questions/study-housekeeping.ts'
 
 /** Own personal connections for the full asynchronous operation, independently of HTTP response life. */
 export class StudyLibraryScope {

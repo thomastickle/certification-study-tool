@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import type { ViteDevServer, FSWatcher } from 'vite'
 import { createProductionApplication } from '../../src/server/production-application.ts'
 import { observeRuntime } from './runtime-observation.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 type CapturedVite = { server?: ViteDevServer; watcher?: FSWatcher & { closed: boolean } }
 
@@ -169,7 +169,7 @@ test('rejected environment factories release the watcher even before init can re
 
 test('public-file failure removes HMR listeners before environment/watch ownership is exposed', async () => {
   const { createServer } = await import('node:http')
-  const { DevelopmentVite } = await import('../../src/server/development-vite.ts')
+  const { DevelopmentVite } = await import('../../src/server/web/development-vite.ts')
   const directory = mkdtempSync(join(tmpdir(), 'study-vite-public-files-'))
   const previousDirectory = process.cwd()
   writeFileSync(join(directory, 'not-directory'), 'fixture')
@@ -202,7 +202,7 @@ test('public-file failure removes HMR listeners before environment/watch ownersh
 test('successful Vite initialization retains config-file watching and restart outside the web root', async () => {
   const { createServer } = await import('node:http')
   const { mkdirSync } = await import('node:fs')
-  const { DevelopmentVite } = await import('../../src/server/development-vite.ts')
+  const { DevelopmentVite } = await import('../../src/server/web/development-vite.ts')
   const directory = mkdtempSync(join(tmpdir(), 'study-vite-config-watch-'))
   const previousDirectory = process.cwd()
   mkdirSync(join(directory, 'web'))

@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { runtimeConfiguration } from './runtime-configuration.ts'
+import { runtimeConfiguration } from './runtime/runtime-configuration.ts'
 import { createProductionApplication } from './production-application.ts'
 
 const configuration = runtimeConfiguration(process.env)

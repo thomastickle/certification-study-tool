@@ -1,5 +1,21 @@
 # Staged Nest runtime boundary
 
+Nest transport layout follows feature ownership. Only `main.ts`, `application.ts`,
+`application.module.ts`, and `production-application.ts` remain at `src/server/`:
+
+- `runtime/` owns configuration, startup acquisition/unwind, runtime aliases and study scope.
+- `security/` owns admission, global guards/filter/interceptor and joined request input/lifetime.
+- `auth/` owns authentication/session controllers and workflows; its module borrows the
+  runtime-owned authentication singleton. `health/` owns its controller and service.
+- `library-http/` and `study-http/` keep controllers, route guards and private feature
+  helpers next to modules that contain registration only.
+- `web/` owns static/Vite serving and watcher lifetime; `http/` contains framework-free
+  request/body/routing helpers and application errors.
+
+The global runtime is registered once. Auth and health modules are composed by the
+application module; security keeps its existing global provider order. Domain
+repositories and services retain their existing directories and ownership.
+
 Production `main.ts` calls `createProductionApplication(configuration)` from
 `production-application.ts`. It composes `LibraryHttpModule`, `StudyHttpModule`,
 security controllers/guards and `PublicWeb` through one configured RuntimeModule.

@@ -3,7 +3,7 @@ import type { StudyRepository } from '../questions/study-library.ts'
 import { certificationReadiness, emptyReadiness } from './readiness.ts'
 import { masteryHistory } from '../quizzes/mastery-history.ts'
 import { studyDay } from '../quizzes/mastery.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import { certificationScope, isClf } from '../quizzes/certification-scope.ts'
 import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
 

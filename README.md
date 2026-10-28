@@ -299,3 +299,5 @@ also remembered locally. `src/web/app/themes/base.css` owns shared semantic colo
 tokens and the Blue palette; each other palette has its own CSS override file in
 the same folder. Component styles consume these variables. Native CSS handles
 theme switching; Vite builds the CSS without a Sass dependency.
+
+See [the maintained Nest layout](docs/architecture.md) for feature module and runtime ownership.

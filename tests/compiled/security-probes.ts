@@ -21,18 +21,18 @@ import {
   StudyContext,
   StudyRequest,
   VerifiedActor,
-} from '../../src/server/security-context.ts'
-import type { StudyRequestContext } from '../../src/server/security-context.ts'
+} from '../../src/server/security/security-context.ts'
+import type { StudyRequestContext } from '../../src/server/security/security-context.ts'
 import type { SessionUser } from '../../src/shared/auth-contracts.ts'
-import type { RequestUrl } from '../../src/server/request-url.ts'
+import type { RequestUrl } from '../../src/server/http/request-url.ts'
 import { ImportService } from '../../src/server/importer/import-service.ts'
-import { ApplicationError } from '../../src/server/errors.ts'
-import { ApplicationRuntime } from '../../src/server/application-runtime.ts'
+import { ApplicationError } from '../../src/server/http/errors.ts'
+import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
-import { RUNTIME_CONFIGURATION } from '../../src/server/runtime-configuration.ts'
-import type { RuntimeConfiguration } from '../../src/server/runtime-configuration.ts'
-import { StudyLibraryScope } from '../../src/server/study-library-scope.ts'
-import { SHARED_LIBRARY_REPOSITORY } from '../../src/server/runtime.module.ts'
+import { RUNTIME_CONFIGURATION } from '../../src/server/runtime/runtime-configuration.ts'
+import type { RuntimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
+import { StudyLibraryScope } from '../../src/server/runtime/study-library-scope.ts'
+import { SHARED_LIBRARY_REPOSITORY } from '../../src/server/runtime/runtime.module.ts'
 import { LibraryRepository } from '../../src/server/questions/library-repository.ts'
 
 /** Per-app controls; never replace production providers or keep global test overrides. */
@@ -42,7 +42,7 @@ export class ProbeWork {
   release: Promise<void> = Promise.resolve()
   personal: LibraryRepository | undefined
   bodyRead = 0
-  guardRequest?: import('../../src/server/security-context.ts').AdmittedRequest
+  guardRequest?: import('../../src/server/security/security-context.ts').AdmittedRequest
   guardClosed: (() => void) | undefined
   inputEntered: (() => void) | undefined
   failureEntered: (() => void) | undefined
@@ -52,7 +52,7 @@ export class ProbeWork {
   inputControllerCalls = 0
   cooperativeCleanup = false
   bodyEntered: (() => void) | undefined
-  bodyRequest?: import('../../src/server/security-context.ts').AdmittedRequest
+  bodyRequest?: import('../../src/server/security/security-context.ts').AdmittedRequest
 }
 
 /** Suspend a later guard to prove shutdown owns the gap before scope interception starts. */
@@ -77,11 +77,11 @@ export class ProbeSlowGuard {
 /** Deliberately use ordinary Nest custom factories, including an asynchronous instance pipe. */
 const PendingResource = createParamDecorator(
   async (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context
-      .switchToHttp()
-      .getRequest<
-        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
-      >()
+    const request = context.switchToHttp().getRequest<
+      import('../../src/server/security/security-context.ts').AdmittedRequest & {
+        inputProbe: ProbeWork
+      }
+    >()
     const work = request.inputProbe
     work.personal = request.studyContext!.personal
     work.inputEntered?.()
@@ -103,11 +103,11 @@ const RejectSibling = createParamDecorator(
 
 const PipeResource = createParamDecorator(
   (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context
-      .switchToHttp()
-      .getRequest<
-        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
-      >()
+    const request = context.switchToHttp().getRequest<
+      import('../../src/server/security/security-context.ts').AdmittedRequest & {
+        inputProbe: ProbeWork
+      }
+    >()
     request.inputProbe.personal = request.studyContext!.personal
     return request.inputProbe
   },
@@ -125,11 +125,11 @@ const pendingResourcePipe = {
 
 const CaptureBody = createParamDecorator(
   (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context
-      .switchToHttp()
-      .getRequest<
-        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
-      >()
+    const request = context.switchToHttp().getRequest<
+      import('../../src/server/security/security-context.ts').AdmittedRequest & {
+        inputProbe: ProbeWork
+      }
+    >()
     const work = request.inputProbe
     work.personal = request.studyContext!.personal
     work.bodyRequest = request
@@ -144,11 +144,11 @@ const CaptureBody = createParamDecorator(
 
 const CooperativeResource = createParamDecorator(
   (_data: unknown, context: import('@nestjs/common').ExecutionContext) => {
-    const request = context
-      .switchToHttp()
-      .getRequest<
-        import('../../src/server/security-context.ts').AdmittedRequest & { inputProbe: ProbeWork }
-      >()
+    const request = context.switchToHttp().getRequest<
+      import('../../src/server/security/security-context.ts').AdmittedRequest & {
+        inputProbe: ProbeWork
+      }
+    >()
     const work = request.inputProbe
     work.personal = request.studyContext!.personal
     return new Promise((resolve) => {

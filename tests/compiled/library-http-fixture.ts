@@ -6,7 +6,7 @@ import { request } from 'node:http'
 import type { Server } from 'node:http'
 import { createApplication } from '../../src/server/application.ts'
 import { oidcFixture, closeServer } from '../oidc-fixture.ts'
-import { runtimeConfiguration } from '../../src/server/runtime-configuration.ts'
+import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
 
 /** Exercise admission with raw targets; fetch would normalize away the attack. */
 export async function libraryFixture(

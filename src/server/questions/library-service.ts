@@ -1,4 +1,4 @@
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import type { LibraryView } from './library-repository.ts'
 import { privateItemId } from '../../shared/library-identity.ts'
 import type { LibraryVisibility } from '../../shared/contracts.ts'
