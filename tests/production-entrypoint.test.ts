@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { oidcFixture, closeServer } from './oidc-fixture.ts'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -16,6 +16,11 @@ for (const production of [true, false]) {
     { timeout: 20000 },
     async () => {
       const directory = mkdtempSync(join(tmpdir(), 'nest-main-'))
+      const shell = '<!doctype html><title>Owned production shell</title>'
+      if (production) {
+        mkdirSync(join(directory, 'dist'))
+        writeFileSync(join(directory, 'dist', 'index.html'), shell)
+      }
       const provider = await oidcFixture()
       const shared = new LibraryRepository(join(directory, 'library.sqlite3'))
       populate(shared, 12)
@@ -27,7 +32,8 @@ for (const production of [true, false]) {
       const port = address.port
       await closeServer(probe)
       const origin = `http://127.0.0.1:${port}`
-      const child = spawn(process.execPath, ['build/src/server/main.js'], {
+      const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
+        cwd: production ? directory : process.cwd(),
         env: {
           ...process.env,
           NODE_ENV: production ? 'production' : 'development',
@@ -97,7 +103,11 @@ for (const production of [true, false]) {
         })
         assert.equal(submitted.status, 200)
         assert.equal((await fetch(path, { method: 'DELETE', headers })).status, 200)
-        assert.equal((await fetch(origin + '/study')).status, 200)
+        const served = await fetch(origin + '/study')
+        assert.equal(served.status, 200)
+        if (production) {
+          assert.equal(await served.text(), shell)
+        }
         if (!production) {
           const client = await fetch(origin + '/@vite/client')
           assert.equal(client.status, 200)
@@ -138,8 +148,6 @@ test(
   'early repeated signals wait for acquired Vite initialization without listening',
   { timeout: 15000 },
   async () => {
-    const { writeFileSync } = await import('node:fs')
-    const { resolve } = await import('node:path')
     const directory = mkdtempSync(join(tmpdir(), 'nest-main-early-'))
     writeFileSync(join(directory, 'index.html'), '<title>fixture</title>')
     writeFileSync(
@@ -205,14 +213,17 @@ for (const missingStatic of [true, false]) {
     `main startup failure drains naturally (missingStatic=${missingStatic})`,
     { timeout: 15000 },
     async () => {
-      const { resolve } = await import('node:path')
       const directory = mkdtempSync(join(tmpdir(), 'nest-main-failure-'))
+      if (!missingStatic) {
+        mkdirSync(join(directory, 'dist'))
+        writeFileSync(join(directory, 'dist', 'index.html'), '<title>Owned failure fixture</title>')
+      }
       const occupied = createServer()
       await new Promise<void>((resolve) => occupied.listen(0, '127.0.0.1', resolve))
       const address = occupied.address()
       assert.ok(address && typeof address !== 'string')
       const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
-        cwd: missingStatic ? directory : process.cwd(),
+        cwd: directory,
         env: {
           ...process.env,
           NODE_ENV: 'production',
