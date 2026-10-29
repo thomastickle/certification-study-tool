@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -7,8 +8,8 @@ import { LibraryService } from '../src/server/questions/library-service.ts'
 import { bank } from './fixtures.ts'
 
 test('practice keeps colliding shared and private bank IDs distinct', () => {
-  const shared = new LibraryRepository(':memory:')
-  const privateLibrary = new LibraryRepository(':memory:')
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const privateLibrary = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const [library, label] of [
       [shared, 'shared'],
@@ -53,8 +54,8 @@ test('practice keeps colliding shared and private bank IDs distinct', () => {
 })
 
 test('private and shared deletions retain exact provenance in the owner’s saved attempts', () => {
-  const shared = new LibraryRepository(':memory:')
-  const personal = new LibraryRepository(':memory:')
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const personal = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const [library, key] of [
       [shared, 'shared-bank'],

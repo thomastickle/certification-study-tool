@@ -9,6 +9,11 @@ import type { FixtureInfo, Workload } from './foreground-benchmark-worker.ts'
 import { summarize } from './performance-metrics.ts'
 import { benchmarkWorkerLifetime } from './benchmark-worker-lifetime.ts'
 
+const legacyTransport = process.env.STUDY_BENCHMARK_TRANSPORT === 'legacy'
+const workerPath = legacyTransport
+  ? './foreground-benchmark-legacy-worker.ts'
+  : '../build/tests/foreground-benchmark-worker.js'
+
 const profiles: Record<string, Workload> = {
   small: { owners: 10, histories: 10, questions: 48, backlog: 1 },
   bank: { owners: 10, histories: 100, questions: 1000, backlog: 25 },
@@ -33,6 +38,9 @@ console.log(
       freeMemory: freemem(),
       loadAverage: loadavg(),
     },
+    transport: legacyTransport
+      ? 'legacy-manual-dispatch/session-bypass/native'
+      : 'nest-session/compiled/manual-upkeep',
     workloadVersion: 'study-history-v2-answered',
     selected,
     workload,
@@ -44,7 +52,7 @@ console.log(
 // Repetitions are sequential, with fresh synthetic files and OS-selected loopback ports.
 for (let repetition = 1; repetition <= repetitions; repetition++) {
   const worker = fork(
-    fileURLToPath(new URL('./foreground-benchmark-worker.ts', import.meta.url)),
+    fileURLToPath(new URL(workerPath, import.meta.url)),
     [JSON.stringify(workload)],
     {
       stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
@@ -108,7 +116,14 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
       const response = await fetch(fixture.origin + path, {
         method,
         signal: lifetime.signal,
-        headers: { 'Content-Type': 'application/json', 'x-synthetic-actor': String(actor) },
+        headers: legacyTransport
+          ? { 'Content-Type': 'application/json', 'x-synthetic-actor': String(actor) }
+          : {
+              'Content-Type': 'application/json',
+              ...fixture.actors[actor],
+              Host: new URL(fixture.requestOrigin).host,
+              Origin: fixture.requestOrigin,
+            },
         ...(data === undefined ? {} : { body: JSON.stringify(data) }),
       })
       const text = await response.text()
@@ -264,6 +279,7 @@ for (let repetition = 1; repetition <= repetitions; repetition++) {
         measurement: await command('evidence-costs'),
       }),
     )
+    await command('verify', submitted.id)
     failed = false
   } finally {
     const exit = await lifetime.stop(failed)

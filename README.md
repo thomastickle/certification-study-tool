@@ -24,32 +24,40 @@ Each user has a separate database for private banks and study history.
 
 ```sh
 npm ci
-node --env-file=.env --watch src/server/main.ts
+# Standalone Flyway prepares storage outside the server.
+docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
+# NEW installations only; private/app must not already exist.
+mkdir -p private
+npm run database:admin -- init private/app
+npm run dev
 ```
 
 Open **http://127.0.0.1:3000**. Frontend changes reload through Vite; changes to
 backend code, shared types, or the schema restart the local server.
 
-For a built frontend without the development server:
+For a compiled server and built frontend without the development server:
 
 ```sh
 npm run build
 NODE_ENV=production npm start
 ```
 
-The database defaults to `private/app/library.sqlite3`. `STUDY_DB_PATH` selects a
-separate database path and `STUDY_PORT` selects a port. Do not point this app at
-the original Python app's database; existing unrelated databases are refused.
-Private databases default to `private/app/users/<internal-ID>.sqlite3`; identities
-and sessions remain in `accounts.sqlite3`. See [private-library storage and upgrade](docs/private-libraries.md).
-The current library schema is version 4 and uses an application identifier to recognize
-its own databases. Upgrading owner-only study history requires an explicit
-[legacy-owner mapping](docs/authentication.md#upgrade-from-the-owner-only-release).
+The prepared central database defaults to `private/app/central.sqlite3`.
+`STUDY_DB_PATH` selects the central file shared by accounts, sessions and library content;
+`STUDY_ACCOUNTS_PATH` is retired and causes a configuration error. Personal workspaces
+remain separate under `private/app/users/<internal-ID>.sqlite3` unless configured otherwise.
+Prepare or convert databases externally before starting the server. The deployment root
+must contain exact `READY` contents `1\n` and no `RESTART_BLOCKED` marker.
+Login never creates personal files: study requests return 503 until external provisioning
+completes. See [database administration](docs/database-management.md). Actual local data
+conversion is deferred until the complete change has merged into master.
 
 ## Run with Docker
 
 With Docker Engine/Desktop and Docker Compose running, follow the
-[role setup and upgrade instructions](docs/authentication.md) before starting:
+[role setup and upgrade instructions](docs/authentication.md) and the
+[fresh-volume preparation procedure](docs/database-management.md#fresh-docker-volume)
+before starting. A missing database is deliberately not initialized by the image:
 
 ```sh
 docker compose up --build -d
@@ -70,8 +78,8 @@ The `study-data` Docker volume stores SQLite data across container rebuilds and
 recreation. `docker compose down --volumes` **permanently deletes that library**.
 The `keycloak-data` volume separately preserves provider identities.
 Back up the volume while the service is stopped before removing volumes or
-moving machines. This starts a new, empty library; your existing
-`private/app/library.sqlite3` is not copied. Import banks through the browser as
+moving machines. Fresh volume preparation installs an externally generated empty
+library; your existing `private/app/central.sqlite3` is not copied. Import banks through the browser as
 usual. Private files, local databases, credentials, and Git history are excluded
 from the build context and image. No image publishing is required.
 
@@ -139,12 +147,50 @@ scripts. npm installs the platform binary; no Go SDK is needed. Following
 [Microsoft's side-by-side setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0),
 `@typescript/native` aliases `typescript@7.0.2` and supplies `tsc`, while
 `typescript` aliases `@typescript/typescript6@6.0.2` for ESLint's JavaScript API
-(its separate compiler is `tsc6`). The typecheck script explicitly selects the
+and decorator-capable server emit (its separate compiler is `tsc6`). The typecheck script explicitly selects the
 native launcher to avoid competing transitive `tsc` binaries. Keep both aliases:
 TypeScript 7 has no JavaScript API. `npm run typecheck -- --version` verifies the
 default compiler, and `npm test`
 checks compiler error detection and ESLint's TypeScript rules. Vite's client types
 declare frontend asset imports in `src/web/vite-env.d.ts`.
+
+`npm run build:server` uses TypeScript 6 with `tsconfig.server.json` to emit ESM
+into `build/`, rewriting relative `.ts` imports to `.js` and copying the validation
+schema to `build/docs/`. Vite still writes only to `dist/`. `npm start` runs
+`build/src/server/main.js`; build first, and set `NODE_ENV=production` for static
+frontend delivery. Docker packages the compiled code, schema, frontend, and
+production dependencies without requiring a compiler at runtime. Existing CLI
+commands continue to run native TypeScript without decorators.
+
+`npm run dev` rebuilds the server before starting it and restarts on backend,
+shared, schema, build-script, or TypeScript configuration changes. Vite handles
+frontend HMR. Development main now owns a stock Vite child and private Nest API;
+see [process ownership and assertion migration](docs/development-process.md).
+After a build or server startup failure, the watcher stays alive and
+waits for a source change before trying again. `npm test` builds first, retains
+native TypeScript/Node tests and the SVG loader, then runs
+`tests/compiled/**/*.spec.ts` from emitted JavaScript. Put tests that import
+decorated application modules in that compiled suite; use relative `.ts` imports
+throughout it so both tests and providers share one emitted module graph. Do not
+import decorated modules into native TypeScript tests.
+
+Production `main` awaits `createProductionApplication(configuration)`, initializes it,
+then listens. This composes one global runtime, authentication/health/session
+controllers, LibraryHttpModule and StudyHttpModule, plus built static serving.
+Admission precedes routing; bodies remain unparsed until guards and owned inputs run.
+Both signals share shutdown and retain actual request work until database roots
+can close. Development stops public admission before backend drainage and then
+terminates the frontend process group. Await `init()` and `listen()` sequentially: overlapping
+startup is rejected explicitly.
+
+HTTP, authentication and transport/Vite tests exercise compiled Nest or maintained
+pure helpers; the obsolete dispatchers are removed. See the
+[assertion mapping](docs/nest-http-test-migration.md). The foreground benchmark
+also uses authenticated Nest controllers and actual request-owned storage; its
+[methodology](docs/nest-benchmark-migration.md) distinguishes the historical
+dispatcher baseline. The [pinned comparison](docs/nest-performance.md) records all
+normal and slow paths; final integrated review remains under the
+[conversion plan](docs/nest-conversion-plan.md). Issue #81 stays open.
 
 ## Curated CLF-C02 batch import
 
@@ -264,3 +310,5 @@ also remembered locally. `src/web/app/themes/base.css` owns shared semantic colo
 tokens and the Blue palette; each other palette has its own CSS override file in
 the same folder. Component styles consume these variables. Native CSS handles
 theme switching; Vite builds the CSS without a Sass dependency.
+
+See [the maintained Nest layout](docs/architecture.md) for feature module and runtime ownership.

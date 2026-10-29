@@ -1,0 +1,57 @@
+import { dirname, resolve } from 'node:path'
+import { validateOidcSettings } from '../auth/oidc-login.ts'
+import type { AuthenticationOptions } from '../auth/application-authentication.ts'
+
+export const RUNTIME_CONFIGURATION = Symbol('RuntimeConfiguration')
+
+export type RuntimeConfiguration = {
+  /** Explicit app-local benchmark scheduling; omitted in production. */
+  housekeepingSchedule?: { intervalMs: number; monotonicNow: () => number }
+  host: string
+  port: number
+  origin: URL
+  databasePath: string
+  privateLibrariesDirectory: string
+  authentication: AuthenticationOptions
+  production: boolean
+  staticRoot: string
+}
+
+/** Resolve settings without opening files, contacting OIDC, or capturing environment at import time.
+ * @throws {Error} For invalid ports, origin URLs, or the retired separate accounts path.
+ */
+export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeConfiguration {
+  const host = environment.STUDY_HOST ?? '127.0.0.1'
+  const port = Number(environment.STUDY_PORT ?? '3000')
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('STUDY_PORT must be a valid port.')
+  }
+  const databasePath = resolve(environment.STUDY_DB_PATH ?? 'private/app/central.sqlite3')
+  if (environment.STUDY_ACCOUNTS_PATH !== undefined) {
+    throw new Error(
+      'STUDY_ACCOUNTS_PATH is retired. Convert accounts and shared content externally and set STUDY_DB_PATH to the prepared central database.',
+    )
+  }
+  const accountsPath = databasePath
+  const origin = new URL(environment.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
+  const authentication = {
+    origin,
+    issuer: environment.STUDY_OIDC_ISSUER ?? 'http://127.0.0.1:8080/realms/study',
+    clientId: environment.STUDY_OIDC_CLIENT_ID ?? 'study-tool',
+    clientSecret: environment.STUDY_OIDC_CLIENT_SECRET || undefined,
+    accountsPath,
+  }
+  validateOidcSettings(authentication)
+  return {
+    host,
+    port,
+    origin,
+    databasePath,
+    privateLibrariesDirectory: resolve(
+      environment.STUDY_PRIVATE_LIBRARIES_DIR ?? resolve(dirname(databasePath), 'users'),
+    ),
+    authentication,
+    production: environment.NODE_ENV === 'production',
+    staticRoot: resolve('dist'),
+  }
+}

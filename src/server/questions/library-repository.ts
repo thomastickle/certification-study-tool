@@ -18,8 +18,6 @@ import type {
   StoredQuestion,
 } from '../../shared/contracts.ts'
 import { StudyLibrary } from './study-library.ts'
-import { migratePrivateStudy } from './migrate-private-study.ts'
-import { finishStudySeparation } from './study-separation.ts'
 import { openLibraryDatabase } from './open-library-database.ts'
 import type { LibraryOptions } from './open-library-database.ts'
 
@@ -356,7 +354,7 @@ export class LibraryRepository extends LibraryView {
   private ownedDatabase: DatabaseSync
   private closed = false
 
-  constructor(path: string, accountId = 'local', options: LibraryOptions = {}) {
+  constructor(path: string | DatabaseSync, accountId = 'local', options: LibraryOptions = {}) {
     const db = openLibraryDatabase(path, accountId, options)
     super({ db, transactionDepth: 0, privateOwnerId: options.privateOwnerId }, accountId)
     this.ownedDatabase = db
@@ -368,29 +366,5 @@ export class LibraryRepository extends LibraryView {
       this.ownedDatabase.close()
       this.closed = true
     }
-  }
-
-  /** Find only owners with pending migration, not all accounts registered with the identity provider. */
-  studyAccounts(): string[] {
-    return this.ownedDatabase
-      .prepare(
-        `
-      SELECT account_id FROM quiz_sessions
-      UNION SELECT account_id FROM quiz_mastery
-      UNION SELECT account_id FROM earned_certifications
-    `,
-      )
-      .all()
-      .map((row) => String(row.account_id))
-  }
-
-  /** Transfer one account's study evidence before serving any requests against the new layout. */
-  moveStudyTo(destination: string, accountId: string): void {
-    migratePrivateStudy(this.ownedDatabase, destination, accountId)
-  }
-
-  /** Startup must finish shared-file byte cleanup even when all owner transfers already committed. */
-  finishStudyMigration(): void {
-    finishStudySeparation(this.ownedDatabase)
   }
 }

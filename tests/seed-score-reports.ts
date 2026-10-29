@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -9,6 +10,7 @@ if (!database || existsSync(database)) {
   throw new Error('Provide a new disposable database path for synthetic score-report fixtures.')
 }
 mkdirSync(dirname(resolve(database)), { recursive: true, mode: 0o700 })
+prepareRuntimeDatabase(database)
 const repository = new LibraryRepository(database)
 const now = Date.now() - 60000
 for (const [id, mode, total, correctCount, age] of [

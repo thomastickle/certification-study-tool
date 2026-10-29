@@ -1,0 +1,259 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from './managed-database-fixture.ts'
+import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { test } from 'node:test'
+import { oidcFixture, closeServer } from './oidc-fixture.ts'
+import { LibraryRepository } from '../src/server/questions/library-repository.ts'
+import { populate } from './quiz-fixtures.ts'
+
+for (const production of [true, false]) {
+  test(
+    `compiled main serves full authenticated Nest workflows and drains signals (production=${production})`,
+    { timeout: 20000 },
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'nest-main-'))
+      const shell = '<!doctype html><title>Owned production shell</title>'
+      if (production) {
+        mkdirSync(join(directory, 'dist'))
+        writeFileSync(join(directory, 'dist', 'index.html'), shell)
+      }
+      const provider = await oidcFixture()
+      prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
+      const shared = new LibraryRepository(join(directory, 'library.sqlite3'))
+      populate(shared, 12)
+      shared.close()
+      const probe = createServer()
+      await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve))
+      const address = probe.address()
+      assert.ok(address && typeof address !== 'string')
+      const port = address.port
+      await closeServer(probe)
+      const origin = `http://127.0.0.1:${port}`
+      const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
+        cwd: production ? directory : process.cwd(),
+        env: {
+          ...process.env,
+          NODE_ENV: production ? 'production' : 'development',
+          STUDY_PORT: String(port),
+          STUDY_HOST: '127.0.0.1',
+          STUDY_ORIGIN: origin,
+          STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+          STUDY_OIDC_ISSUER: provider.issuerIdentifier,
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      const exit = once(child, 'exit')
+      child.stderr.resume()
+      let socket: WebSocket | undefined
+      try {
+        await new Promise<void>((resolve, reject) => {
+          child.stdout.on('data', (chunk) => {
+            if (String(chunk).includes('Certification Study Tool:')) {
+              resolve()
+            }
+          })
+          child.once('exit', () => reject(new Error('Main exited before listening')))
+        })
+        assert.equal((await fetch(origin + '/api/questions')).status, 401)
+        const login = await fetch(origin + '/auth/login', { redirect: 'manual' })
+        const loginCookie = login.headers.getSetCookie()[0]!.split(';')[0]!
+        const authorization = await fetch(login.headers.get('location')!, { redirect: 'manual' })
+        const callback = await fetch(authorization.headers.get('location')!, {
+          redirect: 'manual',
+          headers: { Cookie: loginCookie },
+        })
+        assert.equal(callback.status, 302)
+        const cookie = callback.headers
+          .getSetCookie()
+          .find((value) => value.startsWith('study_session='))!
+          .split(';')[0]!
+        const session = await (
+          await fetch(origin + '/api/session', { headers: { Cookie: cookie } })
+        ).json()
+        provisionTestWorkspace(
+          join(directory, 'library.sqlite3'),
+          join(directory, 'users'),
+          session.user.id,
+        )
+        const headers = {
+          Cookie: cookie,
+          'X-Study-Account': session.user.id,
+          Origin: origin,
+          'Content-Type': 'application/json',
+        }
+        const questions = await fetch(origin + '/api/questions', { headers })
+        assert.equal(questions.status, 200)
+        const created = await fetch(origin + '/api/quizzes', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        })
+        assert.equal(created.status, 201)
+        const quiz = await created.json()
+        const path = origin + '/api/quizzes/' + quiz.id
+        const submitted = await fetch(path + '/submit', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            answers: quiz.questions.map((question: { questionId: number }) => ({
+              questionId: question.questionId,
+              selected: [],
+              confidence: null,
+              flagged: false,
+            })),
+          }),
+        })
+        assert.equal(submitted.status, 200)
+        assert.equal((await fetch(path, { method: 'DELETE', headers })).status, 200)
+        const served = await fetch(origin + '/study')
+        assert.equal(served.status, 200)
+        if (production) {
+          assert.equal(await served.text(), shell)
+        }
+        if (!production) {
+          const client = await fetch(origin + '/@vite/client')
+          assert.equal(client.status, 200)
+          assert.match(await client.text(), /WebSocket/)
+          const source = await fetch(origin + '/src/web/main.tsx')
+          assert.equal(source.status, 200)
+          socket = new WebSocket(`ws://127.0.0.1:${port}/`, 'vite-hmr')
+          await new Promise<void>((resolve, reject) => {
+            socket!.addEventListener('open', () => resolve(), { once: true })
+            socket!.addEventListener('error', () => reject(new Error('HMR failed')), { once: true })
+          })
+        }
+        const closed =
+          socket &&
+          new Promise<void>((resolve) =>
+            socket!.addEventListener('close', () => resolve(), { once: true }),
+          )
+        child.kill('SIGINT')
+        child.kill('SIGTERM')
+        const [code, signal] = await exit
+        assert.equal(code, 0)
+        assert.equal(signal, null)
+        await closed
+      } finally {
+        socket?.close()
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill('SIGTERM')
+        }
+        await exit
+        await closeServer(provider.server)
+        rmSync(directory, { recursive: true, force: true })
+      }
+    },
+  )
+}
+
+test(
+  'early repeated signals cancel the acquired frontend process without listening',
+  { timeout: 15000 },
+  async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'nest-main-early-'))
+    writeFileSync(join(directory, 'index.html'), '<title>fixture</title>')
+    writeFileSync(
+      join(directory, 'vite.config.mjs'),
+      `export default { plugins: [{ name: 'gated-startup', async configureServer(server) { await new Promise(resolve => server.watcher.once('ready', resolve)); console.log('VITE-GATED'); await new Promise(() => {}) } }] }`,
+    )
+    const portProbe = createServer()
+    await new Promise<void>((resolve) => portProbe.listen(0, '127.0.0.1', resolve))
+    const portAddress = portProbe.address()
+    assert.ok(portAddress && typeof portAddress !== 'string')
+    await closeServer(portProbe)
+    prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
+    const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
+      cwd: directory,
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        STUDY_PORT: String(portAddress.port),
+        STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    child.stderr.resume()
+    const exit = once(child, 'exit')
+    let output = ''
+    try {
+      await new Promise<void>((resolve, reject) => {
+        child.stdout.on('data', (chunk) => {
+          output += String(chunk)
+          if (output.includes('VITE-GATED')) {
+            resolve()
+          }
+        })
+        child.once('exit', () => reject(new Error('Exited before gated Vite initialization')))
+      })
+      // The Vite handle/stdin no longer live in main; own the pending child through process exit.
+      const frontendPid = Number(
+        readFileSync(`/proc/${child.pid}/task/${child.pid}/children`, 'utf8').trim(),
+      )
+      assert.ok(Number.isInteger(frontendPid) && frontendPid > 0)
+      child.kill('SIGTERM')
+      child.kill('SIGINT')
+      const [code, signal] = await exit
+      assert.equal(code, 0)
+      assert.equal(signal, null)
+      assert.doesNotMatch(output, /Certification Study Tool:/)
+      assert.throws(() => process.kill(-frontendPid, 0), { code: 'ESRCH' })
+    } finally {
+      child.stdin.end()
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGTERM')
+      }
+      await exit
+      rmSync(directory, { recursive: true, force: true })
+    }
+  },
+)
+
+for (const missingStatic of [true, false]) {
+  test(
+    `main startup failure drains naturally (missingStatic=${missingStatic})`,
+    { timeout: 15000 },
+    async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'nest-main-failure-'))
+      if (!missingStatic) {
+        mkdirSync(join(directory, 'dist'))
+        writeFileSync(join(directory, 'dist', 'index.html'), '<title>Owned failure fixture</title>')
+      }
+      const occupied = createServer()
+      await new Promise<void>((resolve) => occupied.listen(0, '127.0.0.1', resolve))
+      const address = occupied.address()
+      assert.ok(address && typeof address !== 'string')
+      prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
+      const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
+        cwd: directory,
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          STUDY_HOST: '127.0.0.1',
+          STUDY_PORT: String(address.port),
+          STUDY_DB_PATH: join(directory, 'library.sqlite3'),
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      let error = ''
+      child.stdout.resume()
+      child.stderr.on('data', (chunk) => {
+        error += String(chunk)
+      })
+      try {
+        const [code, signal] = await once(child, 'exit')
+        assert.equal(code, 1)
+        assert.equal(signal, null)
+        assert.match(error, missingStatic ? /npm run build/ : /EADDRINUSE/)
+        assert.doesNotMatch(error, /ERR_SERVER_NOT_RUNNING/)
+      } finally {
+        await closeServer(occupied)
+        rmSync(directory, { recursive: true, force: true })
+      }
+    },
+  )
+}

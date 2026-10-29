@@ -1,21 +1,22 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { answeredBenchmarkHistory } from './answered-benchmark-history.ts'
 import { masteryHistory } from '../src/server/quizzes/mastery-history.ts'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { createServer } from 'node:http'
+import type { Server } from 'node:http'
+import { createApplication } from '../src/server/application.ts'
+import { ApplicationRuntime } from '../src/server/runtime/application-runtime.ts'
+import { runtimeConfiguration } from '../src/server/runtime/runtime-configuration.ts'
+import { AccountRepository } from '../src/server/auth/account-repository.ts'
+import { LibraryHttpModule } from '../src/server/library-http/library-http.module.ts'
+import { StudyHttpModule } from '../src/server/study-http/study.module.ts'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
-import { apiController } from '../src/server/http-controller.ts'
-import { requestUrl } from '../src/server/request-url.ts'
-import { ImportPreviews } from '../src/server/importer/import-previews.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { LibraryService } from '../src/server/questions/library-service.ts'
-import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
-import { StudyHousekeeping } from '../src/server/questions/study-housekeeping.ts'
 import type { LibraryItemId } from '../src/shared/contracts.ts'
 import {
   assertCompletedBenchmarkEvidence,
@@ -41,25 +42,62 @@ export interface FixtureInfo {
   sharedSource: number
   privateSource: number
   startup: unknown
+  requestOrigin: string
+  actors: Record<string, string>[]
 }
 
 const config: Workload = JSON.parse(process.argv[2]!)
 const directory = mkdtempSync(join(tmpdir(), 'study-foreground-benchmark-'))
+// Natural exit/SIGTERM can remove synthetic artifacts; SIGKILL cannot guarantee cleanup.
+process.on('exit', () => rmSync(directory, { recursive: true, force: true }))
 const initializeStart = performance.now()
-const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
-const initialSchemaOpenMs = performance.now() - initializeStart
-process.on('exit', () => {
-  shared.close()
-  rmSync(directory, { recursive: true, force: true })
+let monotonic = 0
+let requestOrigin = 'http://127.0.0.1:49152'
+const configuration = runtimeConfiguration({
+  STUDY_DB_PATH: join(directory, 'shared.sqlite3'),
+  STUDY_ORIGIN: requestOrigin,
+  STUDY_OIDC_ISSUER: 'http://127.0.0.1:49153/synthetic',
 })
-process.on('SIGTERM', () => process.exit(1))
-const libraries = new PrivateLibraries(join(directory, 'users'))
-const owners = Array.from({ length: config.owners }, () => randomUUID())
+prepareRuntimeDatabase(configuration.databasePath)
+configuration.housekeepingSchedule = { intervalMs: 0, monotonicNow: () => monotonic }
+const app = await createApplication(configuration, [LibraryHttpModule, StudyHttpModule])
+const runtime = app.get(ApplicationRuntime)
+const shared = runtime.sharedLibrary
+const libraries = runtime.privateLibraries
+const housekeeping = runtime.housekeeping
+const initialSchemaOpenMs = performance.now() - initializeStart
+const accounts = new AccountRepository(configuration.authentication.accountsPath)
+const actors: Record<string, string>[] = []
+const owners = Array.from({ length: config.owners }, (_, index) => {
+  const account = accounts.identify({
+    issuer: configuration.authentication.issuer,
+    subject: `benchmark-${index}`,
+    name: `Synthetic ${index}`,
+  })
+  provisionTestWorkspace(
+    configuration.databasePath,
+    configuration.privateLibrariesDirectory,
+    account.id,
+  )
+  const token = randomUUID()
+  accounts.saveSession(token, account.id, Date.now() + 3600000, 'admin')
+  actors.push({ Cookie: `study_session=${token}`, 'X-Study-Account': account.id })
+  return account.id
+})
+accounts.close()
 const target = owners[0]!
 const epoch = Date.now()
-let monotonic = 0
-const housekeeping = new StudyHousekeeping(shared, libraries, () => monotonic)
-const previews = new ImportPreviews()
+let closing: Promise<void> | undefined
+
+/** Drain owned HTTP/work and roots before removing synthetic files. */
+function shutdown(): Promise<void> {
+  closing ??= app.close().finally(() => rmSync(directory, { recursive: true, force: true }))
+  return closing
+}
+
+process.on('SIGTERM', () => {
+  void shutdown().then(() => process.exit(1))
+})
 let probe: TimerProbe | undefined
 let durations: number[] = []
 let actorDurations: number[][] = []
@@ -69,6 +107,8 @@ let opens = 0
 let activeConnections = 0
 let peakConnections = 0
 let observedOpens = 0
+let observations = 0
+let observedObservations = 0
 const originalOpen = libraries.open.bind(libraries)
 libraries.open = (id) => {
   opens++
@@ -84,6 +124,14 @@ libraries.open = (id) => {
     }
   }
   return personal
+}
+
+const observeRequest = housekeeping.observeRequest.bind(housekeeping)
+housekeeping.observeRequest = (method, actor, personal) => {
+  assert.ok(activeConnections > 0, 'Observation must retain the real request connection')
+  assert.ok(owners.includes(actor))
+  observations++
+  observeRequest(method, actor, personal)
 }
 
 /** Build legitimate completed snapshots through the grading boundary before cloning history. */
@@ -197,34 +245,21 @@ for (let index = 1; index < config.backlog; index++) {
 const liveBank = populate(shared, config.questions / 4, 'shared-live')
 const sharedSource = shared.sources()[0]!.id as number
 
-/** Match the request-owned connection/cleanup boundary used by main, bypassing OIDC only. */
-const server = createServer(async (request, response) => {
+// Observe the real scope, including body/service work, upkeep observation and close.
+const withLibrary = runtime.studyLibraries.withLibrary.bind(runtime.studyLibraries)
+runtime.studyLibraries.withLibrary = async (actor, method, work) => {
   const start = performance.now()
-  // The harness selects only precreated synthetic actors; no account comes from payload/query.
-  const actor = owners[Number(request.headers['x-synthetic-actor'] ?? 0)]
-  assert.ok(actor)
-  const personal = libraries.open(actor)
   try {
-    const url = new URL(request.url ?? '/', `http://127.0.0.1:${request.socket.localPort}`)
-    const context = requestUrl(url)
-    const controller = apiController(
-      shared,
-      { id: actor, role: 'admin' },
-      undefined,
-      previews,
-      personal,
-    )
-    await controller(request, response, context)
+    return await withLibrary(actor, method, work)
   } finally {
-    housekeeping.observeRequest(request.method, actor, personal)
-    personal.close()
     const elapsed = performance.now() - start
     durations.push(elapsed)
-    const actorIndex = owners.indexOf(actor)
-    actorDurations[actorIndex] ??= []
-    actorDurations[actorIndex]!.push(elapsed)
+    const index = owners.indexOf(actor.id)
+    assert.ok(index >= 0)
+    actorDurations[index] ??= []
+    actorDurations[index]!.push(elapsed)
   }
-})
+}
 
 /** Time maintenance separately from fixture setup and foreground HTTP. */
 async function maintenance() {
@@ -239,6 +274,7 @@ async function maintenance() {
 }
 
 const originalSnapshots = new Map<string, Map<string, string>>()
+monotonic += 5000
 const startup = await maintenance()
 assert.equal(startup.opens, config.owners)
 for (const [index, id] of owners.entries()) {
@@ -272,11 +308,27 @@ for (const [index, id] of owners.entries()) {
     personal.close()
   }
 }
-await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-const address = server.address()
+try {
+  await app.init()
+  await app.listen(0, '127.0.0.1')
+} catch (error) {
+  await shutdown().catch(() => undefined)
+  throw error
+}
+const address = (app.getHttpServer() as Server).address()
 assert.ok(address && typeof address !== 'string')
+configuration.origin.port = String(address.port)
+requestOrigin = configuration.origin.origin
 process.send!({
-  ready: { origin: `http://127.0.0.1:${address.port}`, sharedSource, privateSource: 1, startup },
+  ready: {
+    origin: `http://127.0.0.1:${address.port}`,
+    sharedSource,
+    privateSource: 1,
+    startup,
+    actors,
+    requestOrigin,
+    syntheticDirectory: directory,
+  },
 })
 
 /** Keep control/setup outside the regions sampled by the independent HTTP client. */
@@ -286,6 +338,7 @@ async function command(name: string, completedId?: string) {
     actorDurations = []
     memoryStart = process.memoryUsage()
     peakRss = memoryStart.rss
+    observedObservations = observations
     observedOpens = opens
     peakConnections = 0
     probe = new TimerProbe(() => {
@@ -298,11 +351,14 @@ async function command(name: string, completedId?: string) {
     const timerDelay = await probe.stop()
     assert.equal(activeConnections, 0)
     return {
+      requestServiceBoundary:
+        'Nest StudyLibraryScope: open/body/service/observation/close; excludes admission and guards',
       requestServiceMs: summarize(durations),
       serviceSamplesMs: durations,
       actorServiceSamplesMs: actorDurations,
       actorServiceMs: actorDurations.map(summarize),
       memory: { start: memoryStart, end: process.memoryUsage(), sampledPeakRss: peakRss },
+      observations: observations - observedObservations,
       opens: opens - observedOpens,
       timerDelay,
       activeConnections,
@@ -424,14 +480,26 @@ async function command(name: string, completedId?: string) {
         await measure('corruptRecoveryDueMs', () =>
           service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
         )
-        sql.exec('DROP TABLE quiz_evidence')
-        await measure('derivedSchemaReopenMs', () => {
-          const reopened = libraries.open(target)
-          reopened.close()
-        })
-        await measure('schemaBackfillDueMs', () =>
-          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        // Missing storage is an external maintenance failure, never a lazy runtime upgrade.
+        const projectionSchema = String(
+          sql
+            .prepare(
+              "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'quiz_evidence'",
+            )
+            .get()!.sql,
         )
+        sql.exec('DROP TABLE quiz_evidence')
+        try {
+          assert.throws(() => libraries.open(target), /not ready/)
+          assert.throws(() => store.studyHistory(), /quiz_evidence/)
+        } finally {
+          // Test harness restores the externally managed table; runtime never repairs missing schema.
+          sql.exec(projectionSchema)
+        }
+      }
+      const recovered = personal.quizStore()
+      if ('studyHistory' in recovered) {
+        assert.deepEqual(recovered.studyHistory(), masteryHistory(recovered.completed()))
       }
       const bytes = hasEvidence
         ? sql.prepare('SELECT sum(length(payload)) AS bytes FROM quiz_evidence').get()!.bytes
@@ -502,5 +570,5 @@ process.on('message', (message: { name: string; completedId?: string }) => {
 })
 
 process.on('disconnect', () => {
-  server.close(() => process.exit(0))
+  void shutdown().then(() => process.exit(0))
 })

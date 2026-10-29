@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -6,7 +7,7 @@ import { ImportService } from '../src/server/importer/import-service.ts'
 import { populate } from './quiz-fixtures.ts'
 
 test('quiz uses only checked source banks, including a mixed official/third-party selection', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const input = populate(repository)
     const importer = new ImportService(repository)
@@ -54,7 +55,7 @@ test('quiz uses only checked source banks, including a mixed official/third-part
 })
 
 test('empty, invalid, repeated or unavailable source IDs are rejected instead of falling back to all sources', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(repository)

@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -8,7 +9,7 @@ import { populate } from './quiz-fixtures.ts'
 const options = { sourceFilter: 'mixed', questionType: 'mixed', mode: 'exam' }
 
 test('exam selects 65 unique questions in representative domains with a 90-minute deadline', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository, 24)
     const before = repository.allQuestions()
@@ -42,7 +43,7 @@ test('exam selects 65 unique questions in representative domains with a 90-minut
 })
 
 test('exam saves, expires from saved choices, and identifies its history and report', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository, 24)
     let now = 1000
@@ -91,7 +92,7 @@ test('exam saves, expires from saved choices, and identifies its history and rep
 })
 
 test('exam honors bank filters and rejects shortages or invalid modes without abandoning an active attempt', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(repository)

@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -5,7 +6,7 @@ import { ImportService } from '../src/server/importer/import-service.ts'
 import { bank } from './fixtures.ts'
 
 test('preview is read-only; confirming imports a source and its questions atomically', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const input = bank()
@@ -21,7 +22,7 @@ test('preview is read-only; confirming imports a source and its questions atomic
 })
 
 test('invalid records reject the whole bank and identify each failing question', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const input = bank()
@@ -47,7 +48,7 @@ test('invalid records reject the whole bank and identify each failing question',
 })
 
 test('reimport skips unchanged records and requires review before changing content', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const input = bank()
@@ -69,7 +70,7 @@ test('reimport skips unchanged records and requires review before changing conte
 })
 
 test('duplicates retain both sources; conflicting answer keys require correction before saving', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const first = bank('first')
@@ -96,7 +97,7 @@ test('duplicates retain both sources; conflicting answer keys require correction
 })
 
 test('missing study classification is allowed and reported for later review', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const input = bank()
@@ -111,7 +112,7 @@ test('missing study classification is allowed and reported for later review', ()
 })
 
 test('questions with no classification at all can be imported for later curation', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const input = bank()
@@ -132,7 +133,7 @@ test('an import failure rolls back both source metadata and all questions', () =
     }
   }
 
-  const repository = new FailingRepository(':memory:')
+  const repository = new FailingRepository(prepareManagedDatabase())
   try {
     const service = new ImportService(repository)
     const input = bank()

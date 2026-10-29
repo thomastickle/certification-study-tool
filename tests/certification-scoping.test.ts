@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -27,7 +28,7 @@ function library(repository: LibraryRepository, size = 65) {
 }
 
 test('generic practice includes unclassified questions, persists scope, and isolates recovery', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     library(repository)
     const service = new QuizService(repository)
@@ -56,7 +57,7 @@ test('generic practice includes unclassified questions, persists scope, and isol
 })
 
 test('generic exams require enough unique eligible questions', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     library(repository, 64)
     assert.throws(
@@ -71,7 +72,7 @@ test('generic exams require enough unique eligible questions', () => {
 test('mastery, due review, recent and reports stay scoped even after library deletion', async () => {
   const { ReportService } = await import('../src/server/reports/report-service.ts')
   const { LibraryService } = await import('../src/server/questions/library-service.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   let now = Date.UTC(2026, 9, 1, 12)
   try {
     library(repository)
@@ -132,74 +133,6 @@ test('mastery, due review, recent and reports stay scoped even after library del
     assert.equal(service.due(filters).unavailable, 0)
     assert.equal(reports.get(scope).unique.mastered, 20)
   } finally {
-    repository.close()
-  }
-})
-
-test('HTTP current, recent, due and reports honor the complete certification pair', async () => {
-  const { createServer } = await import('node:http')
-  const { apiTestHandler } = await import('./support/api-test-handler.ts')
-  const repository = new LibraryRepository(':memory:')
-  const server = createServer(apiTestHandler(repository, { id: 'local', role: 'admin' }))
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  assert.ok(address && typeof address !== 'string')
-  const base = `http://127.0.0.1:${address.port}`
-  const query = new URLSearchParams(scope)
-  try {
-    library(repository)
-    const service = new QuizService(repository)
-    const legacy = service.start(filters)
-    const generic = service.start({ ...filters, ...scope })
-
-    const get = async (path: string) => {
-      const response = await fetch(`${base}${path}`)
-      assert.equal(response.status, 200)
-      return response.json()
-    }
-
-    assert.equal((await get(`/api/quizzes/current?${query}`)).id, generic.id)
-    assert.equal((await get('/api/quizzes/current')).id, legacy.id)
-    const stored = repository.quizStore().find(generic.id)!
-    service.submit(generic.id, { answers: generic.questions })
-    assert.deepEqual(
-      (await get(`/api/quizzes?${query}`)).map((q: { id: string }) => q.id),
-      [generic.id],
-    )
-    assert.deepEqual(await get('/api/quizzes'), [])
-    assert.equal((await get(`/api/reports?${query}`)).counts.total, 20)
-    assert.equal((await get(`/api/reports?${query}`)).provider, scope.provider)
-    assert.equal((await get('/api/reports')).counts.total, 0)
-    const otherProvider = {
-      ...stored,
-      id: 'other-provider',
-      status: 'completed' as const,
-      finishedAt: Date.now(),
-      options: { ...stored.options, provider: 'Other' },
-    }
-    repository.quizStore().save(otherProvider)
-    assert.equal((await get(`/api/reports?${query}`)).counts.total, 20)
-    const historical = repository.quizStore().find(generic.id)!
-    historical.startedAt -= 8 * 86400000
-    historical.finishedAt! -= 8 * 86400000
-    historical.questions.forEach((question, index) => {
-      question.selected = historical.keys[index]!.correct
-      question.correct = true
-      question.confidence = 'Confident'
-    })
-    repository.quizStore().save(historical)
-    assert.equal((await get(`/api/quizzes/due?${query}`)).total, 20)
-    assert.equal((await get('/api/quizzes/due')).total, 0)
-    for (const path of [
-      '/api/reports?provider=',
-      '/api/quizzes?certification=',
-      '/api/quizzes/current?provider=',
-      '/api/quizzes/due?provider=',
-    ]) {
-      assert.equal((await fetch(`${base}${path}`)).status, 400)
-    }
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()))
     repository.close()
   }
 })

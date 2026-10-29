@@ -1,9 +1,4 @@
-import {
-  initializeStudyEvidence,
-  evidenceSavepoint,
-  persistedStudyHistory,
-  saveStudyEvidence,
-} from './study-evidence.ts'
+import { evidenceSavepoint, persistedStudyHistory, saveStudyEvidence } from './study-evidence.ts'
 import { sameCertification } from './certification-scope.ts'
 import type { CertificationScope } from './certification-scope.ts'
 import { masteryHistory } from './mastery-history.ts'
@@ -17,15 +12,6 @@ export type StoredQuiz = QuizView & {
   purgeAt?: number
 }
 
-export function migrateQuizzes(db: DatabaseSync): void {
-  if (Number(db.prepare('PRAGMA user_version').get()?.user_version) !== 1) return
-  db.exec(`BEGIN IMMEDIATE;
-    CREATE TABLE quiz_sessions (id TEXT PRIMARY KEY, status TEXT NOT NULL, started_at INTEGER NOT NULL, data TEXT NOT NULL);
-    CREATE TABLE quiz_mastery (fingerprint TEXT PRIMARY KEY, boosted INTEGER NOT NULL, correct_streak INTEGER NOT NULL);
-    PRAGMA user_version = 2;
-    COMMIT;`)
-}
-
 /** Snapshot storage has no cascading source/question FKs: old results survive library deletion. */
 export class QuizRepository {
   private db: DatabaseSync
@@ -34,7 +20,6 @@ export class QuizRepository {
   constructor(db: DatabaseSync, accountId = 'local') {
     this.db = db
     this.accountId = accountId
-    initializeStudyEvidence(db)
   }
 
   transaction<T>(work: () => T): T {

@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
@@ -28,7 +29,7 @@ test('Home, Reports and individual reviews visibly explain retained evidence fro
       }
     },
   })
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const { HomeDashboard } = await import('../src/web/features/home/HomeDashboard.tsx')
     const { ReportDashboard } = await import('../src/web/features/reports/ReportDashboard.tsx')

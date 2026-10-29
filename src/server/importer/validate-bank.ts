@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { Ajv2020 } from 'ajv/dist/2020.js'
 import type { Bank } from '../../shared/contracts.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import { matchText, reference } from './bank-tools.ts'
 
 const schema = JSON.parse(

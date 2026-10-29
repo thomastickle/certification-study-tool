@@ -3,8 +3,16 @@
 !package.json
 !package-lock.json
 !tsconfig.json
+!tsconfig.server.json
 !vite.config.ts
+!scripts/
+!scripts/build-server.ts
+!scripts/validate-static-assets.ts
 !src/
 !src/**
 !docs/
 !docs/**
+
+!database/
+!database/migrations/
+!database/migrations/**

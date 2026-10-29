@@ -1,0 +1,150 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { compatibilityFixture } from './compatibility-fixture.ts'
+import { bank } from '../fixtures.ts'
+
+test('HTTP supports preview, confirm, browse and scoped deletion while denying cross-site writes', async () => {
+  const fixture = await compatibilityFixture()
+  const { fetch } = fixture
+  const base = fixture.base + ''
+
+  const post = (path: string, data: unknown, origin = base) =>
+    fetch(base + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: origin },
+      body: JSON.stringify(data),
+    })
+
+  try {
+    const input = bank()
+    assert.equal(
+      (await post('/api/imports/preview', { bank: input }, 'https://untrusted.example')).status,
+      403,
+    )
+    const previewResponse = await post('/api/imports/preview', { bank: input })
+    assert.equal(previewResponse.status, 200)
+    const preview = await previewResponse.json()
+    assert.equal(
+      (await post('/api/imports/confirm', { bank: input, token: preview.token, reviewed: false }))
+        .status,
+      201,
+    )
+    const page = await (await fetch(base + '/api/questions')).json()
+    assert.equal(page.total, 1)
+    assert.equal(
+      (
+        await fetch(base + '/api/questions/' + page.items[0].id, {
+          method: 'DELETE',
+          headers: { Origin: 'https://untrusted.example' },
+        })
+      ).status,
+      403,
+    )
+    assert.equal(
+      (await fetch(base + '/api/questions/' + page.items[0].id, { method: 'DELETE' })).status,
+      204,
+    )
+    const sources = await (await fetch(base + '/api/sources')).json()
+    assert.equal(
+      (await fetch(base + '/api/sources/' + sources[0].id, { method: 'DELETE' })).status,
+      204,
+    )
+    assert.deepEqual(await (await fetch(base + '/api/sources')).json(), [])
+    assert.equal((await fetch(base + '/api/questions?page=-1')).status, 400)
+    assert.equal(
+      (
+        await fetch(base + '/api/imports/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{broken',
+        })
+      ).status,
+      400,
+    )
+  } finally {
+    await fixture.close()
+  }
+})
+
+for (const mode of ['quiz', 'exam'] as const) {
+  test(`${mode} HTTP saves confidence, scores results and rejects cross-site mutations`, async () => {
+    const { populate } = await import('../quiz-fixtures.ts')
+    const fixture = await compatibilityFixture()
+    const { fetch } = fixture
+    populate(fixture.shared, 24)
+    const base = fixture.base + ''
+
+    const post = (path: string, data: unknown, method = 'POST', origin = base) =>
+      fetch(base + path, {
+        method,
+        headers: { 'Content-Type': 'application/json', Origin: origin },
+        body: JSON.stringify(data),
+      })
+
+    try {
+      assert.equal(
+        (
+          await post(
+            '/api/quizzes',
+            { sourceFilter: 'mixed', questionType: 'mixed', mode },
+            'POST',
+            'https://untrusted.example',
+          )
+        ).status,
+        403,
+      )
+      const response = await post('/api/quizzes', {
+        sourceFilter: 'mixed',
+        questionType: 'mixed',
+        mode,
+      })
+      assert.equal(response.status, 201)
+      const quiz = await response.json()
+      assert.equal(quiz.questions.length, mode === 'exam' ? 65 : 20)
+      assert.equal(quiz.deadline - quiz.startedAt, (mode === 'exam' ? 90 : 20) * 60_000)
+      assert.equal('keys' in quiz, false)
+      assert.equal(quiz.mode, mode)
+      const answers = quiz.questions.map((q: { questionId: number }) => ({
+        questionId: q.questionId,
+        selected: [],
+        confidence: 'Unsure',
+        flagged: true,
+      }))
+      assert.equal((await post(`/api/quizzes/${quiz.id}/answers`, { answers }, 'PUT')).status, 200)
+      const paused = await (await post(`/api/quizzes/${quiz.id}/pause`, {})).json()
+      assert.equal(paused.status, 'paused')
+      assert.ok(paused.pausedAt >= quiz.startedAt)
+      const recovered = await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json()
+      assert.equal(recovered.id, quiz.id)
+      assert.equal(recovered.status, 'paused')
+      assert.equal('keys' in recovered, false)
+      assert.equal(recovered.questions[0].correctAnswerIds, undefined)
+      const resumed = await (await post(`/api/quizzes/${quiz.id}/resume`, {})).json()
+      assert.equal(resumed.status, 'active')
+      assert.equal(resumed.pausedAt, null)
+      const result = await (await post(`/api/quizzes/${quiz.id}/submit`, { answers })).json()
+      assert.equal(result.mode, mode)
+      assert.equal(result.correctCount, 0)
+      assert.equal(result.questions[0].confidence, 'Unsure')
+      assert.ok(result.questions[0].correctAnswerIds)
+      const history = await (await fetch(base + '/api/quizzes')).json()
+      assert.equal(history.length, 1)
+      assert.equal(history[0].mode, mode)
+      const saved = await (await fetch(base + `/api/quizzes/${quiz.id}`)).json()
+      assert.equal(saved.mode, mode)
+      assert.equal(saved.status, 'completed')
+      const discarded = await (
+        await post('/api/quizzes', { mode, sourceFilter: 'mixed', questionType: 'mixed' })
+      ).json()
+      const abandoned = await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json()
+      assert.equal(abandoned.status, 'abandoned')
+      assert.equal(abandoned.correctCount, null)
+      assert.equal(await (await post(`/api/quizzes/${discarded.id}/abandon`, {})).json(), null)
+      assert.equal((await fetch(`${base}/api/quizzes/${discarded.id}`)).status, 404)
+      assert.equal(await (await fetch(`${base}/api/quizzes/current?mode=${mode}`)).json(), null)
+      assert.equal((await (await fetch(`${base}/api/quizzes`)).json()).length, 1)
+    } finally {
+      await fixture.close()
+    }
+  })
+}

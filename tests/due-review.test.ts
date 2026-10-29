@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -7,7 +8,7 @@ import { populate } from './quiz-fixtures.ts'
 const options = { sourceFilter: 'mixed', questionType: 'mixed' }
 
 test('Due Review preserves quotas, does not advance early, honors filters and keeps deleted items overdue', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = Date.parse('2026-10-20T16:00:00Z')
@@ -89,7 +90,7 @@ test('Due Review preserves quotas, does not advance early, honors filters and ke
 test('review expiry scores saved evidence, repeated submission is idempotent and review is excluded from pass targets', async () => {
   const { ReportService } = await import('../src/server/reports/report-service.ts')
   const { quizReport } = await import('../src/shared/quiz-report.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = Date.parse('2026-10-20T16:00:00Z')
@@ -137,7 +138,7 @@ test('review expiry scores saved evidence, repeated submission is idempotent and
 
 test('edited keys cannot inherit old due identities and historical results remain unchanged', async () => {
   const { ImportService } = await import('../src/server/importer/import-service.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const input = populate(repository)
     let now = Date.parse('2026-10-20T16:00:00Z')

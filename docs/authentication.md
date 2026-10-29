@@ -43,7 +43,7 @@ docker compose up --build -d --wait
 
 The image contains no seeded users or passwords. Keep the Keycloak volume:
 recreating users can change their subjects. Native development can use
-`node --env-file=.env --watch src/server/main.ts` with Keycloak running.
+`npm run dev` with Keycloak running.
 The development client permits exact callbacks at ports 3000 and 3100; a native
 server on port 3100 needs matching `STUDY_PORT` and `STUDY_ORIGIN` settings.
 
@@ -75,16 +75,16 @@ application role claim grant student access.
 
 ## Configuration
 
-| Variable                      | Default                                                          | Purpose                                                             |
-| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `STUDY_DB_PATH`               | `private/app/library.sqlite3`; `/data/library.sqlite3` in Docker | Shared banks and shared-bank deletion records.                      |
-| `STUDY_PRIVATE_LIBRARIES_DIR` | `users` beside the shared database                               | One private library and study database per internal account ID.     |
-| `STUDY_ACCOUNTS_PATH`         | `accounts.sqlite3` beside the study database                     | Identity and hashed sessions; a separate file.                      |
-| `STUDY_LEGACY_OWNER_SUBJECT`  | Unset                                                            | Explicit ownership mapping for existing single-owner study history. |
-| `STUDY_OIDC_ISSUER`           | `http://127.0.0.1:8080/realms/study`                             | Trusted issuer identifier, retained exactly.                        |
-| `STUDY_OIDC_CLIENT_ID`        | `study-tool`                                                     | Registered client.                                                  |
-| `STUDY_OIDC_CLIENT_SECRET`    | Unset                                                            | Optional private server-side client secret.                         |
-| `STUDY_ORIGIN`                | `http://127.0.0.1:<STUDY_PORT>`                                  | Exact browser origin and Host allowlist.                            |
+| Variable                      | Default                                                          | Purpose                                                         |
+| ----------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| `STUDY_DB_PATH`               | `private/app/central.sqlite3`; `/data/central.sqlite3` in Docker | Central accounts, sessions and shared content.                  |
+| `STUDY_PRIVATE_LIBRARIES_DIR` | `users` beside the shared database                               | One private library and study database per internal account ID. |
+| `STUDY_ACCOUNTS_PATH`         | Retired; setting this causes a configuration error               | Convert externally and select STUDY_DB_PATH.                    |
+| `STUDY_LEGACY_OWNER_SUBJECT`  | Unset                                                            | Retired runtime setting; external conversion owns mapping.      |
+| `STUDY_OIDC_ISSUER`           | `http://127.0.0.1:8080/realms/study`                             | Trusted issuer identifier, retained exactly.                    |
+| `STUDY_OIDC_CLIENT_ID`        | `study-tool`                                                     | Registered client.                                              |
+| `STUDY_OIDC_CLIENT_SECRET`    | Unset                                                            | Optional private server-side client secret.                     |
+| `STUDY_ORIGIN`                | `http://127.0.0.1:<STUDY_PORT>`                                  | Exact browser origin and Host allowlist.                        |
 
 `STUDY_OWNER_SUBJECT` no longer controls admission. The legacy-owner setting is
 for data attribution and never grants admin rights. Its value must be the previous
@@ -110,7 +110,7 @@ cookies. Keycloak `start-dev` and the loopback Compose setup are for development
   revoke that account's application sessions. With the standard volume:
 
   ```sh
-  docker compose exec study node src/server/auth/revoke-sessions.ts --accounts /data/accounts.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
+  docker compose exec study node build/src/server/auth/revoke-sessions.js --accounts /data/central.sqlite3 --issuer '<exact-configured-issuer>' --subject '<user-ID>'
   ```
 
   Native runs can use `npm run auth:revoke --` with the same arguments. Issuer and
@@ -129,33 +129,9 @@ cookies. Keycloak `start-dev` and the loopback Compose setup are for development
 
 ## Upgrade from the owner-only release
 
-1. Retain the old image tag, stop **all** study application instances, and back up
-   the entire stopped application volume plus Keycloak and private settings.
-   Keep the same Compose project, volume, and `/data/library.sqlite3` path.
-2. Configure the Keycloak role and mapper above without replacing the existing
-   realm or users. Assign `study-tool → admin` to intended library managers.
-3. Copy the old `STUDY_OWNER_SUBJECT` value into `.env` as
-   `STUDY_LEGACY_OWNER_SUBJECT`. Keep the same issuer. Confirm this identifies the
-   person whose existing study history belongs to them.
-4. Start the new image. An atomic study-schema upgrade attributes attempts, legacy
-   mastery, and earned certifications to that identity. Shared questions, source
-   IDs, concept mappings, and import revisions stay intact. Startup refuses an
-   occupied legacy study database without the explicit mapping.
-5. Sign in as the previous owner and verify history and earned certifications.
-   A second user should see shared questions and empty personal history. Confirm
-   that a student cannot import or delete. After success, remove the old owner-only
-   setting and the one-time legacy-owner setting from `.env`.
-
-Empty databases need no legacy mapping. Upgraded databases are not reassigned by
-later changes to the setting. The library schema is version 4; account/session
-storage is version 2. Startup moves attributed study evidence into each owner's
-private file before serving requests. Account IDs remain stable. A new user
-starts with an empty private library and can study shared banks without a copy.
-Theme and sidebar layout remain browser-local preferences; study
-evidence and tracked-certification selection are account-specific.
-
-For rollback, stop all new instances and preserve their newer data separately.
-Restore the **entire** application volume, including account, shared and user databases, from the stopped pre-upgrade backup,
-then start the retained old image with its former environment. The old image
-cannot open upgraded schemas. Provider role/mapper additions can remain.
-`docker compose down` retains volumes; `down --volumes` deletes their data.
+Use the external [database administration workflow](database-management.md) with
+all writers stopped and drained. The runtime does not identify a legacy owner or
+upgrade accounts and study schemas. Existing local user data conversion is deferred
+until the complete change merges into master. Preserve the configured issuer and
+verified account mappings through conversion; normal login continues to issue
+sessions in the prepared central file, without provisioning personal workspaces.

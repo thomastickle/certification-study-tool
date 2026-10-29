@@ -12,5 +12,6 @@ private/
 # Generated output and dependency-manager files.
 node_modules/
 dist/
+build/
 coverage/
 package-lock.json

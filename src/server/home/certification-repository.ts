@@ -2,25 +2,6 @@ import type { DatabaseSync } from 'node:sqlite'
 
 export type EarnedCertification = { provider: string; code: string; name: string }
 
-/** Version earned credentials independently from library content and immutable quiz snapshots. */
-export function migrateCertifications(db: DatabaseSync): void {
-  db.exec('BEGIN IMMEDIATE')
-  try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS certification_schema (version INTEGER PRIMARY KEY CHECK (version = 1));
-      INSERT OR IGNORE INTO certification_schema VALUES (1);
-      CREATE TABLE IF NOT EXISTS earned_certifications (
-        provider TEXT NOT NULL, code TEXT NOT NULL, name TEXT NOT NULL,
-        PRIMARY KEY (provider, code)
-      );
-      COMMIT;
-    `)
-  } catch (error) {
-    db.exec('ROLLBACK')
-    throw error
-  }
-}
-
 /** Earned credentials survive bank deletion and do not alter study evidence. */
 export class CertificationRepository {
   private db: DatabaseSync

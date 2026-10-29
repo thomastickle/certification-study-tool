@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -7,7 +9,7 @@ import { bank } from './fixtures.ts'
 
 /** Import synthetic variations through the public import boundary. */
 function fixture() {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   const importer = new ImportService(repository)
   const input = bank()
   input.questions.push({
@@ -163,6 +165,7 @@ test('reviewed groups and dismissals survive reopening without changing bank rec
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const directory = mkdtempSync(join(tmpdir(), 'synthetic-concepts-'))
+  prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
   let repository = new LibraryRepository(join(directory, 'library.sqlite3'))
   try {
     const importer = new ImportService(repository)

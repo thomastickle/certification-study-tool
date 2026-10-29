@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -17,6 +19,7 @@ import { studyReportMarkdown } from '../src/shared/report-export.ts'
 test('bank deletion flags actual quiz/exam provenance without changing evidence, including after reimport and restart', () => {
   const directory = mkdtempSync(join(tmpdir(), 'bank-indicators-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   let repository = new LibraryRepository(path)
   const now = Date.parse('2026-10-21T12:00:00Z')
   try {
@@ -97,7 +100,7 @@ test('bank deletion flags actual quiz/exam provenance without changing evidence,
 })
 
 test('legacy snapshots use unambiguous drawn provenance within their certification, including pending results', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const quizzes = new QuizService(repository, () => 1000)
@@ -122,7 +125,7 @@ test('legacy snapshots use unambiguous drawn provenance within their certificati
 })
 
 test('ambiguous legacy banks never become attributed merely because another matching bank was deleted', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const input = populate(repository)
     const quizzes = new QuizService(repository, () => 1000)
@@ -146,7 +149,7 @@ test('ambiguous legacy banks never become attributed merely because another matc
 })
 
 test('mixed-bank attempts retain each deleted bank while unrelated certification results remain unmarked', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const input = populate(repository)
     input.source.key = 'second'

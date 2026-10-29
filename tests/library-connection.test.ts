@@ -1,3 +1,4 @@
+import { prepareManagedDatabase, preparePersonalFixtures } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -13,7 +14,7 @@ function saveSource(repository: Pick<LibraryRepository, 'saveSource'>, key: stri
 }
 
 test('account views share nested savepoints and publish only the outer revision', () => {
-  const root = new LibraryRepository(':memory:')
+  const root = new LibraryRepository(prepareManagedDatabase())
   try {
     const alice = root.forAccount('alice')
     const bob = root.forAccount('bob')
@@ -53,7 +54,7 @@ test('account views share nested savepoints and publish only the outer revision'
 })
 
 test('only the root can close its connection and shutdown closes it once', (context) => {
-  const root = new LibraryRepository(':memory:')
+  const root = new LibraryRepository(prepareManagedDatabase())
   const alice = root.forAccount('alice')
   const bob = alice.forAccount('bob')
   const close = context.mock.method(DatabaseSync.prototype, 'close')
@@ -78,10 +79,11 @@ test('only the root can close its connection and shutdown closes it once', (cont
 test('failed database inspection closes the opened connection', (context) => {
   const directory = mkdtempSync(join(tmpdir(), 'library-initialization-'))
   const path = join(directory, 'invalid.sqlite3')
+  writeFileSync(join(directory, 'READY'), '1\n')
   writeFileSync(path, 'This is deliberately not a SQLite database.')
   const close = context.mock.method(DatabaseSync.prototype, 'close')
   try {
-    assert.throws(() => new LibraryRepository(path), /not a database/)
+    assert.throws(() => new LibraryRepository(path), /not ready/)
     assert.equal(close.mock.callCount(), 1)
     const failedDatabase = close.mock.calls[0]!.this
     assert.ok(failedDatabase instanceof DatabaseSync)
@@ -96,12 +98,12 @@ for (const scenario of [
   {
     name: 'unrecognized schema',
     sql: 'CREATE TABLE unrelated (value TEXT)',
-    error: /Unrecognized database/,
+    error: /not ready/,
   },
   {
     name: 'unsupported version',
     sql: 'PRAGMA application_id = 1096242004; PRAGMA user_version = 99',
-    error: /Unsupported database version/,
+    error: /not ready/,
   },
   {
     name: 'migration failure',
@@ -110,12 +112,13 @@ for (const scenario of [
       PRAGMA user_version = 1;
       CREATE TABLE quiz_sessions (id TEXT PRIMARY KEY);
     `,
-    error: /quiz_sessions already exists/,
+    error: /not ready/,
   },
 ]) {
   test(`initialization closes once after ${scenario.name} and leaves the file unchanged`, (context) => {
     const directory = mkdtempSync(join(tmpdir(), 'library-initialization-'))
     const path = join(directory, 'library.sqlite3')
+    writeFileSync(join(directory, 'READY'), '1\n')
     const fixture = new DatabaseSync(path)
     fixture.exec(scenario.sql)
     fixture.close()
@@ -137,9 +140,10 @@ for (const scenario of [
 
 test('request-owned private roots close independently and their views retain owner protection', () => {
   const directory = mkdtempSync(join(tmpdir(), 'library-request-'))
-  const libraries = new PrivateLibraries(directory)
+  const libraries = new PrivateLibraries(directory, directory)
   const account = '00000000-0000-4000-8000-000000000001'
-  const shared = new LibraryRepository(':memory:')
+  preparePersonalFixtures(directory, [account])
+  const shared = new LibraryRepository(prepareManagedDatabase())
   const first = libraries.open(account)
   const second = libraries.open(account)
   try {

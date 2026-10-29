@@ -11,7 +11,7 @@ import type {
   QuizSummary,
   QuizView,
 } from '../../shared/quiz-contracts.ts'
-import { ApplicationError } from '../errors.ts'
+import { ApplicationError } from '../http/errors.ts'
 import type { StudyRepository } from '../questions/study-library.ts'
 import { isLibraryItemId } from '../../shared/library-identity.ts'
 import type { StoredQuiz } from './quiz-repository.ts'

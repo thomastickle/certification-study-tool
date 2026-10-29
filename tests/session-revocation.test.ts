@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -9,6 +10,7 @@ import { AccountRepository } from '../src/server/auth/account-repository.ts'
 test('operator revocation requires an exact identity and leaves other accounts signed in', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-session-revocation-'))
   const path = join(directory, 'accounts.sqlite3')
+  prepareRuntimeDatabase(path)
   const accounts = new AccountRepository(path)
   const issuer = 'https://identity.example/realm'
   try {

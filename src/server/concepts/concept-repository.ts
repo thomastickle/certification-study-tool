@@ -3,26 +3,6 @@ import type { ConceptScope } from '../../shared/concept-contracts.ts'
 
 export type ReviewedConcept = ConceptScope & { id: string; name: string; identities: string[] }
 
-/** Add independently versioned concept metadata without rewriting library or quiz tables. */
-export function migrateConcepts(db: DatabaseSync): void {
-  db.exec('BEGIN IMMEDIATE')
-  try {
-    db.exec(`
-    CREATE TABLE IF NOT EXISTS concept_schema (version INTEGER PRIMARY KEY CHECK (version = 1));
-    INSERT OR IGNORE INTO concept_schema VALUES (1);
-    CREATE TABLE IF NOT EXISTS reviewed_concepts (
-      id TEXT PRIMARY KEY, provider TEXT NOT NULL, certification TEXT NOT NULL,
-      name TEXT NOT NULL, normalized_name TEXT NOT NULL, identities TEXT NOT NULL,
-      UNIQUE(provider, certification, normalized_name)
-    );
-    CREATE TABLE IF NOT EXISTS dismissed_concept_suggestions (id TEXT PRIMARY KEY);
-    COMMIT;`)
-  } catch (error) {
-    db.exec('ROLLBACK')
-    throw error
-  }
-}
-
 /** Store reviewed mappings separately from immutable source content and saved attempts. */
 export class ConceptRepository {
   private db: DatabaseSync

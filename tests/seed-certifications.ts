@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -9,6 +10,7 @@ if (!path || existsSync(path)) {
   throw new Error('Provide a new disposable database path for certification fixtures.')
 }
 mkdirSync(dirname(resolve(path)), { recursive: true, mode: 0o700 })
+prepareRuntimeDatabase(path)
 const repository = new LibraryRepository(path)
 const importer = new ImportService(repository)
 for (const certification of [

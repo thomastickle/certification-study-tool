@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -8,7 +9,7 @@ import { populate } from './quiz-fixtures.ts'
 const options = { sourceFilter: 'mixed', questionType: 'mixed' }
 
 test('only submitted completed snapshots supply mastery, replay survives restart and ignores legacy streaks', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(
@@ -48,7 +49,7 @@ test('only submitted completed snapshots supply mastery, replay survives restart
 })
 
 test('same-day confident practice scores normally without earning miss-recovery days', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = Date.parse('2026-03-07T17:00:00Z')

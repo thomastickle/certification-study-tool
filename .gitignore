@@ -7,9 +7,10 @@
 *.sqlite3
 *.sqlite3-*
 
-# Node dependencies and generated frontend assets.
+# Node dependencies and generated server/frontend assets.
 /node_modules/
 /dist/
+/build/
 *.tsbuildinfo
 .env
 .env.*

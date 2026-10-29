@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -13,7 +15,7 @@ const options = { sourceFilter: 'mixed', questionType: 'mixed' }
 const twoDays = 48 * 60 * 60 * 1000
 
 test('pending deletion excludes a result from all study evidence; undo restores the saved attempt', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = Date.UTC(2026, 9, 21, 12)
@@ -71,7 +73,7 @@ test('pending deletion excludes a result from all study evidence; undo restores 
 })
 
 test('deletion rejects unfinished attempts, expires at exactly 48 hours, and permits early permanent deletion', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000
@@ -117,6 +119,7 @@ test('deletion rejects unfinished attempts, expires at exactly 48 hours, and per
 test('pending deletions survive restart and source removal; expiry purges only deleted results', () => {
   const directory = mkdtempSync(join(tmpdir(), 'quiz-deletion-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   let repository = new LibraryRepository(path)
   let now = 1000
   try {

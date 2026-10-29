@@ -1,6 +1,24 @@
 # Application architecture
 
-One Node HTTP server serves React and the API. The default deployment is local;
+Nest transport layout follows feature ownership. Only `main.ts`, `application.ts`,
+`application.module.ts`, and `production-application.ts` remain at `src/server/`:
+
+- `runtime/` owns configuration, startup acquisition/unwind, runtime aliases and study scope.
+- `security/` owns admission, global guards/filter/interceptor and guarded body parsing and request lifetime.
+- `auth/` owns authentication/session controllers and workflows; its module borrows the
+  runtime-owned authentication singleton. `health/` owns its controller and service.
+- `library-http/` and `study-http/` keep controllers, route guards and private feature
+  helpers next to modules that contain registration only.
+- `web/` owns static/Vite serving and watcher lifetime; `http/` contains framework-free
+  request/body/routing helpers and application errors.
+
+Production assets use [configured Express static middleware](nest-static-serving.md).
+
+The global runtime is registered once. Auth and health modules are composed by the
+application module; security keeps its existing global provider order. Domain
+repositories and services retain their existing directories and ownership.
+
+One NestJS HTTP application serves React and the API. The default deployment is local;
 remote origins require HTTPS. One SQLite database holds shared bank content; each
 user has a separate file for private banks and study records. Another database
 holds identities and hashed application sessions.
@@ -10,7 +28,7 @@ flowchart LR
   GUI[React GUI] --> Auth[Session and workspace checks]
   Auth <--> Provider[OIDC provider]
   Auth --> Accounts[(Accounts and sessions)]
-  Auth --> HTTP[HTTP controller]
+  Auth --> HTTP[Nest feature controllers]
   HTTP --> Admin[Admin role check]
   Admin --> Import[Import service]
   Admin --> Library[Library service]
@@ -33,9 +51,12 @@ flowchart LR
   and initial schema creation live in the repository; services own transactions.
 - `src/server/auth/` verifies OIDC identity and role claims, manages opaque
   sessions, and binds admitted requests to an application account.
-- `src/server/http-controller.ts` translates authenticated requests into service
-  calls. It enforces origin, request-size, and shared-content role checks.
-- `src/server/main.ts` owns startup, the database connection, and frontend serving.
+- `src/server/library-http/` and `src/server/study-http/` contain Nest controllers
+  that translate authenticated requests into existing service calls. Admission,
+  guards, owned input parsing and the security filter preserve HTTP policy.
+- `src/server/main.ts` starts the compiled production composition. The configured
+  `RuntimeModule` owns shared resources; `StudyLibraryScope` owns each verified
+  actor's request storage. `PublicWeb` serves built static files; [development process ownership](development-process.md) uses a stock Vite child.
 - `src/web/` owns React presentation, file selection, and confirmation dialogs.
 - `src/shared/` contains TypeScript request/result types used across boundaries.
 
@@ -139,3 +160,37 @@ content or other user-supplied markup to it. SVG strokes use `currentColor`, and
 shared wrapper controls size so navigation and action icons follow their theme.
 The quiz and practice destinations share the same artwork. Existing artwork is
 preserved by this extraction; it is not attributed to an external icon set.
+
+## Nest HTTP production composition
+
+Compiled `main.ts` uses `createProductionApplication`: one RuntimeModule supplies
+security, LibraryHttpModule and StudyHttpModule. Admission normalizes original
+request targets before Express selection. Guards precede body/parameter work;
+request-owned personal storage remains alive through the actual operation and
+housekeeping observation. Public static serving owns production paths, while
+unknown `/api/*` and `/auth/*` retain JSON security/error handling.
+
+Main serializes initialization and listening and shares early/repeated signal shutdown.
+Production retains the Nest/static transport; development owns a public stock Vite
+child and private real Nest API. It stops public admission, drains backend work and
+SQLite roots in the existing lifetime order, then terminates/joins the frontend
+process group. See [process ownership and assertion migration](development-process.md).
+Overlapping backend factory startup is rejected.
+
+HTTP/security/lifecycle tests now exercise compiled Nest or maintained pure helpers;
+the legacy dispatchers and transport adapters are removed. The benchmark runs the
+actual authenticated Nest API modules with deterministic manual housekeeping.
+Its inert legacy fixture supports pinned pre-Nest comparisons only. See
+[assertion mappings](nest-http-test-migration.md) and
+[measurement boundaries](nest-benchmark-migration.md). Existing reports remain
+historical; the [pinned Nest comparison](nest-performance.md) records the new
+measurements. Final integrated review remains a separate gate. Issue #81 stays open.
+
+The [infrastructure review](nest-infrastructure-review.md) records standard-framework
+replacements, deleted transition code and the tested compatibility exceptions.
+Normal product controllers use guarded body interception with standard Nest Body
+parameters; resource I/O stays in awaited controller/service/interceptor operations.
+
+The factory returns the native Nest object. `ApplicationOwner` owns sequential
+init/listen and one joined close for main/development startup; it does not expose
+an app-shaped facade. Native parameter metadata and pipes are unmodified.

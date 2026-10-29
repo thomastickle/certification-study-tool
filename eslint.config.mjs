@@ -19,7 +19,7 @@ const declarations = [
 ]
 
 export default defineConfig([
-  globalIgnores(['private/**', 'dist/**', 'node_modules/**']),
+  globalIgnores(['private/**', 'dist/**', 'build/**', 'node_modules/**']),
   {
     files: ['**/*.{js,mjs,cjs,ts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended, prettier],
