@@ -24,6 +24,8 @@ Each user has a separate database for private banks and study history.
 
 ```sh
 npm ci
+# External database administration integration tests use this pinned image.
+docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
 npm run dev
 ```
 

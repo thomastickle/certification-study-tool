@@ -28,6 +28,8 @@ jobs:
           check-latest: true
           cache: npm
       - run: npm ci
+      - name: Load pinned standalone Flyway for administration tests
+        run: docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
       - run: npm run check
 
   docker:
