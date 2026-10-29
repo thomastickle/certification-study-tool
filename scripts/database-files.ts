@@ -27,7 +27,7 @@ export const sqlRoot = fileURLToPath(new URL('../database/', import.meta.url))
 
 const ownerPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 
-type ValidationOptions = { unbound?: boolean; legacyHistory?: boolean }
+type ValidationOptions = { unbound?: boolean }
 
 type TemplateManifest = {
   format: 1
@@ -116,17 +116,17 @@ function normalizeSql(sql: string): string {
 }
 
 /** Capture tables, constraints, indices, triggers, columns and foreign keys, excluding Flyway metadata. */
-export function schemaContract(db: DatabaseSync): string {
+export function schemaContract(db: DatabaseSync, includeFlyway = false): string {
   const objects = db
     .prepare(
       `
       SELECT type, name, tbl_name, sql
       FROM sqlite_master
-      WHERE name NOT LIKE 'sqlite_%' AND tbl_name != 'flyway_schema_history'
+      WHERE name NOT GLOB 'sqlite_*' AND (? OR tbl_name != 'flyway_schema_history')
       ORDER BY type, name
     `,
     )
-    .all()
+    .all(includeFlyway ? 1 : 0)
     .map((row) => ({
       type: row.type,
       name: row.name,
@@ -184,19 +184,17 @@ export function validateCurrent(
     ) {
       throw new Error('Unsupported database identity/version; unsupported managed format.')
     }
-    if (!options.legacyHistory) {
-      const history = db
-        .prepare('SELECT version, type, script, success FROM flyway_schema_history')
-        .all()
-      if (
-        history.length !== 1 ||
-        history[0]?.version !== '1' ||
-        history[0]?.type !== 'SQL' ||
-        history[0]?.script !== 'V1__current_schema.sql' ||
-        history[0]?.success !== 1
-      ) {
-        throw new Error('Successful Flyway V1 SQL history required.')
-      }
+    const history = db
+      .prepare('SELECT version, type, script, success FROM flyway_schema_history')
+      .all()
+    if (
+      history.length !== 1 ||
+      history[0]?.version !== '1' ||
+      history[0]?.type !== 'SQL' ||
+      history[0]?.script !== 'V1__current_schema.sql' ||
+      history[0]?.success !== 1
+    ) {
+      throw new Error('Successful Flyway V1 SQL history required.')
     }
     if (kind === 'central') {
       if (
@@ -216,7 +214,8 @@ export function validateCurrent(
         }
       }
     }
-    if (schemaContract(db) !== schemaContract(expected)) {
+    expected.exec(readFileSync(join(sqlRoot, 'legacy-contracts/flyway-history.sql'), 'utf8'))
+    if (schemaContract(db, true) !== schemaContract(expected, true)) {
       throw new Error('Database schema does not match the exact supported current contract.')
     }
     for (const marker of ['concept_schema', 'certification_schema']) {

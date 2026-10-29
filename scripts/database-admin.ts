@@ -32,6 +32,9 @@ import {
 import { migratePrivateStudy } from '../database/tools/legacy/migrate-private-study.ts'
 import { finishStudySeparation } from '../database/tools/legacy/study-separation.ts'
 
+import { validateLegacySchema } from './database-legacy.ts'
+import type { LegacyKind } from './database-legacy.ts'
+
 export const ownerPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/
 
 type Conversion = {
@@ -125,6 +128,7 @@ export function preflight(options: Conversion): { accounts: string[]; privateFil
           }
         }
       }
+      validateLegacySchema(db, path === options.accounts ? 'accounts' : 'shared')
     } finally {
       db.close()
     }
@@ -148,6 +152,7 @@ export function preflight(options: Conversion): { accounts: string[]; privateFil
       const db = new DatabaseSync(path, { readOnly: true })
       try {
         integrity(db)
+        validateLegacySchema(db, 'personal')
         if (
           db.prepare('PRAGMA application_id').get()?.application_id !== 1096242004 ||
           db.prepare('PRAGMA user_version').get()?.user_version !== 4 ||
@@ -226,13 +231,15 @@ function sync(path: string): void {
 /** Copy application rows into Flyway-created tables, retaining exact IDs and SQL constraints.
  * Missing legacy owner/role columns have explicit conversion rules; unknown columns fail closed.
  */
-function importRows(source: string, target: string, legacyOwner?: string): void {
+function importRows(source: string, target: string, kind: LegacyKind, legacyOwner?: string): void {
   const input = new DatabaseSync(source, { readOnly: true })
-  const output = new DatabaseSync(target)
+  let output: DatabaseSync | undefined
   try {
+    const permittedTables = validateLegacySchema(input, kind)
+    output = new DatabaseSync(target)
     output.exec('PRAGMA foreign_keys = ON; BEGIN IMMEDIATE')
     const tables = input
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*'")
       .all()
     const priority = [
       'accounts',
@@ -253,6 +260,7 @@ function importRows(source: string, target: string, legacyOwner?: string): void 
         continue
       }
       if (
+        !permittedTables.includes(table) ||
         !/^[a-z_]+$/.test(table) ||
         !output
           .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -324,11 +332,40 @@ function importRows(source: string, target: string, legacyOwner?: string): void 
     integrity(output)
     output.exec('COMMIT')
   } catch (error) {
-    output.exec('ROLLBACK')
+    if (output?.isTransaction) output.exec('ROLLBACK')
     throw error
   } finally {
     input.close()
-    output.close()
+    output?.close()
+  }
+}
+
+/** Recheck identity and session preservation after all role-scoped imports and transfers. */
+function verifyAuthenticationRows(source: string, central: string): void {
+  const original = new DatabaseSync(source, { readOnly: true })
+  let converted: DatabaseSync | undefined
+  try {
+    converted = new DatabaseSync(central, { readOnly: true })
+    const accounts = 'SELECT id, issuer, subject, name FROM accounts ORDER BY id'
+    const hasRole = original
+      .prepare('PRAGMA table_info(sessions)')
+      .all()
+      .some((row) => row.name === 'role')
+    const role = hasRole ? 'role' : "'student' AS role"
+    const sessions = `SELECT token_hash, account_id, expires_at, ${role} FROM sessions ORDER BY token_hash`
+    const targetSessions =
+      'SELECT token_hash, account_id, expires_at, role FROM sessions ORDER BY token_hash'
+    if (
+      JSON.stringify(original.prepare(accounts).all()) !==
+        JSON.stringify(converted.prepare(accounts).all()) ||
+      JSON.stringify(original.prepare(sessions).all()) !==
+        JSON.stringify(converted.prepare(targetSessions).all())
+    ) {
+      throw new Error('Converted identities or sessions do not match the accounts snapshot.')
+    }
+  } finally {
+    converted?.close()
+    original.close()
   }
 }
 
@@ -408,13 +445,13 @@ export async function convert(options: Conversion, offline: boolean): Promise<vo
     flyway(root, central, 'central')
     flyway(root, template, 'personal')
     sealTemplate(template)
-    importRows(snapshots[0]!, central)
-    importRows(snapshots[1]!, central, options.legacyOwner)
+    importRows(snapshots[0]!, central, 'accounts')
+    importRows(snapshots[1]!, central, 'shared', options.legacyOwner)
     for (const owner of plan.accounts) {
       const target = provisionTemplate(template, fleet, owner)
       const index = plan.privateFiles.findIndex((path) => path.endsWith(`/${owner}.sqlite3`))
       if (index >= 0) {
-        importRows(snapshots[index + 2]!, target, owner)
+        importRows(snapshots[index + 2]!, target, 'personal', owner)
       }
       const db = new DatabaseSync(central)
       try {
@@ -437,6 +474,7 @@ export async function convert(options: Conversion, offline: boolean): Promise<vo
     flyway(root, central, 'central')
     sync(central)
     sync(fleet)
+    verifyAuthenticationRows(snapshots[0]!, central)
     record({ status: 'fleet-success', owners: plan.accounts.length })
     writeFileSync(join(root, 'READY'), '1\n', { flag: 'wx', mode: 0o600 })
     sync(join(root, 'READY'))
@@ -453,6 +491,37 @@ export async function convert(options: Conversion, offline: boolean): Promise<vo
   }
 }
 
+/** Refuse every gate entry, including dangling links, before any provisioning write. */
+function requireDeploymentReady(root: string): void {
+  rejectLinks(root)
+  try {
+    lstatSync(join(root, 'RESTART_BLOCKED'))
+    throw new Error('Maintenance gate active.')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+  requireFile(join(root, 'READY'))
+  if (readFileSync(join(root, 'READY'), 'utf8') !== '1\n')
+    throw new Error('Deployment is not ready.')
+}
+
+/** Check readiness even when there are no registered accounts to provision. */
+export function provisionPending(central: string, template: string, directory: string): void {
+  requireDeploymentReady(dirname(central))
+  validateCurrent(central, 'central')
+  const db = new DatabaseSync(central, { readOnly: true })
+  let owners: string[]
+  try {
+    owners = db
+      .prepare('SELECT id FROM accounts ORDER BY id')
+      .all()
+      .map((row) => String(row.id))
+  } finally {
+    db.close()
+  }
+  for (const owner of owners) provision(central, template, directory, owner)
+}
+
 /** Provision only a centrally registered account outside ordinary application requests. */
 export function provision(
   central: string,
@@ -460,13 +529,8 @@ export function provision(
   directory: string,
   owner: string,
 ): string {
+  requireDeploymentReady(dirname(central))
   validateCurrent(central, 'central')
-  if (existsSync(join(dirname(central), 'RESTART_BLOCKED'))) {
-    throw new Error('Maintenance gate active.')
-  }
-  if (readFileSync(join(dirname(central), 'READY'), 'utf8') !== '1\n') {
-    throw new Error('Deployment is not ready.')
-  }
   const db = new DatabaseSync(central, { readOnly: true })
   try {
     if (!db.prepare('SELECT id FROM accounts WHERE id = ?').get(owner)) {
@@ -508,6 +572,7 @@ export async function maintain(root: string, offline: boolean): Promise<void> {
   if (existsSync(gate)) {
     throw new Error('Prior failure requires operator recovery.')
   }
+  requireDeploymentReady(root)
   const lock = openSync(lockPath, 'wx', 0o600)
   try {
     writeFileSync(gate, 'Maintenance incomplete. Do not restart.\n', { flag: 'wx', mode: 0o600 })
@@ -597,20 +662,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (command === 'provision') {
       console.log(provision(options.central, options.template, options.directory, options.owner))
     } else {
-      validateCurrent(options.central, 'central')
-      const central = new DatabaseSync(options.central, { readOnly: true })
-      let owners: string[]
-      try {
-        owners = central
-          .prepare('SELECT id FROM accounts ORDER BY id')
-          .all()
-          .map((row) => String(row.id))
-      } finally {
-        central.close()
-      }
-      for (const owner of owners) {
-        provision(options.central, options.template, options.directory, owner)
-      }
+      provisionPending(options.central, options.template, options.directory)
     }
   } else {
     const options = JSON.parse(readFileSync(config, 'utf8')) as Conversion

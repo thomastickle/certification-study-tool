@@ -2,6 +2,11 @@ import { DatabaseSync } from 'node:sqlite'
 
 /** Deployed Epic 1 study tables, reconstructed only inside disposable test databases. */
 export const legacyStudySchema = `
+  -- Derived evidence did not exist in the deployed preownership layout.
+  DROP TRIGGER IF EXISTS quiz_evidence_insert;
+  DROP TRIGGER IF EXISTS quiz_evidence_update;
+  DROP TRIGGER IF EXISTS quiz_evidence_delete;
+  DROP TABLE IF EXISTS quiz_evidence;
   DROP TABLE IF EXISTS deleted_sources;
   DROP TABLE IF EXISTS shared_deletion_cursor;
       BEGIN IMMEDIATE;

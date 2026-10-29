@@ -41,3 +41,9 @@ destination. No power-loss or fleet-wide atomicity guarantee is inferred.
 All heavy real-Flyway runs use `/tmp/study-nest-final-check.lock`. The historical
 prototype tests do not regenerate performance measurements or claim new benchmark
 results. Test logs are retained outside Git with private permissions.
+
+Preownership fixtures now explicitly remove derived evidence tables/triggers when
+materializing the deployed v2 layout. That cache was introduced after ownership;
+retaining modern cache objects in the old fixture falsely represented a supported
+legacy schema. Authoritative saved snapshots and all transfer/recovery assertions
+remain intact; external conversion rebuilds current derived evidence as before.

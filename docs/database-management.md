@@ -34,7 +34,14 @@ Create a protected JSON configuration with explicit absolute paths:
 `legacyOwner` is needed only for occupied preownership tables. Verify its internal
 UUID against the old accounts database and the prior operator's identity; never
 infer ownership from first login. Preflight rejects unknown study owners, foreign
-and future formats, symlinks and an existing destination.
+and future formats, symlinks and an existing destination. Each input role has a
+complete frozen legacy schema contract under database/legacy-contracts: tables,
+views, indices, triggers, columns, constraints and foreign keys are checked
+read-only before any output is created. Independently versioned early extensions
+must be complete supported groups. Legacy reference SQL is used only in memory
+for validation; it is not applied to input files or used as an upgrade engine.
+Imports are restricted to that input role, and converted identities/session rows
+are compared again to the authentic accounts snapshot before READY publication.
 
 ```sh
 node scripts/database-admin.ts preflight /synthetic/conversion.json
@@ -90,7 +97,10 @@ node scripts/database-admin.ts provision /synthetic/provision.json
 
 Provision configuration has `central`, `template`, `directory`, and `owner` fields.
 A control-plane job enumerates registered central account UUIDs and calls this
-command explicitly; it must not run from a login handler. Coordinate all
+command explicitly; it must not run from a login handler. Both individual and
+pending provisioning reject every RESTART_BLOCKED directory entry, including a
+dangling symlink, and require a regular, nonlink READY file with exact contents.
+An empty account list does not bypass these deployment checks. Coordinate all
 provisioning and maintenance jobs with the operator's external process lock.
 
 Maintenance preflights the complete current fleet, creates verified per-file
