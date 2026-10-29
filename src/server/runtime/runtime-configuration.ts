@@ -27,13 +27,13 @@ export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeCon
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('STUDY_PORT must be a valid port.')
   }
-  const databasePath = resolve(environment.STUDY_DB_PATH ?? 'private/app/library.sqlite3')
-  const accountsPath = resolve(
-    environment.STUDY_ACCOUNTS_PATH ?? resolve(dirname(databasePath), 'accounts.sqlite3'),
-  )
-  if (accountsPath === databasePath) {
-    throw new Error('STUDY_ACCOUNTS_PATH must be separate from STUDY_DB_PATH.')
+  const databasePath = resolve(environment.STUDY_DB_PATH ?? 'private/app/central.sqlite3')
+  if (environment.STUDY_ACCOUNTS_PATH !== undefined) {
+    throw new Error(
+      'STUDY_ACCOUNTS_PATH is retired. Convert accounts and shared content externally and set STUDY_DB_PATH to the prepared central database.',
+    )
   }
+  const accountsPath = databasePath
   const origin = new URL(environment.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
   const authentication = {
     origin,

@@ -1,6 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { chmodSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { OidcSettings } from './oidc-login.ts'
 import { OidcLogin } from './oidc-login.ts'
@@ -31,10 +29,8 @@ export class ApplicationAuthentication {
     this.login = new OidcLogin(options)
     this.options = options
     this.now = options.now ?? Date.now
-    mkdirSync(dirname(options.accountsPath), { recursive: true, mode: 0o700 })
     const accounts = new AccountRepository(options.accountsPath)
     try {
-      chmodSync(options.accountsPath, 0o600)
       this.accounts = accounts
     } catch (error) {
       accounts.close()

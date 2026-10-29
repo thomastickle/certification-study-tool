@@ -1,5 +1,3 @@
-import { chmodSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
 import { ApplicationAuthentication } from '../auth/application-authentication.ts'
 import { ImportPreviews } from '../importer/import-previews.ts'
 import { LibraryRepository } from '../questions/library-repository.ts'
@@ -47,11 +45,7 @@ export class ApplicationRuntime {
     let shared: LibraryRepository | undefined
     let runtime: ApplicationRuntime | undefined
     try {
-      const subject = configuration.legacyOwnerSubject
-      const legacyOwnerId = subject ? authentication.legacyOwnerId(subject) : undefined
-      mkdirSync(dirname(configuration.databasePath), { recursive: true, mode: 0o700 })
-      shared = new LibraryRepository(configuration.databasePath, 'local', { legacyOwnerId })
-      chmodSync(configuration.databasePath, 0o600)
+      shared = new LibraryRepository(configuration.databasePath)
       const libraries = new PrivateLibraries(configuration.privateLibrariesDirectory)
       runtime = new ApplicationRuntime(
         authentication,
@@ -59,7 +53,6 @@ export class ApplicationRuntime {
         libraries,
         configuration.housekeepingSchedule,
       )
-      libraries.migrateFrom(shared)
       await runtime.housekeeping.tick()
       if (configuration.housekeepingSchedule?.intervalMs !== 0) {
         runtime.timer = setInterval(() => {

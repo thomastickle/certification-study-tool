@@ -31,41 +31,6 @@ type EvidenceRow = {
   checksum: string
 }
 
-const initializedConnections = new WeakSet<DatabaseSync>()
-
-/** Add derived storage without scanning history or changing the authoritative v4 transfer format. */
-export function initializeStudyEvidence(db: DatabaseSync): void {
-  if (initializedConnections.has(db)) {
-    return
-  }
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS quiz_evidence (
-      account_id TEXT NOT NULL,
-      id TEXT NOT NULL,
-      version INTEGER NOT NULL,
-      provider TEXT,
-      certification TEXT,
-      payload TEXT NOT NULL,
-      checksum TEXT NOT NULL,
-      PRIMARY KEY (account_id, id)
-    );
-    CREATE TRIGGER IF NOT EXISTS quiz_evidence_insert AFTER INSERT ON quiz_sessions BEGIN
-      DELETE FROM quiz_evidence WHERE account_id = NEW.account_id AND id = NEW.id;
-    END;
-    CREATE TRIGGER IF NOT EXISTS quiz_evidence_update AFTER UPDATE ON quiz_sessions BEGIN
-      DELETE FROM quiz_evidence WHERE account_id = OLD.account_id AND id = OLD.id;
-      DELETE FROM quiz_evidence WHERE account_id = NEW.account_id AND id = NEW.id;
-    END;
-    CREATE TRIGGER IF NOT EXISTS quiz_evidence_delete AFTER DELETE ON quiz_sessions BEGIN
-      DELETE FROM quiz_evidence WHERE account_id = OLD.account_id AND id = OLD.id;
-    END;
-  `)
-  // An enclosing caller may still roll back this DDL; only cache committed initialization.
-  if (!db.isTransaction) {
-    initializedConnections.add(db)
-  }
-}
-
 /** Bind the small derived payload to its owner, attempt, scope and extraction version. */
 function checksum(accountId: string, row: Omit<EvidenceRow, 'checksum'>): string {
   return createHash('sha256')

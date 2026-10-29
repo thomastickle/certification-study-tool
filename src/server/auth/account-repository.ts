@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
+import { openManagedDatabase, validateManagedDatabase } from '../questions/managed-database.ts'
 import type { SessionUser, StudyRole } from '../../shared/auth-contracts.ts'
 
 export type Identity = { issuer: string; subject: string; name: string; role?: StudyRole }
@@ -10,50 +11,12 @@ export type Account = { id: string; name: string }
 export class AccountRepository {
   private db: DatabaseSync
 
-  constructor(path: string) {
-    this.db = new DatabaseSync(path, { timeout: 5000 })
-    try {
-      const version = Number(this.db.prepare('PRAGMA user_version').get()?.user_version)
-      const appId = Number(this.db.prepare('PRAGMA application_id').get()?.application_id)
-      const existingTables = this.db.prepare(`
-        SELECT count(*) AS total
-        FROM sqlite_master
-        WHERE name NOT LIKE 'sqlite_%'
-      `)
-      const occupied = Number(existingTables.get()?.total) > 0
-      const unrecognizedSchema = version === 0 && occupied
-      const incompatibleVersion =
-        version !== 0 && (appId !== 1096242005 || ![1, 2].includes(version))
-      if (unrecognizedSchema || incompatibleVersion) {
-        throw new Error('Unrecognized account database. Use a separate application data directory.')
-      }
-      this.db.exec(`
-      PRAGMA foreign_keys = ON;
-      BEGIN IMMEDIATE;
-      CREATE TABLE IF NOT EXISTS accounts (
-        id TEXT PRIMARY KEY,
-        issuer TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        name TEXT NOT NULL,
-        UNIQUE(issuer, subject)
-      );
-      CREATE TABLE IF NOT EXISTS sessions (
-        token_hash TEXT PRIMARY KEY,
-        account_id TEXT NOT NULL REFERENCES accounts(id),
-        expires_at INTEGER NOT NULL,
-        role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'student'))
-      );
-      CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
-    `)
-      if (version === 1) {
-        this.db.exec(
-          "ALTER TABLE sessions ADD COLUMN role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('admin', 'student'))",
-        )
-      }
-      this.db.exec('PRAGMA application_id = 1096242005; PRAGMA user_version = 2; COMMIT;')
-    } catch (error) {
-      this.db.close()
-      throw error
+  constructor(path: string | DatabaseSync) {
+    if (typeof path === 'string') {
+      this.db = openManagedDatabase(path)
+    } else {
+      validateManagedDatabase(path)
+      this.db = path
     }
   }
 
