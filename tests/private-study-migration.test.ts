@@ -11,15 +11,33 @@ import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { bank } from './fixtures.ts'
-import { legacyStudySchema } from './legacy-study-schema.ts'
+import { legacyStudySchema, prepareLegacyCleanupMarker } from './legacy-study-schema.ts'
 import { migrateStudyOwnership } from '../src/server/questions/study-schema.ts'
-import { migratePrivateStudy } from '../src/server/questions/migrate-private-study.ts'
+import { migratePrivateStudy } from '../database/tools/legacy/migrate-private-study.ts'
+import {
+  moveStudyTo,
+  studyAccounts,
+  transferFleet,
+} from '../database/tools/legacy/transfer-fleet.ts'
 import { populate } from './quiz-fixtures.ts'
+
+/** Test setup supplies already prepared files; production provisioning belongs to the admin CLI. */
+function transferFixtureFleet(
+  source: string,
+  directory: string,
+  libraries: PrivateLibraries,
+): void {
+  transferFleet(source, (owner) => {
+    libraries.open(owner).close()
+    return join(directory, `${owner}.sqlite3`)
+  })
+}
 
 test('secure-delete is restored even when SQLite refuses to detach the destination', () => {
   const directory = mkdtempSync(join(tmpdir(), 'private-study-detach-'))
   const sourcePath = join(directory, 'shared.sqlite3')
   const shared = new LibraryRepository(sourcePath)
+  prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
   const accountId = randomUUID()
   const libraries = new PrivateLibraries(join(directory, 'users'))
   const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
@@ -77,7 +95,7 @@ test('an interrupted source deletion recovers both files and retries without los
     `)
     source.close()
     const migrationUrl = new URL(
-      '../src/server/questions/migrate-private-study.ts',
+      '../database/tools/legacy/migrate-private-study.ts',
       import.meta.url,
     )
     const child = spawnSync(
@@ -118,7 +136,8 @@ test('an interrupted source deletion recovers both files and retries without los
       recovered.close()
     }
     shared = new LibraryRepository(sourcePath)
-    shared.moveStudyTo(destinationPath, accountId)
+    prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
+    moveStudyTo(join(directory, 'shared.sqlite3'), destinationPath, accountId)
     const migrated = new DatabaseSync(destinationPath)
     try {
       assert.deepEqual(
@@ -132,8 +151,8 @@ test('an interrupted source deletion recovers both files and retries without los
     } finally {
       migrated.close()
     }
-    assert.deepEqual(shared.studyAccounts(), [])
-    shared.moveStudyTo(destinationPath, accountId)
+    assert.deepEqual(studyAccounts(join(directory, 'shared.sqlite3')), [])
+    moveStudyTo(join(directory, 'shared.sqlite3'), destinationPath, accountId)
   } finally {
     shared.close()
     rmSync(directory, { recursive: true, force: true })
@@ -144,6 +163,7 @@ test('a failed source deletion restores connection state and permits a retry on 
   const directory = mkdtempSync(join(tmpdir(), 'private-study-cleanup-'))
   const sourcePath = join(directory, 'shared.sqlite3')
   const shared = new LibraryRepository(sourcePath)
+  prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
   const accountId = randomUUID()
   const libraries = new PrivateLibraries(join(directory, 'users'))
   const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
@@ -191,6 +211,7 @@ for (const ambiguous of [false, true]) {
   test(`migration pins ${ambiguous ? 'ambiguous' : 'unique'} legacy provenance before source context is lost`, () => {
     const directory = mkdtempSync(join(tmpdir(), 'private-study-provenance-'))
     const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
+    prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
     const accountId = randomUUID()
     const libraries = new PrivateLibraries(join(directory, 'users'))
     try {
@@ -214,7 +235,7 @@ for (const ambiguous of [false, true]) {
       for (const question of expected.questions) {
         question.sourceId = ambiguous ? null : shared.sources()[0]!.id
       }
-      libraries.migrateFrom(shared)
+      transferFixtureFleet(join(directory, 'shared.sqlite3'), join(directory, 'users'), libraries)
       const migrated = libraries.open(accountId)
       try {
         assert.deepEqual(migrated.quizStore().find(quiz.id), expected)
@@ -239,6 +260,7 @@ for (const invalidDestination of [
     const directory = mkdtempSync(join(tmpdir(), 'private-study-preconditions-'))
     const sourcePath = join(directory, 'shared.sqlite3')
     const shared = new LibraryRepository(sourcePath)
+    prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
     const accountId = randomUUID()
     const libraries = new PrivateLibraries(join(directory, 'users'))
     const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
@@ -277,6 +299,7 @@ test('a locked destination fails closed and can be retried after the other write
   const directory = mkdtempSync(join(tmpdir(), 'private-study-lock-'))
   const sourcePath = join(directory, 'shared.sqlite3')
   const shared = new LibraryRepository(sourcePath)
+  prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
   const accountId = randomUUID()
   const libraries = new PrivateLibraries(join(directory, 'users'))
   const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
@@ -309,6 +332,7 @@ test('a locked destination fails closed and can be retried after the other write
 test('existing study evidence moves to its owner file without copying shared content or other accounts', () => {
   const directory = mkdtempSync(join(tmpdir(), 'private-study-migration-'))
   const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
+  prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
   const alice = randomUUID()
   const bob = randomUUID()
   try {
@@ -338,7 +362,11 @@ test('existing study evidence moves to its owner file without copying shared con
     const libraries = new PrivateLibraries(join(directory, 'users'))
     const destination = libraries.open(alice)
     destination.close()
-    shared.moveStudyTo(join(directory, 'users', `${alice}.sqlite3`), alice)
+    moveStudyTo(
+      join(directory, 'shared.sqlite3'),
+      join(directory, 'users', `${alice}.sqlite3`),
+      alice,
+    )
     const migrated = libraries.open(alice)
     try {
       assert.deepEqual(migrated.quizStore().find(quiz.id), saved)
@@ -353,7 +381,11 @@ test('existing study evidence moves to its owner file without copying shared con
         false,
         'The old file must not retain deleted attempt data in reusable SQLite pages',
       )
-      shared.moveStudyTo(join(directory, 'users', `${alice}.sqlite3`), alice)
+      moveStudyTo(
+        join(directory, 'shared.sqlite3'),
+        join(directory, 'users', `${alice}.sqlite3`),
+        alice,
+      )
       assert.deepEqual(migrated.quizStore().find(quiz.id), saved)
       assert.equal(shared.forAccount(bob).quizStore().boosts().size, 0)
     } finally {
@@ -369,6 +401,7 @@ test('a failed transfer rolls back both files and refuses to merge conflicting h
   const directory = mkdtempSync(join(tmpdir(), 'private-study-rollback-'))
   const sourcePath = join(directory, 'shared.sqlite3')
   const shared = new LibraryRepository(sourcePath)
+  prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
   const accountId = randomUUID()
   const destinationPath = join(directory, 'users', `${accountId}.sqlite3`)
   const libraries = new PrivateLibraries(join(directory, 'users'))
@@ -386,7 +419,7 @@ test('a failed transfer rolls back both files and refuses to merge conflicting h
     `)
     injected.close()
     assert.throws(
-      () => shared.moveStudyTo(destinationPath, accountId),
+      () => moveStudyTo(join(directory, 'shared.sqlite3'), destinationPath, accountId),
       /synthetic transfer failure/,
     )
     const check = new DatabaseSync(destinationPath)
@@ -398,7 +431,7 @@ test('a failed transfer rolls back both files and refuses to merge conflicting h
       .run(accountId, 'other-evidence', 0, 1)
     check.close()
     assert.throws(
-      () => shared.moveStudyTo(destinationPath, accountId),
+      () => moveStudyTo(join(directory, 'shared.sqlite3'), destinationPath, accountId),
       /already contains study evidence/,
     )
     const source = new DatabaseSync(sourcePath, { readOnly: true })
@@ -412,7 +445,12 @@ test('a failed transfer rolls back both files and refuses to merge conflicting h
     const otherId = randomUUID()
     libraries.open(otherId).close()
     assert.throws(
-      () => shared.moveStudyTo(join(directory, 'users', `${otherId}.sqlite3`), accountId),
+      () =>
+        moveStudyTo(
+          join(directory, 'shared.sqlite3'),
+          join(directory, 'users', `${otherId}.sqlite3`),
+          accountId,
+        ),
       /selected account/,
     )
   } finally {
@@ -425,6 +463,7 @@ test('migration refuses WAL mode before moving any study evidence', () => {
   const directory = mkdtempSync(join(tmpdir(), 'private-study-wal-'))
   const sourcePath = join(directory, 'shared.sqlite3')
   const shared = new LibraryRepository(sourcePath)
+  prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
   const accountId = randomUUID()
   const libraries = new PrivateLibraries(join(directory, 'users'))
   try {
@@ -434,7 +473,12 @@ test('migration refuses WAL mode before moving any study evidence', () => {
     setup.exec('PRAGMA journal_mode = WAL')
     setup.close()
     assert.throws(
-      () => shared.moveStudyTo(join(directory, 'users', `${accountId}.sqlite3`), accountId),
+      () =>
+        moveStudyTo(
+          join(directory, 'shared.sqlite3'),
+          join(directory, 'users', `${accountId}.sqlite3`),
+          accountId,
+        ),
       /DELETE journal mode/,
     )
     const source = new DatabaseSync(sourcePath, { readOnly: true })
@@ -487,6 +531,7 @@ for (const earlierOwnershipUpgrade of [false, true]) {
     }
     legacy.close()
     const shared = new LibraryRepository(path, 'local', { legacyOwnerId: accountId })
+    prepareLegacyCleanupMarker(join(directory, 'shared.sqlite3'))
     const libraries = new PrivateLibraries(join(directory, 'users'))
     try {
       if (earlierOwnershipUpgrade) {
@@ -497,17 +542,25 @@ for (const earlierOwnershipUpgrade of [false, true]) {
           }
           return execute.call(this, sql)
         })
-        assert.throws(() => libraries.migrateFrom(shared), /Synthetic cleanup interruption/)
+        assert.throws(
+          () =>
+            transferFixtureFleet(
+              join(directory, 'shared.sqlite3'),
+              join(directory, 'users'),
+              libraries,
+            ),
+          /Synthetic cleanup interruption/,
+        )
         t.mock.restoreAll()
         assert.deepEqual(
-          shared.studyAccounts(),
+          studyAccounts(join(directory, 'shared.sqlite3')),
           [],
           'Transfers have committed before cleanup fails',
         )
         assert.ok(ids.some((id) => readFileSync(path).includes(Buffer.from(id))))
       }
-      libraries.migrateFrom(shared)
-      assert.equal(shared.studyAccounts().length, 0)
+      transferFixtureFleet(join(directory, 'shared.sqlite3'), join(directory, 'users'), libraries)
+      assert.equal(studyAccounts(join(directory, 'shared.sqlite3')).length, 0)
       const bytes = readFileSync(path)
       for (const id of ids) {
         assert.equal(
@@ -519,7 +572,7 @@ for (const earlierOwnershipUpgrade of [false, true]) {
       const personal = libraries.open(accountId)
       assert.equal(personal.quizStore().completed().length, 10)
       personal.close()
-      libraries.migrateFrom(shared)
+      transferFixtureFleet(join(directory, 'shared.sqlite3'), join(directory, 'users'), libraries)
       assert.equal(shared.sources().length, 1)
     } finally {
       shared.close()

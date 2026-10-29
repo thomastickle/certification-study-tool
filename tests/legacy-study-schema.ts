@@ -1,3 +1,5 @@
+import { DatabaseSync } from 'node:sqlite'
+
 /** Deployed Epic 1 study tables, reconstructed only inside disposable test databases. */
 export const legacyStudySchema = `
   DROP TABLE IF EXISTS deleted_sources;
@@ -53,3 +55,19 @@ export const legacyAccountSchema = `
   PRAGMA user_version = 1;
   COMMIT;
 `
+
+/** Historical fixtures need the staging cleanup metadata that Flyway supplies in production. */
+export function prepareLegacyCleanupMarker(path: string): void {
+  const db = new DatabaseSync(path)
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS private_study_separation (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        complete INTEGER NOT NULL CHECK (complete IN (0, 1))
+      );
+      INSERT OR IGNORE INTO private_study_separation VALUES (1, 1);
+    `)
+  } finally {
+    db.close()
+  }
+}
