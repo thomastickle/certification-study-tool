@@ -1,0 +1,1113 @@
+{
+  "image": "redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86",
+  "platform": "linux/amd64",
+  "node": "v24.22.1",
+  "host": {
+    "osRelease": "7.0.0-38-generic",
+    "cpu": "Intel(R) Core(TM) i5-8265U CPU @ 1.60GHz",
+    "logicalCpus": 8,
+    "totalMemoryBytes": 33361731584
+  },
+  "controls": [
+    "corrupt-template-refused",
+    "stale-template-refused",
+    "migration-failure-rolled-back-and-retry-succeeded",
+    "flyway-checksum-mismatch-refused",
+    "flyway-unknown-applied-version-refused",
+    "partial-fleet-failure-gated-and-retry-succeeded"
+  ],
+  "measurements": [
+    {
+      "operation": "template-generation-first-container",
+      "milliseconds": 4266.445442,
+      "bytes": 135168
+    },
+    {
+      "operation": "fresh-flyway-bind-install",
+      "milliseconds": 5191.176034999997
+    },
+    {
+      "operation": "template-clone-bind-install",
+      "milliseconds": 17.996683999997913
+    },
+    {
+      "operation": "noop-flyway-validate",
+      "milliseconds": 5113.8770099999965
+    },
+    {
+      "operation": "fleet-current-adoption",
+      "count": 1,
+      "milliseconds": 15113.511181999987
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.454786999995122,
+      "bytes": 28672,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5032.308000999998,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.055741999996826,
+      "bytes": 126976,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5086.661810999998,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.610093000010238,
+      "bytes": 122880,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4934.381392999989,
+      "count": 1
+    },
+    {
+      "operation": "fleet-next-upgrade",
+      "count": 1,
+      "milliseconds": 17090.582200999997
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 6.069881000003079,
+      "bytes": 40960,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5291.043305999992,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.849550999992061,
+      "bytes": 139264,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5281.824875999999,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 11.844651999999769,
+      "bytes": 135168,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6458.394205000004,
+      "count": 1
+    },
+    {
+      "operation": "fleet-current-adoption",
+      "count": 10,
+      "milliseconds": 63953.163318000006
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 6.53403999999864,
+      "bytes": 28672,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5555.634372,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.930203000010806,
+      "bytes": 126976,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5896.93374800001,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.463501999998698,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5151.518666999997,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 11.613127999997232,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4997.12009099999,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.259742000023834,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5350.722780000011,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.844459999992978,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5513.152342999994,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.32744900000398,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5098.3398450000095,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.300656999985222,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5209.630375000008,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.790715999988606,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5242.568989000021,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 16.993130000017118,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5378.940734000003,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.215296000009403,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5113.869177000015,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.579767000017455,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5156.837808000011,
+      "count": 10
+    },
+    {
+      "operation": "fleet-next-upgrade",
+      "count": 10,
+      "milliseconds": 70570.57360100001
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.039231000002474,
+      "bytes": 40960,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5104.697370000009,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.757881999976235,
+      "bytes": 139264,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5165.872319999995,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 17.294980000006035,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5483.602009000024,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.09325400000671,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4937.389334000007,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.495328999997582,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5659.543867,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 13.448298000002978,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5523.193605999986,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.760781000019051,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6024.550159000006,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 13.64493000000948,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5840.695168000006,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.989673000003677,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6274.780010999995,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.044542000017827,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 7030.50677800001,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.942233999987366,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5898.382963999989,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.221125000010943,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 7324.782894000004,
+      "count": 10
+    },
+    {
+      "operation": "fresh-flyway-bind-install",
+      "milliseconds": 5765.216707999993
+    },
+    {
+      "operation": "template-clone-bind-install",
+      "milliseconds": 14.629124999977648
+    },
+    {
+      "operation": "noop-flyway-validate",
+      "milliseconds": 4925.853781999962
+    },
+    {
+      "operation": "fleet-current-adoption",
+      "count": 1,
+      "milliseconds": 17137.747360999987
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.363023000012618,
+      "bytes": 28672,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4860.570513999963,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.617526000016369,
+      "bytes": 126976,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 7018.630327999999,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.042934000026435,
+      "bytes": 122880,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5180.8813229999505,
+      "count": 1
+    },
+    {
+      "operation": "fleet-next-upgrade",
+      "count": 1,
+      "milliseconds": 15650.606189000013
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 5.339711000036914,
+      "bytes": 40960,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4584.632478000014,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.797435000014957,
+      "bytes": 139264,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5544.8262939999695,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 16.26933999999892,
+      "bytes": 135168,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5456.748701000004,
+      "count": 1
+    },
+    {
+      "operation": "fleet-current-adoption",
+      "count": 10,
+      "milliseconds": 60334.871591
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.206155000021681,
+      "bytes": 28672,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4064.209812999994,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.468929000024218,
+      "bytes": 126976,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4666.391900999995,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.958101000054739,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5604.384546999994,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.368908000004012,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4726.60297300003,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.925433000025805,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4689.755610000051,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.405882000050042,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5317.74145999999,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.705703000014182,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4756.73060499999,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.882140000001527,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5600.482773000025,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.718118999968283,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4905.864606000017,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.01630199997453,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4821.623855000013,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 11.171159000019543,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4832.371975999966,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 25.31511100003263,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6091.124173999997,
+      "count": 10
+    },
+    {
+      "operation": "fleet-next-upgrade",
+      "count": 10,
+      "milliseconds": 64397.68806100002
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.4199229999794625,
+      "bytes": 40960,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6322.2418419999885,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.006371000024956,
+      "bytes": 139264,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4644.252531000006,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.988059000053909,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5077.983336000005,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.440154000010807,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5251.25205499999,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 11.883771000022534,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6818.2700799999875,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.109456999984104,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5265.088957,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.689236000005621,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5520.218366999994,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.286224999988917,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5280.448993000027,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.409879999991972,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6296.980775000004,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.58764699997846,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4404.575596999959,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.420897999953013,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4471.889295000001,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.761406000005081,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4760.189457,
+      "count": 10
+    },
+    {
+      "operation": "fresh-flyway-bind-install",
+      "milliseconds": 4476.00192900002
+    },
+    {
+      "operation": "template-clone-bind-install",
+      "milliseconds": 14.042070000024978
+    },
+    {
+      "operation": "noop-flyway-validate",
+      "milliseconds": 4549.320967999985
+    },
+    {
+      "operation": "fleet-current-adoption",
+      "count": 1,
+      "milliseconds": 14480.215547
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.32816700002877,
+      "bytes": 28672,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5062.480549999978,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.470277999993414,
+      "bytes": 126976,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4825.264558999974,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.25573799997801,
+      "bytes": 122880,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4528.358175000001,
+      "count": 1
+    },
+    {
+      "operation": "fleet-next-upgrade",
+      "count": 1,
+      "milliseconds": 13796.624408999982
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 5.843112999980804,
+      "bytes": 40960,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4513.116443999985,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.81910299998708,
+      "bytes": 139264,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4455.339952000009,
+      "count": 1
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.841741000011098,
+      "bytes": 135168,
+      "count": 1
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4778.276705999975,
+      "count": 1
+    },
+    {
+      "operation": "fleet-current-adoption",
+      "count": 10,
+      "milliseconds": 53959.75669899996
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.910387000010815,
+      "bytes": 28672,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 3914.617787999974,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 12.162696000013966,
+      "bytes": 126976,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4307.927260000026,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.585567999980412,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4387.478658999957,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.907268000009935,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5608.068727999984,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 20.083930999971926,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4438.734399000008,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.072853000019677,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4464.563602999959,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.842022000055294,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4405.385955000005,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.065717999998014,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4568.973710999999,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.918520000006538,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4346.686835,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.642499000008684,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4398.22718300001,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.28588400001172,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4382.3102859999635,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 16.949040000035893,
+      "bytes": 122880,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4449.549218999979,
+      "count": 10
+    },
+    {
+      "operation": "fleet-next-upgrade",
+      "count": 10,
+      "milliseconds": 60112.43426300003
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 7.277608999982476,
+      "bytes": 40960,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4581.886316000018,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.460997999995016,
+      "bytes": 139264,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5001.568765999982,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.20155999995768,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4508.860660999897,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.399540000013076,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4512.75750800001,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.41742100007832,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4853.763496999978,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 8.748587999958545,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4410.3261459999485,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.780614999937825,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4416.102971000015,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.759459999972023,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4539.026272000046,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.975242999964394,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 4515.286198999966,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 11.584280000068247,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6789.302507000044,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 10.17829100007657,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 5587.6716590001015,
+      "count": 10
+    },
+    {
+      "operation": "backup",
+      "milliseconds": 9.453272999962792,
+      "bytes": 135168,
+      "count": 10
+    },
+    {
+      "operation": "flyway-maintenance",
+      "milliseconds": 6160.306729999953,
+      "count": 10
+    }
+  ],
+  "note": "All CLI timings include Docker/JVM startup. Image pull excluded. No RSS measurement. Synthetic fixtures: 1 account/session, 100 shared questions, 25 attempts/evidence rows per personal DB. Personal counts exclude 2 central DBs. Snapshots are preservation fixtures, not scored quiz payloads."
+}
