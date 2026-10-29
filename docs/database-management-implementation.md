@@ -104,3 +104,25 @@ names and SQL paths through the overseer. Neither lane publishes independently;
 return scoped local commits for integrated verification and an independently
 reviewed PR against `t3/nest-conversion`. No user database, environment, volume or
 live service is to be changed before the post-master local conversion.
+
+### Administration lane implementation notes
+
+The admin entry point is `scripts/database-admin.ts`: `preflight`, `convert`,
+`template`, `provision`, `provision-pending`, and offline `maintain`. Conversion
+creates fresh Flyway V1 schemas and imports legacy rows, rather than baselining
+legacy files or applying Node schema version dispatch. Original inputs remain
+untouched. Owner transfers and physical cleanup live in `database/tools/legacy`.
+
+Publication contract: the central parent directory contains `READY` with exact
+`1\n` only after complete fleet validation. `RESTART_BLOCKED` overrides readiness;
+`maintenance.lock` excludes cooperating administrative jobs. All writers and old
+servers still require external operator stop/drain and restart exclusion. Failed
+conversion is abandoned and retried into a different output directory, retaining
+its snapshots and journal. Current fleet maintenance validates and backs up each
+file and retains the gate on any failure; a future schema revision needs matching
+compatibility/recovery support before this command accepts it.
+
+Integration must adapt the remaining historical test setup to the runtime lane's
+managed fixture helper. Transfer assertions now target external administration,
+but historical fixture constructors still use the old runtime setup in this lane's
+base checkout. Integrated verification and independent review remain parent gates.
