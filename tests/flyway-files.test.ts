@@ -4,9 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
-import { AccountRepository } from '../src/server/auth/account-repository.ts'
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
-import { PrivateLibraries } from '../src/server/questions/private-libraries.ts'
+import { prepareHistoricalDatabase } from './legacy-database-fixture.ts'
+import { prepareLegacyCleanupMarker } from './legacy-study-schema.ts'
 import { validateCurrent } from '../scripts/flyway-files.ts'
 
 const owner = '11111111-1111-1111-1111-111111111111'
@@ -16,9 +15,9 @@ test('current deployed accounts, shared and personal schemas pass read-only adop
   try {
     const accounts = join(root, 'accounts.sqlite3')
     const shared = join(root, 'shared.sqlite3')
-    new AccountRepository(accounts).close()
-    new LibraryRepository(shared).close()
-    new PrivateLibraries(join(root, 'personal')).open(owner).close()
+    prepareHistoricalDatabase(accounts, 'accounts')
+    prepareHistoricalDatabase(shared, 'shared')
+    prepareHistoricalDatabase(join(root, 'personal', `${owner}.sqlite3`), 'personal', owner)
     for (const [path, kind, id] of [
       [accounts, 'accounts', undefined],
       [shared, 'shared', undefined],
@@ -37,7 +36,7 @@ test('foreign, future, altered trigger and wrong owner are refused without write
   const root = mkdtempSync(join(tmpdir(), 'flyway-refusal-'))
   try {
     const path = join(root, 'shared.sqlite3')
-    new LibraryRepository(path).close()
+    prepareHistoricalDatabase(path, 'shared')
     const db = new DatabaseSync(path)
     db.exec('PRAGMA user_version = 99')
     db.close()
@@ -49,7 +48,7 @@ test('foreign, future, altered trigger and wrong owner are refused without write
     alter.close()
     assert.throws(() => validateCurrent(path, 'shared'), /schema/i)
     const personalDirectory = join(root, 'personal')
-    new PrivateLibraries(personalDirectory).open(owner).close()
+    prepareHistoricalDatabase(join(personalDirectory, `${owner}.sqlite3`), 'personal', owner)
     const personal = join(personalDirectory, `${owner}.sqlite3`)
     const personalBefore = readFileSync(personal)
     assert.throws(
@@ -100,7 +99,7 @@ test('adoption validates indices, independent markers, constraints and optional 
       'PRAGMA application_id = 1',
     ]) {
       const path = join(root, `${Math.random()}.sqlite3`)
-      new LibraryRepository(path).close()
+      prepareHistoricalDatabase(path, 'shared')
       const db = new DatabaseSync(path)
       db.exec(sql)
       db.close()
@@ -109,9 +108,8 @@ test('adoption validates indices, independent markers, constraints and optional 
       assert.deepEqual(readFileSync(path), before)
     }
     const path = join(root, 'cleanup.sqlite3')
-    const shared = new LibraryRepository(path)
-    shared.finishStudyMigration()
-    shared.close()
+    prepareHistoricalDatabase(path, 'shared')
+    prepareLegacyCleanupMarker(path)
     validateCurrent(path, 'shared')
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -208,11 +206,11 @@ test('offline maintenance refuses missing acknowledgement, concurrent runs and w
     rmSync(join(root, 'maintenance.lock'))
     const accounts = join(root, 'accounts.sqlite3')
     const shared = join(root, 'shared.sqlite3')
-    new AccountRepository(accounts).close()
-    new LibraryRepository(shared).close()
+    prepareHistoricalDatabase(accounts, 'accounts')
+    prepareHistoricalDatabase(shared, 'shared')
     const fleet = join(root, 'fleet')
     mkdirSync(fleet, { mode: 0o700 })
-    new PrivateLibraries(fleet).open(owner).close()
+    prepareHistoricalDatabase(join(fleet, `${owner}.sqlite3`), 'personal', owner)
     const personal = join(fleet, `${owner}.sqlite3`)
     const db = new DatabaseSync(personal)
     db.prepare('UPDATE private_library_owner SET account_id = ?').run(
