@@ -29,7 +29,7 @@ for (const [label, sql] of [
   ['failed migration', 'UPDATE flyway_schema_history SET success = 0'],
   ['incomplete', 'UPDATE private_study_separation SET complete = 0'],
   ['missing projection table', 'DROP TABLE quiz_evidence'],
-]) {
+] as const) {
   test(`reject ${label} central database without schema repair`, () => {
     const db = prepareManagedDatabase()
     try {
