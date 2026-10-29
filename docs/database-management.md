@@ -7,6 +7,65 @@ Docker calls use `--pull never --network none`, a read-only SQL mount, and one
 explicit writable output directory. Protect the SQL catalog and template manifest
 as trusted administrative artifacts; a hash is not a signature.
 
+## Fresh installation
+
+For a genuinely new installation, run the standalone command from a Node 24
+checkout with Docker available and the pinned Flyway image already loaded:
+
+```sh
+docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
+mkdir -p private
+npm run database:admin -- init private/app
+```
+
+The destination must not exist, even as an empty directory. Use conversion for
+an existing installation; never delete its files to make `init` succeed. This
+command reserves a 0700 directory, installs a restart gate and exclusive admin
+lock, invokes real Flyway for central V1 and the personal template, seals and
+validates the template, and creates an empty 0700 `users` directory. It fsyncs
+the prepared files and publishes `READY` last, then removes the gate. Failure
+retains the incomplete destination and gate; preserve it for investigation and
+retry into a different new destination. No account or personal file is created
+until a verified account is registered and externally provisioned.
+
+### Fresh Docker volume
+
+The application image contains no Flyway or migration SQL. Build it, prepare a
+new host staging directory with the command above (use `private/docker-bootstrap`
+instead of `private/app`), then copy the validated deployment into a **new empty**
+named volume before starting Compose. The following example uses project
+`study-local`; choose the matching project name for all subsequent Compose
+commands. Do not run it against an existing installation or a running service.
+
+Run this as one block. The copy is performed by a stopped container; the gate is
+removed only after the entire copy succeeds and ownership is assigned to the
+image's `node` user. Failed installation remains blocked; retain that volume and
+investigate rather than deleting the gate or blindly retrying into it.
+
+```sh
+(
+  set -e
+  docker compose -p study-local build study
+  docker volume create study-local_study-data
+  docker run --rm --network none --user root --volume study-local_study-data:/data \
+    --entrypoint node certification-study-tool-study:local -e \
+    "const fs = require('node:fs'); require('node:assert/strict').deepEqual(fs.readdirSync('/data'), []); fs.writeFileSync('/data/RESTART_BLOCKED', 'Installation incomplete. Do not start.\\n', {flag:'wx',mode:0o600})"
+  docker create --name study-data-install --volume study-local_study-data:/data \
+    certification-study-tool-study:local
+  docker cp --archive private/docker-bootstrap/. study-data-install:/data
+  docker run --rm --network none --user root --volume study-local_study-data:/data \
+    --entrypoint sh certification-study-tool-study:local -c \
+    'chown -R node:node /data && chmod 700 /data && test "$(cat /data/READY)" = 1 && rm /data/RESTART_BLOCKED'
+  docker rm study-data-install
+  docker compose -p study-local up -d
+)
+```
+
+Retain the host staging directory and its restricted Flyway logs. Docker CI uses
+this same external `init` boundary with a fresh named volume and then checks the
+packaged server's health and frontend. It does not use the test-only schema
+fixture for the empty-volume bootstrap.
+
 ## Conversion boundary
 
 **Do not convert the user's local installation before this work has merged into
@@ -42,6 +101,13 @@ must be complete supported groups. Legacy reference SQL is used only in memory
 for validation; it is not applied to input files or used as an upgrade engine.
 Imports are restricted to that input role, and converted identities/session rows
 are compared again to the authentic accounts snapshot before READY publication.
+Shared v1/v2 pre-private installations may have no fleet directory: a missing path
+is treated as an empty fleet without creating or modifying that input. Shared
+v3/v4 still require a real protected fleet directory, even when empty. Symlinks,
+including dangling fleet links, and foreign entries remain errors. If legacy
+`quiz_evidence` exists, every row must have a known account and a matching saved
+attempt; unknown owners or orphan rows require explicit offline reconciliation
+before conversion. Older formats without that table remain supported.
 
 ```sh
 node scripts/database-admin.ts preflight /synthetic/conversion.json
@@ -86,6 +152,9 @@ canonical owner, validates it, fsyncs and installs with a no-replacement hard li
 The directory must be 0700; existing files must validate and be 0600. It must run
 under the same externally enforced writer exclusion as maintenance. Ordinary
 login/request code must not call it.
+Both an already-existing file and a concurrent installation winner must have the
+same Flyway audit identity/checksum as the trusted template. A merely compatible
+legacy v4 file is not considered provisioned; adopt it through offline conversion.
 
 Offline maintenance of the current managed fleet is available as:
 
@@ -110,3 +179,33 @@ Flyway catalogs; a future schema release must extend compatibility validation an
 its recovery tests before it can be used here. Existing failed gates require
 operator review and backup recovery with all writers stopped. There is no
 automatic stale-lock deletion, repair, clean or checksum acceptance.
+
+## Prototype follow-ups and release limits
+
+The `dev/flyway`/`scripts/flyway-*` experiment is historical and is not a supported
+deployment path. Production uses the combined central catalog and
+`scripts/database-admin.ts`; it never uses the prototype's `hasProbe` retry rule.
+This release accepts exactly Flyway V1. It deliberately refuses future migration
+versions: it does not claim support for resuming a mixed V1/V2 fleet. Before any
+real V2 release, add version-specific application contracts and an interrupted
+mixed-version recovery test using an actual column/data change, with Flyway still
+owning execution/checksums. No custom Node version dispatcher is introduced here.
+
+Sequential Flyway process startup remains a fleet downtime cost. A supported
+long-lived Flyway batch runner and its measurements are not delivered by this
+change. Plan a stopped/drained maintenance window from measurements of the
+actual deployment fleet; the prototype's small synthetic timings are not a
+production outage budget. Existing historical conversion/ownership/cleanup tests
+exercise supported legacy declarations; they are not an exhaustive survey of
+every deployed schema lineage. Unsupported forms fail read-only preflight and
+must receive explicit reviewed contracts and fixtures before conversion.
+
+The review correction also exercised actual archived runtime code at
+`fcf980bcc1f45e61a251cd3584fadb200e62a023`: a fresh v4 installation and a v2
+installation created by `028a035dcf717a0f9d5badbafff962ab01721850`, upgraded and
+physically separated by that later runtime. Both contained completed quizzes and
+persisted evidence; the upgraded path retained an incomplete cleanup marker.
+External conversion accepted both, preserved every personal snapshot/evidence
+row exactly, and left all three original account/shared/personal files byte for
+byte unchanged. These retained historical probes supplement the automated
+legacy-contract tests; they are not a claim of exhaustive release coverage.

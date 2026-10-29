@@ -1,11 +1,6 @@
 import { chmodSync, existsSync, lstatSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-import {
-  validateManagedDatabase,
-  validateDeploymentRoot,
-  requireRealDirectory,
-} from './managed-database.ts'
+import { validateDeploymentRoot, requireRealDirectory } from './managed-database.ts'
 import { ApplicationError } from '../http/errors.ts'
 import { LibraryRepository } from './library-repository.ts'
 
@@ -44,18 +39,18 @@ export class PrivateLibraries {
     if (file.isSymbolicLink() || !file.isFile()) {
       throw new Error('Private library must be a regular file.')
     }
-    const probe = new DatabaseSync(path, { readOnly: true })
-    try {
-      validateManagedDatabase(probe, accountId)
-    } finally {
-      probe.close()
-    }
-    chmodSync(this.directory, 0o700)
-    chmodSync(path, 0o600)
-    return new LibraryRepository(path, accountId, {
+    // Repository acquisition validates read-only before restricting/opening the file.
+    const library = new LibraryRepository(path, accountId, {
       privateOwnerId: accountId,
       deploymentRoot: this.deploymentRoot,
     })
+    try {
+      chmodSync(this.directory, 0o700)
+      return library
+    } catch (error) {
+      library.close()
+      throw error
+    }
   }
 
   /** Discover persisted owner files after restart, excluding incomplete installation files. */

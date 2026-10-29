@@ -344,6 +344,23 @@ function syncFile(path: string): void {
   }
 }
 
+/** Apply identical owner, schema, permissions and trusted-history checks to every existing winner. */
+function verifyProvisionedTarget(target: string, template: string, owner: string): void {
+  validateCurrent(target, 'personal', owner)
+  const manifest = JSON.parse(readFileSync(`${template}.manifest.json`, 'utf8')) as TemplateManifest
+  const existing = new DatabaseSync(target, { readOnly: true })
+  try {
+    if (sha256(historyContract(existing)) !== manifest.historySha256) {
+      throw new Error('Existing personal Flyway history differs from the trusted template.')
+    }
+  } finally {
+    existing.close()
+  }
+  if ((lstatSync(target).mode & 0o777) !== 0o600) {
+    throw new Error('Existing personal file must have mode 0600.')
+  }
+}
+
 /** Clone, bind and atomically install outside requests; never overwrite a concurrent winner.
  * @throws {Error} For unsafe paths, stale templates or an existing target with an unverifiable owner.
  */
@@ -362,21 +379,7 @@ export function provisionTemplate(template: string, directory: string, owner: st
   const target = join(directory, `${owner}.sqlite3`)
   verifyTemplate(template)
   if (lstatExists(target)) {
-    validateCurrent(target, 'personal', owner)
-    const manifest = JSON.parse(
-      readFileSync(`${template}.manifest.json`, 'utf8'),
-    ) as TemplateManifest
-    const existing = new DatabaseSync(target, { readOnly: true })
-    try {
-      if (sha256(historyContract(existing)) !== manifest.historySha256) {
-        throw new Error('Existing personal Flyway history differs from the trusted template.')
-      }
-    } finally {
-      existing.close()
-    }
-    if ((lstatSync(target).mode & 0o777) !== 0o600) {
-      throw new Error('Existing personal file must have mode 0600.')
-    }
+    verifyProvisionedTarget(target, template, owner)
     return target
   }
   const temporary = join(directory, `.provisioning-${randomUUID()}.sqlite3`)
@@ -397,7 +400,7 @@ export function provisionTemplate(template: string, directory: string, owner: st
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         throw error
       }
-      validateCurrent(target, 'personal', owner)
+      verifyProvisionedTarget(target, template, owner)
     }
     syncFile(directory)
     return target

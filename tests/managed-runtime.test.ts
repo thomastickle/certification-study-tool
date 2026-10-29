@@ -3,6 +3,7 @@ import { mkdtempSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { DatabaseSync } from 'node:sqlite'
 import { AccountRepository } from '../src/server/auth/account-repository.ts'
 
 test('missing central database fails without creating a file', () => {
@@ -236,5 +237,37 @@ test('prepared central permissions are restricted only after successful read-onl
     assert.equal(statSync(path).mode & 0o777, 0o600)
   } finally {
     rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('private acquisition validates once read-only, then opens one owned writable connection', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'managed-private-acquisition-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const owner = '11111111-1111-1111-1111-111111111111'
+  prepareManagedDatabase(join(directory, `${owner}.sqlite3`), owner).close()
+  writeFileSync(join(directory, 'READY'), '1\n')
+  const connections = new Set<DatabaseSync>()
+  let inspections = 0
+  const prepare = DatabaseSync.prototype.prepare
+  const exec = DatabaseSync.prototype.exec
+  t.mock.method(DatabaseSync.prototype, 'prepare', function (this: DatabaseSync, sql: string) {
+    connections.add(this)
+    if (sql === 'PRAGMA application_id') {
+      inspections++
+    }
+    return prepare.call(this, sql)
+  })
+  t.mock.method(DatabaseSync.prototype, 'exec', function (this: DatabaseSync, sql: string) {
+    connections.add(this)
+    return exec.call(this, sql)
+  })
+  const library = new PrivateLibraries(directory, directory).open(owner)
+  try {
+    assert.equal(inspections, 1)
+    assert.equal(connections.size, 2)
+    assert.deepEqual(library.forAccount(owner).quizStore().snapshots(), [])
+  } finally {
+    library.close()
+    t.mock.restoreAll()
   }
 })

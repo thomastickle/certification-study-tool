@@ -68,6 +68,7 @@ export function preflight(options: Conversion): { accounts: string[]; privateFil
     throw new Error('Destination already exists.')
   }
   const ids: string[] = []
+  let sharedVersion = 0
   for (const [path, identity, versions] of [
     [options.accounts, 1096242005, [1, 2]],
     [options.shared, 1096242004, [1, 2, 3, 4]],
@@ -98,7 +99,13 @@ export function preflight(options: Conversion): { accounts: string[]; privateFil
           ids.push(String(row.id))
         }
       } else {
-        for (const table of ['quiz_sessions', 'quiz_mastery', 'earned_certifications']) {
+        sharedVersion = Number(db.prepare('PRAGMA user_version').get()?.user_version)
+        for (const table of [
+          'quiz_sessions',
+          'quiz_mastery',
+          'earned_certifications',
+          'quiz_evidence',
+        ]) {
           const columns = db.prepare(`PRAGMA table_info(${table})`).all()
           if (!columns.length) {
             continue
@@ -127,6 +134,22 @@ export function preflight(options: Conversion): { accounts: string[]; privateFil
             }
           }
         }
+        if (db.prepare("SELECT name FROM sqlite_master WHERE name = 'quiz_evidence'").get()) {
+          const orphan = db
+            .prepare(
+              `
+            SELECT 1 FROM quiz_evidence AS evidence
+            WHERE NOT EXISTS (
+              SELECT 1 FROM quiz_sessions AS attempt
+              WHERE attempt.account_id = evidence.account_id AND attempt.id = evidence.id
+            ) LIMIT 1
+          `,
+            )
+            .get()
+          if (orphan) {
+            throw new Error('Orphan study evidence requires explicit offline reconciliation.')
+          }
+        }
       }
       validateLegacySchema(db, path === options.accounts ? 'accounts' : 'shared')
     } finally {
@@ -134,6 +157,12 @@ export function preflight(options: Conversion): { accounts: string[]; privateFil
     }
   }
   rejectLinks(options.fleet)
+  if (!existsSync(options.fleet)) {
+    if (sharedVersion <= 2) {
+      return { accounts: ids, privateFiles: [] }
+    }
+    throw new Error('Fleet directory required for ownership-aware legacy releases.')
+  }
   if (
     !lstatSync(options.fleet).isDirectory() ||
     (lstatSync(options.fleet).mode & 0o777) !== 0o700
@@ -225,6 +254,45 @@ function sync(path: string): void {
     fsyncSync(fd)
   } finally {
     closeSync(fd)
+  }
+}
+
+/** Prepare an entirely new deployment using Flyway, publishing readiness only after validation.
+ * @throws {Error} For an existing/unsafe destination or failed preparation; failed output stays gated.
+ */
+export function initialize(root: string): void {
+  rejectLinks(root)
+  mkdirSync(root, { mode: 0o700 })
+  const gate = join(root, 'RESTART_BLOCKED')
+  writeFileSync(gate, 'Initialization incomplete. Do not start any server.\n', {
+    flag: 'wx',
+    mode: 0o600,
+  })
+  sync(gate)
+  sync(root)
+  const lockPath = join(root, 'maintenance.lock')
+  const lock = openSync(lockPath, 'wx', 0o600)
+  try {
+    const fleet = join(root, 'users')
+    mkdirSync(fleet, { mode: 0o700 })
+    const central = join(root, 'central.sqlite3')
+    flyway(root, central, 'central')
+    const template = generateTemplate(root)
+    validateCurrent(central, 'central')
+    // Template validation also proves the catalog and Flyway audit identity are sealed.
+    sync(template)
+    sync(`${template}.manifest.json`)
+    sync(central)
+    sync(fleet)
+    writeFileSync(join(root, 'READY'), '1\n', { flag: 'wx', mode: 0o600 })
+    sync(join(root, 'READY'))
+    sync(root)
+    rmSync(gate)
+    sync(root)
+  } finally {
+    closeSync(lock)
+    rmSync(lockPath)
+    sync(root)
   }
 }
 
@@ -646,9 +714,13 @@ export async function maintain(root: string, offline: boolean): Promise<void> {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command, config, flag] = process.argv.slice(2)
   if (!config) {
-    throw new Error('Usage: database-admin.ts preflight|convert config.json [--offline]')
+    throw new Error(
+      'Usage: database-admin.ts init|template|maintain directory OR preflight|convert|provision|provision-pending config.json [--offline]',
+    )
   }
-  if (command === 'maintain') {
+  if (command === 'init') {
+    initialize(config)
+  } else if (command === 'maintain') {
     await maintain(config, flag === '--offline')
   } else if (command === 'template') {
     console.log(generateTemplate(config))

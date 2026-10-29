@@ -53,11 +53,20 @@ jobs:
         with:
           node-version-file: package.json
           check-latest: true
-      - name: Prepare disposable smoke database outside the server image
-        run: node --input-type=module -e "import { prepareRuntimeDatabase } from './tests/managed-database-fixture.ts'; prepareRuntimeDatabase('/tmp/study-ci-data/central.sqlite3')"
+      - name: Initialize a fresh deployment with standalone Flyway
+        run: |
+          docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
+          node scripts/database-admin.ts init /tmp/study-ci-data
+      - name: Install prepared files into a genuinely empty Docker volume
+        run: |
+          docker volume create study-ci-data
+          docker run --rm --user root --volume study-ci-data:/data --entrypoint node study-tool:ci -e "const fs = require('node:fs'); require('node:assert/strict').deepEqual(fs.readdirSync('/data'), []); fs.writeFileSync('/data/RESTART_BLOCKED', 'Installation incomplete. Do not start.\n', {flag:'wx',mode:0o600})"
+          docker create --name study-tool --user "$(id -u):$(id -g)" --volume study-ci-data:/data --publish 127.0.0.1:3000:3000 study-tool:ci
+          docker cp --archive /tmp/study-ci-data/. study-tool:/data
+          docker run --rm --user root --volume study-ci-data:/data --entrypoint node study-tool:ci -e "require('node:assert/strict').equal(require('node:fs').readFileSync('/data/READY', 'utf8'), '1\n'); require('node:fs').unlinkSync('/data/RESTART_BLOCKED')"
       - name: Verify container health and web app
         run: |
-          docker run --detach --name study-tool --user "$(id -u):$(id -g)" --volume /tmp/study-ci-data:/data --publish 127.0.0.1:3000:3000 study-tool:ci
+          docker start study-tool
           for attempt in {1..30}; do
             status=$(docker inspect --format '{{.State.Health.Status}}' study-tool)
             if [ "$status" = healthy ]; then
@@ -73,7 +82,9 @@ jobs:
           exit 1
       - name: Remove test container
         if: always()
-        run: docker rm --force study-tool || true
+        run: |
+          docker rm --force study-tool || true
+          docker volume rm study-ci-data || true
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json

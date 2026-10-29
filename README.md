@@ -24,8 +24,11 @@ Each user has a separate database for private banks and study history.
 
 ```sh
 npm ci
-# External database administration integration tests use this pinned image.
+# Standalone Flyway prepares storage outside the server.
 docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
+# NEW installations only; private/app must not already exist.
+mkdir -p private
+npm run database:admin -- init private/app
 npm run dev
 ```
 
@@ -52,7 +55,9 @@ conversion is deferred until the complete change has merged into master.
 ## Run with Docker
 
 With Docker Engine/Desktop and Docker Compose running, follow the
-[role setup and upgrade instructions](docs/authentication.md) before starting:
+[role setup and upgrade instructions](docs/authentication.md) and the
+[fresh-volume preparation procedure](docs/database-management.md#fresh-docker-volume)
+before starting. A missing database is deliberately not initialized by the image:
 
 ```sh
 docker compose up --build -d
@@ -73,8 +78,8 @@ The `study-data` Docker volume stores SQLite data across container rebuilds and
 recreation. `docker compose down --volumes` **permanently deletes that library**.
 The `keycloak-data` volume separately preserves provider identities.
 Back up the volume while the service is stopped before removing volumes or
-moving machines. This starts a new, empty library; your existing
-`private/app/central.sqlite3` is not copied. Import banks through the browser as
+moving machines. Fresh volume preparation installs an externally generated empty
+library; your existing `private/app/central.sqlite3` is not copied. Import banks through the browser as
 usual. Private files, local databases, credentials, and Git history are excluded
 from the build context and image. No image publishing is required.
 

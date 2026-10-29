@@ -107,7 +107,7 @@ live service is to be changed before the post-master local conversion.
 
 ### Administration lane implementation notes
 
-The admin entry point is `scripts/database-admin.ts`: `preflight`, `convert`,
+The admin entry point is `scripts/database-admin.ts`: `init`, `preflight`, `convert`,
 `template`, `provision`, `provision-pending`, and offline `maintain`. Conversion
 creates fresh Flyway V1 schemas and imports legacy rows, rather than baselining
 legacy files or applying Node schema version dispatch. Original inputs remain
@@ -122,7 +122,7 @@ its snapshots and journal. Current fleet maintenance validates and backs up each
 file and retains the gate on any failure; a future schema revision needs matching
 compatibility/recovery support before this command accepts it.
 
-Integration must adapt the remaining historical test setup to the runtime lane's
-managed fixture helper. Transfer assertions now target external administration,
-but historical fixture constructors still use the old runtime setup in this lane's
-base checkout. Integrated verification and independent review remain parent gates.
+Historical fixture setup now lives outside server code. Transfer assertions target
+external administration; runtime tests use explicit managed fixtures. Fresh native
+and Docker-volume bootstrap use the real standalone `init` command. Integrated
+verification and independent review remain release gates.
