@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -8,7 +9,7 @@ import { bank } from './fixtures.ts'
 import { populate } from './quiz-fixtures.ts'
 
 test('selection excludes duplicates, unmapped records and other exams; source/type filters are enforced', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const input = populate(repository)
     const duplicate = structuredClone(input)
@@ -73,7 +74,7 @@ test('selection excludes duplicates, unmapped records and other exams; source/ty
 })
 
 test('boosted question receives three units of probability versus one and cannot repeat within a quiz', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const rows = repository.allQuestions()

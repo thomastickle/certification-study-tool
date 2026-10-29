@@ -18,8 +18,8 @@ mixing their contents. Older shared IDs remain numbers; combined practice uses
 The standard Docker volume contains:
 
 ```text
-/data/accounts.sqlite3              identities, roles in sessions, hashed sessions
-/data/library.sqlite3               shared banks, reviewed mappings, deletion events
+/data/central.sqlite3              identities, hashed sessions, shared banks and deletion events
+/data/READY                        exact external readiness marker: 1 followed by newline
 /data/users/<internal-ID>.sqlite3   private banks, attempts, mastery, earned certifications
 ```
 
@@ -39,8 +39,7 @@ Routine expiry and shared-deletion reconciliation isolate failures per account.
 A damaged private file is never replaced or repaired automatically. Its canonical
 internal account ID is logged without database errors or study content. Other
 accounts remain available, and later housekeeping passes retry the failed account. Directory
-discovery failures are also logged and retried. Schema/data migration and physical
-cleanup still fail startup rather than serving a partially separated layout.
+discovery failures are also logged and retried. Incomplete external separation or maintenance blocks startup rather than serving a partially separated layout.
 
 The first upkeep pass reconstructs timers from persisted files before HTTP starts.
 Thereafter, a one-second tick opens only owners whose known active-attempt or
@@ -59,7 +58,7 @@ each next owner, so newly observed or newly due work can run while a sweep progr
 Overlapping ticks share one running promise and coalesce into a follow-up check,
 without concurrent sweeps or queued copies of every tick. Failed owners retry on a
 later tick; discovery failures retain known deadlines and retry at the next cadence.
-Startup awaits the recovery pass after migration and before listening. Shutdown
+Startup validates externally prepared storage and awaits the recovery pass before listening. Shutdown
 cancels unstarted owner work and drains the pass before closing the shared root.
 
 This bounds a processing slice to one owner's synchronous work, not a fixed time
@@ -88,46 +87,19 @@ restart. Private deletion annotates saved attempts in the same private transacti
 Neither operation removes saved answers or grades. Due obligations can remain
 unavailable after their bank is removed, as before.
 
-## Upgrade from Epic 2
+## External preparation and upgrades
 
-1. Stop every application instance. Retain the previous image and make a private
-   backup of the entire stopped application volume, Keycloak volume and settings.
-   Keep the same issuer, account registry, shared database path and Compose project.
-2. The normal application uses SQLite DELETE journal mode. If an operator enabled
-   WAL, stop all clients and checkpoint/change each affected database back to
-   DELETE mode before upgrading. Migration refuses unsupported journal modes.
-3. Build and start the new image. Schema version 4 prevents older releases from
-   opening the upgraded layout. Before HTTP starts, each account's existing
-   attempts, legacy mastery and earned certifications move to its owner file.
-   Banks remain shared; account IDs, attempt IDs, times, answers and library
-   revisions are preserved. Legacy ambiguous source provenance is pinned without
-   guessing. No new `STUDY_LEGACY_OWNER_SUBJECT` is needed when upgrading a genuine
-   Epic 2 database; that setting still applies to pre-Epic-2 unowned history.
-4. Sign in as the old account and check history and earned certifications. Sign
-   in as another account and confirm the private library is empty, shared banks
-   are available, and the other account's history cannot be read. Import a small
-   synthetic private bank and confirm it is absent for the other account.
+The server never initializes or upgrades schemas, transfers history, or provisions
+personal files. Prepare or convert a stopped deployment using the external
+[administration workflow](database-management.md). Accounts and shared content use
+one central file; all actual personal study history stays in separate owner-bound
+files. Login creates only normal account/session records. An unprovisioned workspace
+returns 503 until the external job installs its personal file.
 
-Each owner transfer uses one attached-database transaction. It checks both modes
-under write locks, requires a matching destination owner and refuses conflicting
-destination evidence. A failed transfer rolls back both files. A completed transfer
-removes the old study rows using secure deletion. Before HTTP starts, a one-time
-VACUUM clears pages freed by older ownership upgrades as well. Cleanup completion
-is recorded only after success, so a failed cleanup is retried even if all owner
-transfers already committed. Allow up to twice the shared file's size in free
-space for this step. Existing backups remain sensitive.
-See SQLite's [attached-database transaction requirements](https://www.sqlite.org/lang_attach.html).
-Its [VACUUM documentation](https://www.sqlite.org/lang_vacuum.html) explains the
-physical cleanup and temporary-space requirement.
-Transfers completed before a later owner's failure remain completed; startup can
-be retried after resolving the reported conflict. Do not combine unrelated backups
-or overwrite a user file to bypass the ownership checks.
-
-Rollback requires stopping the application and restoring the **whole coherent
-pre-upgrade volume**, then starting the retained image. Do not restore only the
-shared file or mix user files from a different point in time. Protect Keycloak
-identity continuity as before. `docker compose down` retains volumes;
-`down --volumes` deletes them.
+The deployment root requires exact `READY` contents `1\n`. Any `RESTART_BLOCKED`
+path overrides readiness, including for custom personal directories. Operators must
+stop and drain application and CLI writers before administration. Existing user data
+conversion is deferred until the complete change merges into master.
 
 ## Settings boundaries
 

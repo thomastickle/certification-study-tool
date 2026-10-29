@@ -29,26 +29,10 @@ export class ApplicationAuthentication {
     this.login = new OidcLogin(options)
     this.options = options
     this.now = options.now ?? Date.now
-    const accounts = new AccountRepository(options.accountsPath)
-    try {
-      this.accounts = accounts
-    } catch (error) {
-      accounts.close()
-      throw error
-    }
+    this.accounts = new AccountRepository(options.accountsPath)
     const secure = options.origin.protocol === 'https:'
     this.sessionName = secure ? '__Host-study_session' : 'study_session'
     this.loginName = secure ? '__Secure-study_login' : 'study_login'
-  }
-
-  /** Map an operator-selected legacy owner without issuing a login or granting any role. */
-  legacyOwnerId(subject: string): string {
-    if (!subject.trim()) {
-      throw new Error('STUDY_LEGACY_OWNER_SUBJECT must identify the previous study owner.')
-    }
-    const issuer = this.options.issuer
-    const existing = this.accounts.findIdentity(issuer, subject)
-    return existing?.id ?? this.accounts.identify({ issuer, subject, name: subject }).id
   }
 
   /** Permit provider return documents while retaining origin checks on auth and study operations. */

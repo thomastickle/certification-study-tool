@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import { NestFactory } from '@nestjs/core'
 import { StudyHttpModule } from '../../src/server/study-http/study.module.ts'
 import { QuizService } from '../../src/server/quizzes/quiz-service.ts'
@@ -30,6 +31,7 @@ for (const phase of ['attachment', 'admission'] as const) {
     const configuration = runtimeConfiguration({
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
     })
+    prepareRuntimeDatabase(configuration.databasePath)
     let acquired: ApplicationRuntime | undefined
     const create = ApplicationRuntime.create
     const acquisition = mock.method(
@@ -129,6 +131,7 @@ test('the native Nest application preserves fluent APIs and the acquired provide
     native = await create(...args)
     return native as Awaited<ReturnType<typeof create>>
   })
+  prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
   const app = await createApplication(
     runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') }),
   )
@@ -301,6 +304,7 @@ test('startup owner preserves init failure when cleanup fails and shares shutdow
   const directory = mkdtempSync(join(tmpdir(), 'nest-owner-failure-'))
   const failure = new Error('Synthetic initialization failure')
   const cleanupFailure = new Error('Synthetic disposal failure')
+  prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
   const app = await createApplication(
     runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') }),
     [

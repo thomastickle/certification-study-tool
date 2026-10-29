@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -13,6 +14,7 @@ test('full production composition serves public assets and keeps APIs behind Nes
     NODE_ENV: 'production',
     STUDY_DB_PATH: join(directory, 'library.sqlite3'),
   })
+  prepareRuntimeDatabase(configuration.databasePath)
   configuration.staticRoot = directory
   const { createProductionApplication } = await import('../../src/server/production-application.ts')
   const app = await createProductionApplication(configuration)
@@ -92,6 +94,7 @@ test('shutdown rejects admission while web disposal is gated and roots remain ow
     NODE_ENV: 'production',
     STUDY_DB_PATH: join(directory, 'library.sqlite3'),
   })
+  prepareRuntimeDatabase(configuration.databasePath)
   configuration.staticRoot = directory
   const app = await createApplication(configuration, [], new GatedWeb())
   const runtime = app.get(ApplicationRuntime)

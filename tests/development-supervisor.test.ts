@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -105,6 +106,7 @@ async function createFixture(
     )
   }
 
+  cpSync('database/migrations', join(directory, 'database/migrations'), { recursive: true })
   const reservation = createServer()
   await new Promise<void>((resolveListen) => reservation.listen(0, '127.0.0.1', resolveListen))
   const address = reservation.address()
@@ -112,6 +114,7 @@ async function createFixture(
   await new Promise<void>((resolveClose) => reservation.close(() => resolveClose()))
 
   const origin = `http://127.0.0.1:${address.port}`
+  prepareRuntimeDatabase(join(directory, 'data/library.sqlite3'))
   const environment = {
     ...process.env,
     NODE_ENV: 'development',
@@ -119,7 +122,6 @@ async function createFixture(
     STUDY_PORT: String(address.port),
     STUDY_ORIGIN: origin,
     STUDY_DB_PATH: join(directory, 'data/library.sqlite3'),
-    STUDY_ACCOUNTS_PATH: join(directory, 'data/accounts.sqlite3'),
     STUDY_PRIVATE_LIBRARIES_DIR: join(directory, 'data/users'),
     STUDY_LEGACY_OWNER_SUBJECT: '',
     STUDY_OIDC_ISSUER: 'http://127.0.0.1:1/synthetic',

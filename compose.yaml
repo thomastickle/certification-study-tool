@@ -21,7 +21,6 @@ services:
       STUDY_OIDC_ISSUER: ${STUDY_OIDC_ISSUER:-http://127.0.0.1:${STUDY_KEYCLOAK_PORT:-8080}/realms/study}
       STUDY_OIDC_CLIENT_ID: ${STUDY_OIDC_CLIENT_ID:-study-tool}
       STUDY_ORIGIN: ${STUDY_ORIGIN:-http://127.0.0.1:${STUDY_WEB_PORT:-3000}}
-      STUDY_LEGACY_OWNER_SUBJECT: ${STUDY_LEGACY_OWNER_SUBJECT:-}
     restart: unless-stopped
     init: true
 

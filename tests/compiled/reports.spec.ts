@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from '../managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { StoredQuiz } from '../../src/server/quizzes/quiz-repository.ts'
@@ -82,7 +83,7 @@ function attempt(id: string, finishedAt: number, mode: 'quiz' | 'exam' = 'quiz')
 }
 
 test('reports weight question outcomes, retain skipped questions, and group historical snapshots', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const now = Date.UTC(2026, 9, 19, 12)
     repository.quizStore().save(attempt('old-quiz', now - 2 * 86400000))
@@ -161,7 +162,7 @@ test('mode, certification and rolling time filters apply to all report sections 
 
 test('master export records scope, skipped outcomes, domain evidence and individual attempts', async () => {
   const { studyReportMarkdown } = await import('../../src/shared/report-export.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const now = Date.UTC(2026, 9, 19)
     repository.quizStore().save(attempt('saved-quiz', now))
@@ -215,7 +216,7 @@ test('report reads score expired attempts and remain stable after source deletio
 
 test('score-first exports and aggregates include skips, unequal sizes, domains and filtered days', async () => {
   const { studyReportMarkdown } = await import('../../src/shared/report-export.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const now = Date.UTC(2026, 9, 19, 12)
     const base = attempt('eight-of-twenty', now)
@@ -280,7 +281,7 @@ test('score-first exports and aggregates include skips, unequal sizes, domains a
 
 test('empty and all-skipped master exports distinguish no measured score from zero', async () => {
   const { studyReportMarkdown } = await import('../../src/shared/report-export.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const now = Date.UTC(2026, 9, 19)
     const service = new ReportService(repository, () => now)

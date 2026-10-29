@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -12,6 +14,7 @@ for (const mode of ['quiz', 'exam'] as const) {
   test(`${mode} retains multiple pause intervals and causes across restart, excluding pauses from active time`, () => {
     const directory = mkdtempSync(join(tmpdir(), 'pause-history-'))
     const path = join(directory, 'synthetic.sqlite3')
+    prepareRuntimeDatabase(path)
     let repository = new LibraryRepository(path)
     let now = 1000
     let service = new QuizService(repository, () => now)
@@ -71,7 +74,7 @@ for (const mode of ['quiz', 'exam'] as const) {
   })
 
   test(`${mode} deadline wins before pause and retries never extend active time`, () => {
-    const repository = new LibraryRepository(':memory:')
+    const repository = new LibraryRepository(prepareManagedDatabase())
     try {
       populate(repository, 24)
       let now = 1000
@@ -97,7 +100,7 @@ for (const mode of ['quiz', 'exam'] as const) {
 }
 
 test('pause uses one server acceptance timestamp at a moving deadline boundary', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000

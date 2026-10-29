@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -6,7 +7,7 @@ import { quizReport } from '../src/shared/quiz-report.ts'
 import { populate } from './quiz-fixtures.ts'
 
 test('export report includes every question, raw score, selected/correct answers, confidence and provenance', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(repository, () => 1000)
@@ -39,7 +40,7 @@ test('export report includes every question, raw score, selected/correct answers
 })
 
 test('exam report exports use the exam snapshot mode and preserve quiz fallback', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(repository, () => 1000)
@@ -77,7 +78,7 @@ test('exam report exports use the exam snapshot mode and preserve quiz fallback'
 })
 
 test('quiz and exam exports use total questions for primary scores and retain detailed answered accuracy', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository, 24)
     const service = new QuizService(repository, () => 1000)
@@ -108,7 +109,7 @@ test('quiz and exam exports use total questions for primary scores and retain de
 })
 
 test('an individual report without questions has no measured score', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(repository, () => 1000)

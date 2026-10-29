@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { HomeService } from '../src/server/home/home-service.ts'
@@ -17,7 +18,7 @@ function saveExams(repository: LibraryRepository, provider: string, code: string
 }
 
 test('Home assesses any certification from its own generic exam evidence without AWS domains', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     saveExams(repository, 'Azure', 'AZ-900', 65)
     saveExams(repository, 'GCP', 'CDL', 55)
@@ -44,7 +45,7 @@ test('Home assesses any certification from its own generic exam evidence without
 })
 
 test('generic tracks keep insufficient evidence neutral and never borrow another track history', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     saveExams(repository, 'Azure', 'AZ-900', 65)
     const exam = homeExam('gcp-one', 1)
@@ -64,7 +65,7 @@ test('generic tracks keep insufficient evidence neutral and never borrow another
 
 test('generic estimates reject replayed, paused, stale and malformed exam evidence', () => {
   for (const scenario of ['replay', 'paused', 'stale', 'short', 'unscored'] as const) {
-    const repository = new LibraryRepository(':memory:')
+    const repository = new LibraryRepository(prepareManagedDatabase())
     try {
       for (const age of [3, 2, 1]) {
         const exam = homeExam(

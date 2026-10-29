@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs'
+import { copyFileSync, cpSync, mkdirSync, rmSync } from 'node:fs'
 
 // Remove stale modules before emit, including controllers/tests removed since the last build.
 rmSync('build', { recursive: true, force: true })
@@ -28,6 +28,7 @@ if (interrupted || signal || status !== 0) {
     process.exitCode = 1
   }
 } else {
+  cpSync('database/migrations', 'build/database/migrations', { recursive: true })
   // Preserve the schema's module-relative path in both source and compiled graphs.
   mkdirSync('build/docs', { recursive: true })
   copyFileSync('docs/question-bank.schema.json', 'build/docs/question-bank.schema.json')

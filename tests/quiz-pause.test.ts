@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -6,7 +7,7 @@ import { populate } from './quiz-fixtures.ts'
 
 for (const mode of ['quiz', 'exam'] as const) {
   test(`${mode} pause freezes time and mastery, survives service restart, and resumes idempotently`, () => {
-    const repository = new LibraryRepository(':memory:')
+    const repository = new LibraryRepository(prepareManagedDatabase())
     try {
       populate(repository, 24)
       let now = 1000
@@ -42,7 +43,7 @@ for (const mode of ['quiz', 'exam'] as const) {
 }
 
 test('paused answers stay frozen, another mode does not erase them, and abandon never grades', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository, 24)
     let now = 1000
@@ -76,7 +77,7 @@ test('paused answers stay frozen, another mode does not erase them, and abandon 
 })
 
 test('pausing at the deadline cannot prevent normal expiry or expose an editable result', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000

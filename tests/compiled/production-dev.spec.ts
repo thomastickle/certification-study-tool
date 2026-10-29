@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -36,6 +37,7 @@ test('stock child executes local Vite SSR plugins and releases its real Nest run
     STUDY_PORT: String(address.port),
     STUDY_DB_PATH: join(directory, 'library.sqlite3'),
   })
+  prepareRuntimeDatabase(configuration.databasePath)
   const owner = new DevelopmentApplication(configuration, directory)
   try {
     await owner.start()
@@ -58,6 +60,7 @@ test('static factory rejects obsolete development composition after closing acqu
     const configuration = runtimeConfiguration({
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
     })
+    prepareRuntimeDatabase(configuration.databasePath)
     await assert.rejects(createProductionApplication(configuration), /DevelopmentApplication/)
     assert.throws(() => observation.runtime.sharedLibrary.sources(), /closed|not open/)
   } finally {

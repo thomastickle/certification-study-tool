@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { completedRecency, preferVariation } from '../src/server/concepts/concept-variations.ts'
@@ -43,7 +44,7 @@ test('variation preference uses direct groups, completed recency and the same we
 })
 
 test('recency is grounded in completed snapshots and survives source deletion', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000

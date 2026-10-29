@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -7,7 +8,7 @@ import { populate } from './quiz-fixtures.ts'
 
 const options = { sourceFilter: 'mixed', questionType: 'mixed' }
 test('starts a 20-minute weighted-domain quiz without leaking correct answers or mutating banks', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const before = repository.allQuestions()
@@ -38,7 +39,7 @@ test('starts a 20-minute weighted-domain quiz without leaking correct answers or
 })
 
 test('scores exact answer sets, unanswered misses, confidence and review marks; submission is idempotent', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(
@@ -69,7 +70,7 @@ test('scores exact answer sets, unanswered misses, confidence and review marks; 
 })
 
 test('deadline uses saved choices, refuses late changes, and expires without a submit request', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000
@@ -102,7 +103,7 @@ test('deadline uses saved choices, refuses late changes, and expires without a s
 })
 
 test('abandon does not score or change mastery; validation rejects invalid selections and options', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(
@@ -143,7 +144,7 @@ test('abandon does not score or change mastery; validation rejects invalid selec
 })
 
 test('legacy streak-table records are not authoritative for the new mastery scheduler', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     repository.quizStore().record('legacy', false)
     assert.equal(repository.quizStore().boosts().size, 0)
@@ -153,7 +154,7 @@ test('legacy streak-table records are not authoritative for the new mastery sche
 })
 
 test('all completed results remain reachable after more than twenty quizzes', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000
