@@ -12,7 +12,7 @@
     "typecheck": "node node_modules/@typescript/native/bin/tsc --noEmit",
     "dev": "node --env-file-if-exists=.env scripts/development.ts",
     "start": "node --env-file-if-exists=.env build/src/server/main.js",
-    "build": "npm run typecheck && npm run build:server && vite build",
+    "build": "npm run typecheck && npm run build:server && vite build && node scripts/validate-static-assets.ts",
     "format": "npm run lint -- --fix && prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint src tests scripts/*.ts vite.config.ts eslint.config.mjs --max-warnings 0",

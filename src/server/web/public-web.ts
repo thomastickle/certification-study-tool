@@ -5,6 +5,7 @@ import { securityFailure } from '../security/security.filter.ts'
 import type { AdmittedRequest } from '../security/security-context.ts'
 import type { RuntimeConfiguration } from '../runtime/runtime-configuration.ts'
 import type { RequestUrl } from '../http/request-url.ts'
+import { validateStaticAssets } from './validate-static-assets.ts'
 import { staticWebHandler } from './web-handler.ts'
 
 /** Own built public responses through their complete asynchronous work. */
@@ -21,6 +22,7 @@ export class PublicWeb {
     if (!existsSync(resolve(configuration.staticRoot, 'index.html'))) {
       throw new Error('Run npm run build before starting production mode.')
     }
+    validateStaticAssets(configuration.staticRoot)
     this.handler = staticWebHandler(configuration.staticRoot)
   }
 

@@ -1,5 +1,12 @@
-import { BadRequestException, Catch, Inject, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Catch,
+  HttpException,
+  Inject,
+  NotFoundException,
+} from '@nestjs/common'
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common'
+import { STATUS_CODES } from 'node:http'
 import type { ServerResponse } from 'node:http'
 import { ApplicationError } from '../http/errors.ts'
 import { admissionFailure } from '../http/admission-failure.ts'
@@ -22,9 +29,6 @@ export class SecurityExceptionFilter implements ExceptionFilter {
       } catch (denial) {
         error = denial
       }
-    }
-    if (error instanceof BadRequestException) {
-      error = new ApplicationError(error.message)
     }
     try {
       securityFailure(error, request, http.getResponse<ServerResponse>())
@@ -50,12 +54,18 @@ export function securityFailure(
     return
   }
   const study = request.studyErrors === true
-  if (!study && !(error instanceof WorkspaceChangedError)) {
+  const nestError = error instanceof HttpException
+  if (!study && !(error instanceof WorkspaceChangedError) && !nestError) {
     admissionFailure(error, response)
     return
   }
   const expected = error instanceof ApplicationError
-  const status = expected ? error.status : 500
+  let status = 500
+  if (expected) {
+    status = error.status
+  } else if (nestError) {
+    status = error.getStatus()
+  }
   let value: object
   if (error instanceof WorkspaceChangedError) {
     value = { code: 'workspace_changed', error: error.message }
@@ -63,6 +73,13 @@ export function securityFailure(
     value = study
       ? { error: error.message.split('\n')[0], details: error.details }
       : { error: error.message }
+  } else if (nestError && status < 500) {
+    // Keep existing validation messages, but never serialize arbitrary HttpException payloads.
+    const message =
+      error instanceof BadRequestException ? error.message.split('\n')[0] : STATUS_CODES[status]
+    value = study
+      ? { error: message ?? 'The request could not be completed.', details: [] }
+      : { error: message ?? 'The request could not be completed.' }
   } else {
     value = {
       error: study

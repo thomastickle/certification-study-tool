@@ -109,13 +109,21 @@ scan, or application-wide proxy. ReadJsonBody fully awaits parsing before native
 Body/Param/Query and ordinary local/class/DI/global pipes run. Parameter factories
 and pipes may coerce and validate; resource I/O belongs in awaited controllers,
 services or interceptors. Native Nest does not join fail-fast parameter siblings.
+Async parameter factories and pipes must be side-effect-free and must not borrow or retain studyContext,
+personal/shared repositories or other request-owned resources. DB-dependent
+validation and business work must be returned/awaited by one controller/service
+operation. The scoped interceptor does not make unsupported async siblings safe.
+A feature requiring resource-using async inputs needs a reproducing lifetime test
+and a Nest-supported ownership design first; do not restore metadata rewriting.
 See the assertion map in nest-http-test-migration.md for retired adapter contracts.
 
 The global filter emits authentication `{error}`, workspace
 `{code: 'workspace_changed', error}`, and admitted study `{error, details}` schemas.
 Unexpected study failures retain the legacy sanitized local-operation message;
-other unexpected failures use the generic request message. Nest's default
-`statusCode/message/error` schema and internal error text never escape. JSON
+other unexpected failures use the generic request message. Standard Nest
+HttpException statuses are preserved. Client errors use HTTP status phrases, except existing BadRequest validation messages; 5xx messages stay generic.
+Exception response objects are never serialized. Nest's default
+`statusCode/message/error` schema and internal diagnostics never escape. JSON
 responses use no-store/nosniff; admission sets same-origin referrer policy (auth
 uses no-referrer). Ended/destroyed responses are left alone and partial responses
 are destroyed on failure.

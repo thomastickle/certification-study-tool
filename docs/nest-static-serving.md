@@ -11,8 +11,14 @@ bridge uses the frozen admitted path rather than the raw request target.
 Compatibility policy remains explicit: GET/HEAD only, root index and nonexistent
 extensionless SPA fallback, existing directories rejected, lexical containment,
 legacy MIME types (including octet-stream for all other extensions), no-cache and
-nosniff. Dotfiles and symlinks retain existing behavior; fixtures never access
-human files. Deployments must control the distribution directory and its links.
+nosniff. The middleware-level compatibility matrix retains historical dotfile/link
+behavior, but release builds and production startup now reject hidden entries,
+all symlinks (even in-root links), and special files anywhere in the asset tree.
+The root itself must be a real directory. These checks run before publication
+and before public serving is initialized. Distribution assets must remain
+immutable while serving; this is an artifact/startup gate, not a defense against
+concurrent filesystem replacement by a privileged writer. Fixtures use only
+synthetic owned files. SPA fallback and API/auth exclusion remain unchanged.
 A middleware-local request view removes conditional headers, disables ranges and
 re-encodes the resolved path. This preserves unconditional full 200 responses
 without altering the security context or authenticated request headers.
@@ -37,8 +43,8 @@ can exhaust their startup budgets on a shared machine. Tests, deadlines and
 test-internal concurrency assertions remain unchanged. This scheduling bound
 does not guarantee that unrelated timing failures cannot occur.
 
-This bounded replacement does not complete PR85's deletion-first work: Vite,
-proxy/input internals and application lifetime machinery are separate concerns.
+The custom Vite graph, application proxy and joined-input metadata machinery
+have also been removed. The infrastructure inventory records remaining ownership.
 The policy bridge can be longer than the former file server despite deleting
 manual I/O; source counts must be reported separately from tests and docs.
 

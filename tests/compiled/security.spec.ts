@@ -1315,3 +1315,29 @@ for (const reverse of [false, true]) {
     }
   })
 }
+
+test('standard Nest HTTP exceptions retain status and sanitized JSON without losing request ownership', async () => {
+  const f = await fixture()
+  try {
+    const session = await f.login('alice')
+    for (const [status, message] of [
+      [401, 'Unauthorized'],
+      [403, 'Forbidden'],
+      [409, 'Conflict'],
+      [500, 'The local operation failed. No partial import was saved.'],
+      [503, 'The local operation failed. No partial import was saved.'],
+    ] as const) {
+      const response = await f.authorized(`/api/probe/http-error/${status}`, session)
+      assert.equal(response.status, status)
+      assert.equal(JSON.parse(response.body).error, message)
+      assert.equal(response.body.includes('sensitive'), false)
+      assert.equal(response.body.includes('token'), false)
+      assert.equal(response.headers['content-type'], 'application/json')
+      assert.equal(response.headers['cache-control'], 'no-store')
+      assert.equal(response.headers['x-content-type-options'], 'nosniff')
+      assert.equal((await f.authorized('/api/probe', session)).status, 200)
+    }
+  } finally {
+    await f.close()
+  }
+})

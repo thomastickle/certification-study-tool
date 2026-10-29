@@ -3,7 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json tsconfig.server.json vite.config.ts ./
-COPY scripts/build-server.ts ./scripts/build-server.ts
+COPY scripts/build-server.ts scripts/validate-static-assets.ts ./scripts/
 COPY src ./src
 COPY docs ./docs
 RUN npm run build && npm prune --omit=dev
