@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from '../managed-database-fixture.ts'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, statSync } from 'node:fs'
@@ -24,6 +25,7 @@ import {
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'study-runtime-'))
   const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  prepareRuntimeDatabase(configuration.databasePath)
   return { directory, configuration }
 }
 
@@ -47,7 +49,7 @@ test('configured Nest graph has one singleton owner, secure migrated files, and 
     let drained = 0
     runtime.attachTransport(async () => {
       runtime.sharedLibrary.quizStore().nextHousekeepingAt()
-      runtime.authentication.legacyOwnerId('during-drain')
+      Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe')
       drained++
     })
     await runtime.onModuleDestroy()
@@ -56,7 +58,10 @@ test('configured Nest graph has one singleton owner, secure migrated files, and 
     await app.close()
     assert.equal(drained, 1)
     assert.throws(() => runtime.sharedLibrary.quizStore().nextHousekeepingAt(), /closed|not open/)
-    assert.throws(() => runtime.authentication.legacyOwnerId('after-close'), /closed|not open/)
+    assert.throws(
+      () => Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+      /closed|not open/,
+    )
   } finally {
     await app.close()
     rmSync(directory, { recursive: true, force: true })
@@ -77,7 +82,10 @@ test('a failing transport drain still releases both database roots', async () =>
     // Nest reports hook errors and continues shutdown rather than rejecting close().
     await app.close()
     assert.throws(() => runtime.sharedLibrary.quizStore().nextHousekeepingAt(), /closed|not open/)
-    assert.throws(() => runtime.authentication.legacyOwnerId('after-close'), /closed|not open/)
+    assert.throws(
+      () => Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+      /closed|not open/,
+    )
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -130,7 +138,7 @@ test('corrupt account construction releases its SQLite handle', async () => {
     },
   )
   try {
-    await assert.rejects(ApplicationRuntime.create(configuration), /not a database/)
+    await assert.rejects(ApplicationRuntime.create(configuration), /not ready/)
     assert.ok(opened.size > 0)
     for (const db of opened) {
       assert.equal(db.isOpen, false, 'failed initialization must release acquired handles')
@@ -141,11 +149,9 @@ test('corrupt account construction releases its SQLite handle', async () => {
   }
 })
 
-for (const phase of ['mapping', 'chmod', 'migration', 'upkeep', 'unsupported-shared'] as const) {
+for (const phase of ['foreign-keys', 'upkeep', 'unsupported-shared'] as const) {
   test(`failed ${phase} initialization closes all acquired SQLite connections`, async () => {
     const { directory, configuration } = fixture()
-    const fs = await import('node:fs')
-    const { syncBuiltinESMExports } = await import('node:module')
     const { DatabaseSync } = await import('node:sqlite')
     const opened = new Set<InstanceType<typeof DatabaseSync>>()
     const originalPrepare = DatabaseSync.prototype.prepare
@@ -163,30 +169,18 @@ for (const phase of ['mapping', 'chmod', 'migration', 'upkeep', 'unsupported-sha
 
     let restore = () => {}
 
-    if (phase === 'mapping') {
-      configuration.legacyOwnerSubject = '   '
-    } else if (phase === 'chmod') {
-      const originalChmod = fs.default.chmodSync
-      const chmod = mock.method(
-        fs.default,
-        'chmodSync',
-        (...args: Parameters<typeof originalChmod>) => {
-          if (args[0] === configuration.databasePath) {
-            throw new Error('injected chmod failure')
-          }
-          return originalChmod(...args)
+    if (phase === 'foreign-keys') {
+      const originalExec = DatabaseSync.prototype.exec
+      const exec = mock.method(
+        DatabaseSync.prototype,
+        'exec',
+        function (this: InstanceType<typeof DatabaseSync>, sql: string) {
+          opened.add(this)
+          if (sql === 'PRAGMA foreign_keys = ON') throw new Error('injected connection failure')
+          return originalExec.call(this, sql)
         },
       )
-      syncBuiltinESMExports()
-      restore = () => {
-        chmod.mock.restore()
-        syncBuiltinESMExports()
-      }
-    } else if (phase === 'migration') {
-      const migration = mock.method(PrivateLibraries.prototype, 'migrateFrom', () => {
-        throw new Error('injected migration failure')
-      })
-      restore = () => migration.mock.restore()
+      restore = () => exec.mock.restore()
     } else if (phase === 'upkeep') {
       const tick = mock.method(StudyHousekeeping.prototype, 'tick', async () => {
         throw new Error('injected upkeep failure')
@@ -198,7 +192,7 @@ for (const phase of ['mapping', 'chmod', 'migration', 'upkeep', 'unsupported-sha
       db.close()
     }
     try {
-      await assert.rejects(ApplicationRuntime.create(configuration), /legacy|injected|Unsupported/i)
+      await assert.rejects(ApplicationRuntime.create(configuration), /injected|not ready/i)
       assert.ok(opened.size > 0)
       for (const db of opened) {
         assert.equal(db.isOpen, false)
@@ -246,31 +240,39 @@ test('Nest shutdown awaits background drain before transport and database closur
   }
 })
 
-test('Nest readiness includes explicit owner migration and startup expiry before any transport', async () => {
+test('Nest readiness includes externally provisioned owner and startup expiry before any transport', async () => {
   const { directory, configuration } = fixture()
-  const { DatabaseSync } = await import('node:sqlite')
   const { LibraryRepository } = await import('../../src/server/questions/library-repository.ts')
   const { QuizService } = await import('../../src/server/quizzes/quiz-service.ts')
   const { populate } = await import('../quiz-fixtures.ts')
-  const { legacyStudySchema } = await import('../legacy-study-schema.ts')
   const shared = new LibraryRepository(configuration.databasePath)
-  populate(shared)
-  const quiz = new QuizService(shared, () => Date.now() - 30 * 60_000).start({
-    sourceFilter: 'mixed',
-    questionType: 'mixed',
-  })
+  const { AccountRepository } = await import('../../src/server/auth/account-repository.ts')
+  const accounts = new AccountRepository(configuration.databasePath)
+  const accountId = accounts.identify({
+    issuer: configuration.authentication.issuer,
+    subject: 'synthetic',
+    name: 'Owner',
+  }).id
+  accounts.close()
+  provisionTestWorkspace(
+    configuration.databasePath,
+    configuration.privateLibrariesDirectory,
+    accountId,
+  )
+  const personal = new PrivateLibraries(configuration.privateLibrariesDirectory).open(accountId)
+  populate(personal)
+  const quiz = new QuizService(
+    shared.forAccount(accountId, personal),
+    () => Date.now() - 30 * 60_000,
+  ).start({ sourceFilter: 'mixed', questionType: 'mixed' })
+  personal.close()
   shared.close()
-  const db = new DatabaseSync(configuration.databasePath)
-  db.exec(legacyStudySchema)
-  db.close()
-  configuration.legacyOwnerSubject = 'synthetic-legacy-owner'
   const app = await NestFactory.createApplicationContext(RuntimeModule.register(configuration), {
     logger: false,
     abortOnError: false,
   })
   try {
     const runtime = app.get(ApplicationRuntime)
-    const accountId = runtime.authentication.legacyOwnerId(configuration.legacyOwnerSubject)
     const personal = runtime.privateLibraries.open(accountId)
     try {
       assert.equal(personal.quizStore().find(quiz.id)!.status, 'completed')

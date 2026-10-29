@@ -1,9 +1,9 @@
-import { LibraryRepository } from '../src/server/questions/library-repository.ts'
+import type { LibraryView } from '../src/server/questions/library-repository.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
 import { bank } from './fixtures.ts'
 
 export function populate(
-  repository: LibraryRepository,
+  repository: LibraryView,
   questionsPerDomain = 12,
   sourceKey = 'quiz-synthetic',
 ) {

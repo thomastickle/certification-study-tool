@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { DatabaseSync } from 'node:sqlite'
 import { answeredBenchmarkHistory } from './answered-benchmark-history.ts'
@@ -57,6 +58,7 @@ const configuration = runtimeConfiguration({
   STUDY_ORIGIN: requestOrigin,
   STUDY_OIDC_ISSUER: 'http://127.0.0.1:49153/synthetic',
 })
+prepareRuntimeDatabase(configuration.databasePath)
 configuration.housekeepingSchedule = { intervalMs: 0, monotonicNow: () => monotonic }
 const app = await createApplication(configuration, [LibraryHttpModule, StudyHttpModule])
 const runtime = app.get(ApplicationRuntime)
@@ -72,6 +74,11 @@ const owners = Array.from({ length: config.owners }, (_, index) => {
     subject: `benchmark-${index}`,
     name: `Synthetic ${index}`,
   })
+  provisionTestWorkspace(
+    configuration.databasePath,
+    configuration.privateLibrariesDirectory,
+    account.id,
+  )
   const token = randomUUID()
   accounts.saveSession(token, account.id, Date.now() + 3600000, 'admin')
   actors.push({ Cookie: `study_session=${token}`, 'X-Study-Account': account.id })
@@ -473,14 +480,22 @@ async function command(name: string, completedId?: string) {
         await measure('corruptRecoveryDueMs', () =>
           service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
         )
-        sql.exec('DROP TABLE quiz_evidence')
-        await measure('derivedSchemaReopenMs', () => {
-          const reopened = libraries.open(target)
-          reopened.close()
-        })
-        await measure('schemaBackfillDueMs', () =>
-          service.due({ sourceFilter: 'mixed', questionType: 'mixed' }),
+        // Missing storage is an external maintenance failure, never a lazy runtime upgrade.
+        const projectionSchema = String(
+          sql
+            .prepare(
+              "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'quiz_evidence'",
+            )
+            .get()!.sql,
         )
+        sql.exec('DROP TABLE quiz_evidence')
+        try {
+          assert.throws(() => libraries.open(target), /not ready/)
+          assert.throws(() => store.studyHistory(), /quiz_evidence/)
+        } finally {
+          // Test harness restores the externally managed table; runtime never repairs missing schema.
+          sql.exec(projectionSchema)
+        }
       }
       const recovered = personal.quizStore()
       if ('studyHistory' in recovered) {

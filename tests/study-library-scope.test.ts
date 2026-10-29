@@ -1,3 +1,5 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
+import { writeFileSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,7 +19,9 @@ for (const observationFails of [false, true]) {
   for (const failedWork of [false, true]) {
     test(`private connection survives deferred work and closes after observation (failure=${failedWork}, observation failure=${observationFails})`, async () => {
       const directory = mkdtempSync(join(tmpdir(), 'study-scope-'))
-      const libraries = new PrivateLibraries(directory)
+      writeFileSync(join(directory, 'READY'), '1\n')
+      prepareManagedDatabase(join(directory, `${actor.id}.sqlite3`), actor.id).close()
+      const libraries = new PrivateLibraries(directory, directory)
       let personal: LibraryRepository | undefined
       let resume!: () => void
       const deferred = new Promise<void>((resolve) => {

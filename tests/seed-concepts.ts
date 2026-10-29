@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -7,6 +8,7 @@ import { populate } from './quiz-fixtures.ts'
 // A dedicated synthetic DB only. Refuse existing content rather than replacing any user's library.
 const path = resolve('private/ai-runs/issue16/browser.sqlite3')
 mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+prepareRuntimeDatabase(path)
 const repository = new LibraryRepository(path)
 
 try {

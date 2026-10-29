@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -11,6 +13,7 @@ import { ImportService } from '../src/server/importer/import-service.ts'
 test('batch preview is non-mutating; apply retains duplicates and reimport is idempotent', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-batch-'))
   const database = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(database)
   const files = ['first.json', 'second.json']
   try {
     files.forEach((file, i) =>
@@ -18,7 +21,7 @@ test('batch preview is non-mutating; apply retains duplicates and reimport is id
     )
     const options = { sourceDirectory: directory, database, files }
     const preview = await importBatch(options)
-    assert.equal(existsSync(database), false)
+    assert.equal(existsSync(database), true)
     assert.equal(preview.applied, false)
     assert.deepEqual(
       preview.files.map((f) => [
@@ -68,6 +71,7 @@ test('batch preview is non-mutating; apply retains duplicates and reimport is id
 test('invalid later bank reports file and source reference without writing any bank', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-invalid-batch-'))
   const database = join(directory, 'new.sqlite3')
+  prepareRuntimeDatabase(database)
   try {
     writeFileSync(join(directory, 'good.json'), JSON.stringify(bank('good')))
     const invalid = bank('bad')
@@ -83,7 +87,7 @@ test('invalid later bank reports file and source reference without writing any b
       }),
       /bad.json:.*\n[\s\S]*invalid-reference/,
     )
-    assert.equal(existsSync(database), false)
+    assert.equal(existsSync(database), true)
   } finally {
     rmSync(directory, { recursive: true })
   }
@@ -92,6 +96,7 @@ test('invalid later bank reports file and source reference without writing any b
 test('conflicting answer keys block the whole batch; same-key different identities remain separate', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-conflict-batch-'))
   const database = join(directory, 'new.sqlite3')
+  prepareRuntimeDatabase(database)
   try {
     const first = bank('same-key')
     const second = bank('same-key')
@@ -132,6 +137,7 @@ test('conflicting answer keys block the whole batch; same-key different identiti
 test('batch preserves omitted questions and unrelated sources; existing changes require separate review', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-preserve-batch-'))
   const database = join(directory, 'existing.sqlite3')
+  prepareRuntimeDatabase(database)
   try {
     writeFileSync(join(directory, 'unrelated.json'), JSON.stringify(bank('unrelated')))
     await importBatch({
@@ -170,7 +176,7 @@ test('batch preserves omitted questions and unrelated sources; existing changes 
 })
 
 test('outer batch transaction rolls back nested service confirmations and metadata', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     assert.throws(
       () =>
@@ -194,6 +200,7 @@ test('outer batch transaction rolls back nested service confirmations and metada
 test('semantic validation rejects normalized answer collisions, repeated refs, and incorrect multi-select counts', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-semantics-batch-'))
   const database = join(directory, 'new.sqlite3')
+  prepareRuntimeDatabase(database)
   try {
     const ambiguous = bank()
     ambiguous.questions[0]!.answers[1]!.text = ' EXAMPLE A! '
@@ -213,9 +220,24 @@ test('semantic validation rejects normalized answer collisions, repeated refs, a
         importBatch({ sourceDirectory: directory, database, files: ['invalid.json'], apply: true }),
         error,
       )
-      assert.equal(existsSync(database), false)
+      assert.equal(existsSync(database), true)
     }
   } finally {
     rmSync(directory, { recursive: true })
+  }
+})
+
+test('missing import target is refused even for preview without creating files', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'missing-import-target-'))
+  const database = join(directory, 'missing.sqlite3')
+  try {
+    writeFileSync(join(directory, 'bank.json'), JSON.stringify(bank()))
+    await assert.rejects(
+      importBatch({ sourceDirectory: directory, database, files: ['bank.json'] }),
+      /external.*preparation/i,
+    )
+    assert.equal(existsSync(database), false)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
   }
 })

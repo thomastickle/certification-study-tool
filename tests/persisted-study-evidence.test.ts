@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { LibraryService } from '../src/server/questions/library-service.ts'
@@ -26,6 +28,7 @@ const options = {
 test('persisted evidence matches replay through restart, raw mutation, corruption and rollback', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-evidence-test-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   let repository = new LibraryRepository(path)
   try {
     populate(repository)
@@ -147,7 +150,7 @@ function completed(repository: LibraryRepository): StoredQuiz {
 }
 
 test('compact events preserve full replay for varied legacy, namespace, scoring and ordered evidence', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const template = completed(repository)
@@ -258,7 +261,7 @@ test('compact events preserve full replay for varied legacy, namespace, scoring 
 })
 
 test('deleting an earlier event replays later successes, restore and unavailable due obligations', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const first = completed(repository)
@@ -300,6 +303,7 @@ test('deleting an earlier event replays later successes, restore and unavailable
 test('projection write/rebuild failures roll back standalone saves and retain authoritative snapshots', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-evidence-atomic-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   const repository = new LibraryRepository(path)
   const sql = new DatabaseSync(path)
   try {
@@ -333,7 +337,7 @@ test('projection write/rebuild failures roll back standalone saves and retain au
 })
 
 test('answered replay bounds timezone formatter construction across many scored events', (t) => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const template = completed(repository)
@@ -363,6 +367,7 @@ test('answered replay bounds timezone formatter construction across many scored 
 test('process exit inside a mutation transaction recovers snapshot and projection together', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-evidence-crash-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   let repository = new LibraryRepository(path)
   try {
     populate(repository)
@@ -398,24 +403,25 @@ test('process exit inside a mutation transaction recovers snapshot and projectio
   }
 })
 
-test('standalone initialization retries when its caller rolls back schema creation', () => {
-  const db = new DatabaseSync(':memory:')
+test('missing projection table fails without lazy schema repair, including after rollback', () => {
+  const db = prepareManagedDatabase()
   try {
-    db.exec(`CREATE TABLE quiz_sessions (
-      account_id TEXT NOT NULL, id TEXT NOT NULL, status TEXT NOT NULL,
-      started_at INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (account_id, id)
-    )`)
+    db.exec('DROP TABLE quiz_evidence')
     db.exec('BEGIN')
-    new QuizRepository(db)
+    assert.throws(() => new QuizRepository(db).studyHistory(), /quiz_evidence/)
     db.exec('ROLLBACK')
-    assert.equal(new QuizRepository(db).studyHistory().states.size, 0)
+    assert.throws(() => new QuizRepository(db).studyHistory(), /quiz_evidence/)
+    assert.equal(
+      db.prepare("SELECT name FROM sqlite_master WHERE name = 'quiz_evidence'").get(),
+      undefined,
+    )
   } finally {
     db.close()
   }
 })
 
 test('answered diverse fixture preserves large due sets and unavailable obligations', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository, 250)
     const template = completed(repository)
@@ -449,7 +455,7 @@ test('answered diverse fixture preserves large due sets and unavailable obligati
 })
 
 test('production provenance annotation retains valid evidence without hashing saved content', (t) => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const quiz = completed(repository)
@@ -473,6 +479,7 @@ test('production provenance annotation retains valid evidence without hashing sa
 test('provenance annotation repairs invalid rows immediately and preserves row/account bindings', () => {
   const directory = mkdtempSync(join(tmpdir(), 'provenance-evidence-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   const repository = new LibraryRepository(path)
   const sql = new DatabaseSync(path)
   try {
@@ -528,7 +535,7 @@ test('provenance annotation repairs invalid rows immediately and preserves row/a
 })
 
 test('generic annotation callbacks cannot bless changed extraction inputs', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const template = completed(repository)
@@ -596,6 +603,7 @@ test('generic annotation callbacks cannot bless changed extraction inputs', () =
 test('retained and rebuilt annotation writes roll back standalone and enclosing transactions', () => {
   const directory = mkdtempSync(join(tmpdir(), 'provenance-rollback-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   const repository = new LibraryRepository(path)
   const sql = new DatabaseSync(path)
   try {
@@ -655,6 +663,7 @@ test('retained and rebuilt annotation writes roll back standalone and enclosing 
 test('legacy source pinning preserves unknown scoring, sentinels and historical scope errors', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'provenance-legacy-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   const repository = new LibraryRepository(path)
   const sql = new DatabaseSync(path)
   try {
@@ -709,6 +718,7 @@ test('legacy source pinning preserves unknown scoring, sentinels and historical 
 test('standalone annotation protects snapshot and retained evidence from a real second writer', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'provenance-writer-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   let repository = new LibraryRepository(path)
   const prepare = DatabaseSync.prototype.prepare
   try {
@@ -799,6 +809,7 @@ test('standalone annotation protects snapshot and retained evidence from a real 
 test('annotation lock and later-row failures leave all snapshots and evidence unchanged', () => {
   const directory = mkdtempSync(join(tmpdir(), 'provenance-atomic-'))
   const path = join(directory, 'synthetic.sqlite3')
+  prepareRuntimeDatabase(path)
   const repository = new LibraryRepository(path)
   const sql = new DatabaseSync(path)
   try {

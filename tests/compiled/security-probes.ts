@@ -8,6 +8,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   Inject,
   Injectable,
   Module,
@@ -173,6 +174,14 @@ export class ProbeController {
       frozen: Object.isFrozen(url),
       sources: context.content('private').sources(),
     }
+  }
+
+  @Get('http-error/:status')
+  httpError(@Param('status') status: string) {
+    throw new HttpException(
+      { message: 'sensitive synthetic internals', token: 'private fixture' },
+      Number(status),
+    )
   }
 
   @Post('shared')

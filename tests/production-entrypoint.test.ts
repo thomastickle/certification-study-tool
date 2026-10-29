@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -22,6 +23,7 @@ for (const production of [true, false]) {
         writeFileSync(join(directory, 'dist', 'index.html'), shell)
       }
       const provider = await oidcFixture()
+      prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
       const shared = new LibraryRepository(join(directory, 'library.sqlite3'))
       populate(shared, 12)
       shared.close()
@@ -73,6 +75,11 @@ for (const production of [true, false]) {
         const session = await (
           await fetch(origin + '/api/session', { headers: { Cookie: cookie } })
         ).json()
+        provisionTestWorkspace(
+          join(directory, 'library.sqlite3'),
+          join(directory, 'users'),
+          session.user.id,
+        )
         const headers = {
           Cookie: cookie,
           'X-Study-Account': session.user.id,
@@ -159,6 +166,7 @@ test(
     const portAddress = portProbe.address()
     assert.ok(portAddress && typeof portAddress !== 'string')
     await closeServer(portProbe)
+    prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
     const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
       cwd: directory,
       env: {
@@ -219,6 +227,7 @@ for (const missingStatic of [true, false]) {
       await new Promise<void>((resolve) => occupied.listen(0, '127.0.0.1', resolve))
       const address = occupied.address()
       assert.ok(address && typeof address !== 'string')
+      prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
       const child = spawn(process.execPath, [resolve('build/src/server/main.js')], {
         cwd: directory,
         env: {

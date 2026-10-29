@@ -1,3 +1,6 @@
+import { preparePersonalFixtures } from './managed-database-fixture.ts'
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -16,9 +19,11 @@ import { LibraryService } from '../src/server/questions/library-service.ts'
 for (const failure of ['reconciliation', 'expiry', 'close'] as const) {
   test(`housekeeping closes connections, continues and retries after a ${failure} failure`, async (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'study-upkeep-'))
+    prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
     const shared = new LibraryRepository(join(directory, 'library.sqlite3'))
     const libraries = new PrivateLibraries(join(directory, 'users'))
     const ids = [randomUUID(), randomUUID()]
+    preparePersonalFixtures(join(directory, 'users'), ids, directory)
     for (const id of ids) {
       libraries.open(id).close()
     }
@@ -86,7 +91,7 @@ for (const failure of ['reconciliation', 'expiry', 'close'] as const) {
 }
 
 test('routine directory discovery failure is sanitized and does not abort startup', async (t) => {
-  const shared = new LibraryRepository(':memory:')
+  const shared = new LibraryRepository(prepareManagedDatabase())
   const libraries = new PrivateLibraries('/unused-synthetic-directory')
   const logged: unknown[][] = []
   t.mock.method(console, 'error', (...args: unknown[]) => logged.push(args))
@@ -105,9 +110,10 @@ test('routine directory discovery failure is sanitized and does not abort startu
 
 test('scheduler skips idle opens between reconciliation passes and scores observed deadlines', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-scheduled-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const id = randomUUID()
+  preparePersonalFixtures(directory, [id])
   const personal = libraries.open(id)
   let time = 1_000_000
   let monotonic = 0
@@ -157,9 +163,10 @@ test('scheduler skips idle opens between reconciliation passes and scores observ
 
 test('scheduler reconstructs expiry, retention and shared deletions after downtime', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-recovery-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const id = randomUUID()
+  preparePersonalFixtures(directory, [id])
   const personal = libraries.open(id)
   const epoch = 1_000_000
   let time = epoch
@@ -211,6 +218,7 @@ test('scheduler reconstructs expiry, retention and shared deletions after downti
     assert.equal(personal.sharedDeletionCursor(), 1)
     // A new file created outside this process is discovered by the periodic recovery pass.
     const newcomerId = randomUUID()
+    preparePersonalFixtures(directory, [newcomerId])
     const newcomer = libraries.open(newcomerId)
     try {
       const overdue = { ...structuredClone(paused), id: randomUUID(), status: 'active' as const }
@@ -231,9 +239,10 @@ test('scheduler reconstructs expiry, retention and shared deletions after downti
 
 test('failed discovery does not block a known due owner and retries on the next reconciliation', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-discovery-retry-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const id = randomUUID()
+  preparePersonalFixtures(directory, [id])
   const personal = libraries.open(id)
   let time = 1_000_000
   let monotonic = 0
@@ -273,9 +282,10 @@ test('failed discovery does not block a known due owner and retries on the next 
 
 test('foreground resume, deletion and restore refresh or cancel background deadlines', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-foreground-deadlines-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const id = randomUUID()
+  preparePersonalFixtures(directory, [id])
   const personal = libraries.open(id)
   let time = 1_000_000
   let monotonic = 0
@@ -329,9 +339,10 @@ test('foreground resume, deletion and restore refresh or cancel background deadl
 
 test('owner batches yield closed connections, prioritize new deadlines and coalesce ticks', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-batches-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const ids = Array.from({ length: 6 }, () => randomUUID())
+  preparePersonalFixtures(directory, ids)
   for (const id of ids) {
     libraries.open(id).close()
   }
@@ -397,9 +408,10 @@ test('owner batches yield closed connections, prioritize new deadlines and coale
 for (const initiallyDue of [false, true]) {
   test(`a visited owner's future deadline interrupts the idle sweep (initially due: ${initiallyDue})`, async (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'study-due-after-visit-'))
-    const shared = new LibraryRepository(':memory:')
-    const libraries = new PrivateLibraries(directory)
+    const shared = new LibraryRepository(prepareManagedDatabase())
+    const libraries = new PrivateLibraries(directory, directory)
     const ids = Array.from({ length: 4 }, () => randomUUID())
+    preparePersonalFixtures(directory, ids)
     let time = 1_000_000
     const scheduler = new StudyHousekeeping(
       shared,
@@ -475,9 +487,10 @@ for (const initiallyDue of [false, true]) {
 for (const metadata of ['failure', 'stale'] as const) {
   test(`${metadata} deadline metadata cannot spin or starve the remaining owners`, async (t) => {
     const directory = mkdtempSync(join(tmpdir(), 'study-unproductive-deadline-'))
-    const shared = new LibraryRepository(':memory:')
-    const libraries = new PrivateLibraries(directory)
+    const shared = new LibraryRepository(prepareManagedDatabase())
+    const libraries = new PrivateLibraries(directory, directory)
     const ids = Array.from({ length: 4 }, () => randomUUID())
+    preparePersonalFixtures(directory, ids)
     const time = 1_000_000
     const scheduler = new StudyHousekeeping(
       shared,
@@ -535,10 +548,12 @@ for (const metadata of ['failure', 'stale'] as const) {
 
 test('stop cancels a yielded sweep and drains before the root repository closes', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-stop-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   for (let index = 0; index < 4; index++) {
-    libraries.open(randomUUID()).close()
+    const owner = randomUUID()
+    preparePersonalFixtures(directory, [owner])
+    libraries.open(owner).close()
   }
   const opened = t.mock.method(libraries, 'open')
   const scheduler = new StudyHousekeeping(shared, libraries)
@@ -559,9 +574,10 @@ test('stop cancels a yielded sweep and drains before the root repository closes'
 
 test('simultaneously due owners also yield and accept a newer deadline for a visited owner', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-due-batches-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const ids = Array.from({ length: 4 }, () => randomUUID())
+  preparePersonalFixtures(directory, ids)
   let time = 1_000_000
   const scheduler = new StudyHousekeeping(
     shared,
@@ -587,7 +603,7 @@ test('simultaneously due owners also yield and accept a newer deadline for a vis
     const pass = scheduler.tick()
     assert.equal(opened.mock.callCount(), 1, 'Due cohorts must yield just like discovery sweeps')
     const firstId = opened.mock.calls[0]!.arguments[0]
-    const personal = new PrivateLibraries(directory).open(firstId)
+    const personal = new PrivateLibraries(directory, directory).open(firstId)
     let newer: string
     try {
       const quizzes = new QuizService(shared.forAccount(firstId, personal), () => time)
@@ -619,9 +635,10 @@ test('simultaneously due owners also yield and accept a newer deadline for a vis
 
 test('request observation skips read metadata but refreshes attempted mutations and retries failed reads', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'study-request-observation-'))
-  const shared = new LibraryRepository(':memory:')
-  const libraries = new PrivateLibraries(directory)
+  const shared = new LibraryRepository(prepareManagedDatabase())
+  const libraries = new PrivateLibraries(directory, directory)
   const id = randomUUID()
+  preparePersonalFixtures(directory, [id])
   const personal = libraries.open(id)
   let time = 1_000_000
   const scheduler = new StudyHousekeeping(

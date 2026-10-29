@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -15,6 +16,7 @@ test('production static admission, API exclusion and partial-stream shutdown rem
     NODE_ENV: 'production',
     STUDY_DB_PATH: join(directory, 'library.sqlite3'),
   })
+  prepareRuntimeDatabase(configuration.databasePath)
   configuration.staticRoot = directory
   const { createProductionApplication } = await import('../../src/server/production-application.ts')
   const { ApplicationRuntime } = await import('../../src/server/runtime/application-runtime.ts')

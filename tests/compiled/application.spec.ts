@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { ApplicationAuthentication } from '../../src/server/auth/application-authentication.ts'
@@ -14,6 +15,7 @@ import { createApplication } from '../../src/server/application.ts'
 test('compiled Nest decorators serve health through DI and close the listening application', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-nest-'))
   const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  prepareRuntimeDatabase(configuration.databasePath)
   const app = await createApplication(configuration)
   const server = app.getHttpServer() as Server
   try {
@@ -91,6 +93,7 @@ test('startup owner rejects overlapping starts instead of running Nest initializ
   Module({ providers: [StartupGate] })(GatedModule)
   const directory = mkdtempSync(join(tmpdir(), 'study-startup-gate-'))
   const configuration = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  prepareRuntimeDatabase(configuration.databasePath)
   const app = await createApplication(configuration, [GatedModule])
   const owner = new ApplicationOwner(Promise.resolve(app))
   const initializing = owner.start(0, '127.0.0.1')

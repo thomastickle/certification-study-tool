@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { openManagedDatabase } from '../questions/managed-database.ts'
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { backup, DatabaseSync } from 'node:sqlite'
 import type { Bank, Preview, Source } from '../../shared/contracts.ts'
 import { LibraryRepository } from '../questions/library-repository.ts'
@@ -48,16 +49,14 @@ export async function importBatch(options: {
   const temporary = mkdtempSync(join(tmpdir(), 'study-import-preview-'))
   try {
     const snapshot = join(temporary, 'snapshot.sqlite3')
-    if (existsSync(database)) {
-      // SQLite's backup API includes committed WAL data and provides a consistent snapshot.
-      const original = new DatabaseSync(database, { readOnly: true })
-      try {
-        await backup(original, snapshot)
-      } finally {
-        original.close()
-      }
+    // Validate the existing target even for preview; never invent an empty target.
+    const original = openManagedDatabase(database)
+    try {
+      await backup(original, snapshot)
+    } finally {
+      original.close()
     }
-    const simulated = new LibraryRepository(snapshot)
+    const simulated = new LibraryRepository(new DatabaseSync(snapshot))
     let preview: BatchResult
     try {
       preview = run(simulated, inputs, sourceDirectory, database, false)
@@ -65,7 +64,6 @@ export async function importBatch(options: {
       simulated.close()
     }
     if (!options.apply) return preview
-    mkdirSync(dirname(database), { recursive: true })
     const target = new LibraryRepository(database)
     try {
       return run(target, inputs, sourceDirectory, database, true)

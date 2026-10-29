@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -11,7 +12,7 @@ import { currentQuestionIdentities } from '../src/server/quizzes/question-identi
 const options = { sourceFilter: 'mixed', questionType: 'mixed' }
 
 test('one saved-content validation supplies mastery and recency, including incomplete scoring', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(
@@ -84,7 +85,7 @@ test('one saved-content validation supplies mastery and recency, including incom
 })
 
 test('quiz and review starts load each library once and use persisted history', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000
@@ -137,7 +138,7 @@ test('quiz and review starts load each library once and use persisted history', 
 })
 
 test('indexed identities preserve deterministic weighted variation draws', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const records = repository.allQuestions()
@@ -193,7 +194,7 @@ test('indexed identities preserve deterministic weighted variation draws', () =>
 })
 
 test('reusing a service never retains history or library state between requests', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000

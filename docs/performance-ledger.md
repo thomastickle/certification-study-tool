@@ -55,6 +55,32 @@ methodology changes, rerun a common baseline before drawing comparisons; include
 an exact patch/hash manifest when measurements differ from a commit's harness.
 No scheduler, telemetry platform or dependency is introduced.
 
+## 2026-10-29 — managed database review correctness smoke
+
+One sequential `node tests/foreground-benchmark.ts history 1` run on the PR100
+review correction over `3edb683f3953462476d8b94f367dd1acb49c4697`; workload
+`study-history-v2-answered`, real compiled Nest/session transport with manual
+upkeep. Synthetic fixture: 100 owners, 2,000 histories, 1,000 questions, backlog 100. Node 24.22.1, i5-8265U, eight logical CPUs, shared host, warm setup/cache;
+load average at start 5.98/6.27/4.91. Other owned heavy checks were serialized
+under the external lock. Source/emitted manifest SHA256:
+`e299524a2f844cb24684c3b84a305e546ea33df8ae51ecbdffb29f68a7fded18`.
+
+Quiz-start HTTP was 199.6 ms and due-read 181.7 ms, **one observation each**;
+completion was 12.0 ms. Busy-account HTTP median was 361.9 ms and maximum
+965.7 ms across 20 reads. Private deletion/annotation was 1,191.8 ms; backlog
+reconciliation 986.7 ms. Service-side first-use recovery was 1,300.6 ms, version
+rebuild 1,205.5 ms, and restart-open due 192.5 ms. Correctness matched 2,002/11
+actor histories and cursor 101; request/recurrence connection counts returned
+to zero. The run passed its cleanup and worker lifetime checks.
+
+This is a correctness smoke with representative latency observations, not a
+paired performance comparison or evidence of improved tails. The change removes
+one redundant schema validation/read-only SQLite connection per personal
+acquisition; separate connection-count and untouched-invalid-file regressions
+prove that narrower effect. #81 remains open for bulk work, contention, recovery
+and longitudinal measurement. Private samples/manifests are retained with the
+PR100 review-correction evidence; no raw database or credentials are published.
+
 ## 2026-10-27 — historical boundary and approved request-local slice
 
 [Original investigation](performance-investigation.md) used invalid completion

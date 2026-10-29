@@ -13,13 +13,12 @@ export type RuntimeConfiguration = {
   databasePath: string
   privateLibrariesDirectory: string
   authentication: AuthenticationOptions
-  legacyOwnerSubject: string | undefined
   production: boolean
   staticRoot: string
 }
 
 /** Resolve settings without opening files, contacting OIDC, or capturing environment at import time.
- * @throws {Error} For invalid ports, origin URLs, or colliding shared/accounts paths.
+ * @throws {Error} For invalid ports, origin URLs, or the retired separate accounts path.
  */
 export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeConfiguration {
   const host = environment.STUDY_HOST ?? '127.0.0.1'
@@ -27,13 +26,13 @@ export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeCon
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('STUDY_PORT must be a valid port.')
   }
-  const databasePath = resolve(environment.STUDY_DB_PATH ?? 'private/app/library.sqlite3')
-  const accountsPath = resolve(
-    environment.STUDY_ACCOUNTS_PATH ?? resolve(dirname(databasePath), 'accounts.sqlite3'),
-  )
-  if (accountsPath === databasePath) {
-    throw new Error('STUDY_ACCOUNTS_PATH must be separate from STUDY_DB_PATH.')
+  const databasePath = resolve(environment.STUDY_DB_PATH ?? 'private/app/central.sqlite3')
+  if (environment.STUDY_ACCOUNTS_PATH !== undefined) {
+    throw new Error(
+      'STUDY_ACCOUNTS_PATH is retired. Convert accounts and shared content externally and set STUDY_DB_PATH to the prepared central database.',
+    )
   }
+  const accountsPath = databasePath
   const origin = new URL(environment.STUDY_ORIGIN ?? `http://127.0.0.1:${port}`)
   const authentication = {
     origin,
@@ -52,7 +51,6 @@ export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeCon
       environment.STUDY_PRIVATE_LIBRARIES_DIR ?? resolve(dirname(databasePath), 'users'),
     ),
     authentication,
-    legacyOwnerSubject: environment.STUDY_LEGACY_OWNER_SUBJECT || undefined,
     production: environment.NODE_ENV === 'production',
     staticRoot: resolve('dist'),
   }

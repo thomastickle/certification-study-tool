@@ -43,10 +43,6 @@ export function finishStudySeparation(db: DatabaseSync): void {
 /** This marker is shared-file metadata, never part of an account's private library. */
 function ensureCleanupRecord(db: DatabaseSync): void {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS main.private_study_separation (
-      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-      complete INTEGER NOT NULL CHECK (complete IN (0, 1))
-    );
     INSERT OR IGNORE INTO main.private_study_separation VALUES (1, 0);
   `)
 }

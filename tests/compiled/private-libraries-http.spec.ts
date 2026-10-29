@@ -112,3 +112,22 @@ test('private previews reject foreign accounts and shared destinations without c
     await app.close()
   }
 })
+
+test('verified login and study requests leave unprovisioned workspace paths absent', async () => {
+  const { fixture } = await import('./study-http-fixture.ts')
+  const { StudyHttpModule } = await import('../../src/server/study-http/study.module.ts')
+  const { existsSync } = await import('node:fs')
+  const f = await fixture(undefined, [LibraryHttpModule, StudyHttpModule])
+  try {
+    const cookie = await f.login('pending', '', false)
+    assert.equal(existsSync(f.config.privateLibrariesDirectory), false)
+    for (const path of ['/api/home', '/api/questions', '/api/quizzes']) {
+      const response = await f.authorized(path, cookie)
+      assert.equal(response.status, 503, path)
+      assert.match(response.body, /provision/i)
+      assert.equal(existsSync(f.config.privateLibrariesDirectory), false)
+    }
+  } finally {
+    await f.close()
+  }
+})

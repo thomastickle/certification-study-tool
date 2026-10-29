@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { HomeService } from '../src/server/home/home-service.ts'
@@ -12,6 +13,7 @@ if (!database || existsSync(database)) {
   throw new Error('Provide a new disposable database path for synthetic Home fixtures.')
 }
 mkdirSync(dirname(resolve(database)), { recursive: true, mode: 0o700 })
+prepareRuntimeDatabase(database)
 const repository = new LibraryRepository(database)
 try {
   populate(repository, 50)

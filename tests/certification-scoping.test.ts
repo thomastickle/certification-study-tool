@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -27,7 +28,7 @@ function library(repository: LibraryRepository, size = 65) {
 }
 
 test('generic practice includes unclassified questions, persists scope, and isolates recovery', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     library(repository)
     const service = new QuizService(repository)
@@ -56,7 +57,7 @@ test('generic practice includes unclassified questions, persists scope, and isol
 })
 
 test('generic exams require enough unique eligible questions', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     library(repository, 64)
     assert.throws(
@@ -71,7 +72,7 @@ test('generic exams require enough unique eligible questions', () => {
 test('mastery, due review, recent and reports stay scoped even after library deletion', async () => {
   const { ReportService } = await import('../src/server/reports/report-service.ts')
   const { LibraryService } = await import('../src/server/questions/library-service.ts')
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   let now = Date.UTC(2026, 9, 1, 12)
   try {
     library(repository)

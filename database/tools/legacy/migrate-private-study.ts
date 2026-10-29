@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { Source } from '../../shared/contracts.ts'
-import type { StoredQuiz } from '../quizzes/quiz-repository.ts'
-import { pinLegacySources } from './bank-provenance.ts'
+import type { Source } from '../../../src/shared/contracts.ts'
+import type { StoredQuiz } from '../../../src/server/quizzes/quiz-repository.ts'
+import { pinLegacySources } from '../../../src/server/questions/bank-provenance.ts'
 import { requireStudyCleanup } from './study-separation.ts'
 
 const studyTables = {
@@ -45,6 +45,13 @@ function transferStudyInTransaction(db: DatabaseSync, accountId: string): void {
       db.exec('PRAGMA main.secure_delete = ON')
       transferOwnedRows(db, accountId)
       pinMigratedSources(db, accountId)
+      // Session triggers invalidate destination evidence; restore the source cache only afterwards.
+      db.prepare(
+        `
+        INSERT INTO private_study.quiz_evidence
+        SELECT * FROM main.quiz_evidence WHERE account_id = ?
+      `,
+      ).run(accountId)
       deleteTransferredRows(db, accountId)
     }
     db.exec('COMMIT')
@@ -83,7 +90,7 @@ function verifyMigrationPreconditions(db: DatabaseSync, accountId: string): void
 function rejectConflictingEvidence(db: DatabaseSync, accountId: string): number {
   let incoming = 0
   let existing = 0
-  for (const table of Object.keys(studyTables)) {
+  for (const table of [...Object.keys(studyTables), 'quiz_evidence']) {
     incoming += Number(
       db.prepare(`SELECT count(*) AS total FROM main.${table} WHERE account_id = ?`).get(accountId)
         ?.total,
@@ -114,7 +121,7 @@ function transferOwnedRows(db: DatabaseSync, accountId: string): void {
 
 /** Remove only the transferred owner's evidence after every copy and provenance update succeeds. */
 function deleteTransferredRows(db: DatabaseSync, accountId: string): void {
-  for (const table of Object.keys(studyTables)) {
+  for (const table of [...Object.keys(studyTables), 'quiz_evidence']) {
     db.prepare(`DELETE FROM main.${table} WHERE account_id = ?`).run(accountId)
   }
 }

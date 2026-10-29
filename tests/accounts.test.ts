@@ -1,3 +1,4 @@
+import { prepareManagedDatabase, prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -6,11 +7,11 @@ import { test } from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
 import { AccountRepository } from '../src/server/auth/account-repository.ts'
 import { createHash, randomUUID } from 'node:crypto'
-import { legacyAccountSchema } from './legacy-study-schema.ts'
 
 test('account identity survives restart, ignores display name changes, and separates issuers', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-accounts-'))
   const path = join(directory, 'accounts.sqlite3')
+  prepareRuntimeDatabase(path)
   const identity = { issuer: 'https://identity.example/realm', subject: 'alice', name: 'Alice' }
   let accounts = new AccountRepository(path)
   try {
@@ -33,7 +34,7 @@ test('account identity survives restart, ignores display name changes, and separ
 })
 
 test('sessions retain their verified role and only resolve under the configured issuer', () => {
-  const accounts = new AccountRepository(':memory:')
+  const accounts = new AccountRepository(prepareManagedDatabase())
   const issuer = 'https://identity.example/realm'
   try {
     const account = accounts.identify({ issuer, subject: 'alice', name: 'Alice' })
@@ -50,18 +51,20 @@ test('sessions retain their verified role and only resolve under the configured 
   }
 })
 
-test('upgrading existing account sessions preserves identity and grants no implicit admin role', () => {
+test('prepared existing account sessions preserve identity and default to student', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-session-upgrade-'))
   const path = join(directory, 'accounts.sqlite3')
+  prepareRuntimeDatabase(path)
   const id = randomUUID()
   const issuer = 'https://identity.example/realm'
   const token = 'synthetic-pre-upgrade-session'
   const original = new DatabaseSync(path)
   try {
-    original.exec(legacyAccountSchema)
     original.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)').run(id, issuer, 'alice', 'Alice')
     const hash = createHash('sha256').update(token).digest('hex')
-    original.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run(hash, id, 2000)
+    original
+      .prepare('INSERT INTO sessions(token_hash, account_id, expires_at) VALUES (?, ?, ?)')
+      .run(hash, id, 2000)
   } finally {
     original.close()
   }
@@ -82,6 +85,7 @@ test('upgrading existing account sessions preserves identity and grants no impli
 test('sessions persist as hashes, expire at their deadline, and can be revoked', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-sessions-'))
   const path = join(directory, 'accounts.sqlite3')
+  prepareRuntimeDatabase(path)
   let accounts = new AccountRepository(path)
   try {
     const account = accounts.identify({
@@ -134,6 +138,7 @@ test('sessions persist as hashes, expire at their deadline, and can be revoked',
 test('session lookup remains available while another connection holds the write reservation', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-session-read-'))
   const path = join(directory, 'accounts.sqlite3')
+  prepareRuntimeDatabase(path)
   const accounts = new AccountRepository(path)
   const writer = new DatabaseSync(path)
   try {

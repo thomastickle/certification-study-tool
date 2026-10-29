@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -10,7 +11,7 @@ import {
 } from './benchmark-history-evidence.ts'
 
 test('benchmark evidence rejects equal-count replacement, changed evidence and wrong source annotations', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const service = new QuizService(repository, Date.now, () => 0.5)
@@ -57,7 +58,7 @@ test('benchmark evidence rejects equal-count replacement, changed evidence and w
 })
 
 test('benchmark scoring guard rejects impossible chronology, timer metadata and unknown evidence', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1_000_000

@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -22,6 +23,7 @@ test('compiled production runs without source files and preserves HTTP/static co
   mkdirSync(join(directory, 'dist'))
   writeFileSync(join(directory, 'dist/index.html'), '<!doctype html><title>Synthetic shell</title>')
   writeFileSync(join(directory, 'dist/probe.js'), '/* synthetic asset */')
+  prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
   const child = spawn(process.execPath, ['build/src/server/main.js'], {
     cwd: directory,
     env: {
@@ -31,7 +33,6 @@ test('compiled production runs without source files and preserves HTTP/static co
       STUDY_PORT: String(port),
       STUDY_ORIGIN: `http://127.0.0.1:${port}`,
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
-      STUDY_ACCOUNTS_PATH: join(directory, 'accounts.sqlite3'),
       STUDY_PRIVATE_LIBRARIES_DIR: join(directory, 'users'),
       STUDY_LEGACY_OWNER_SUBJECT: '',
       STUDY_OIDC_ISSUER: 'http://127.0.0.1:1/synthetic-issuer',

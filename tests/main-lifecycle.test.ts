@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -29,6 +30,7 @@ function launch(directory: string, port: number, production: boolean) {
   `,
     { mode: 0o600 },
   )
+  prepareRuntimeDatabase(join(directory, 'data/library.sqlite3'))
   const child = spawn(
     process.execPath,
     ['--import', observer, resolve('build/src/server/main.js')],
@@ -43,7 +45,6 @@ function launch(directory: string, port: number, production: boolean) {
         STUDY_PORT: String(port),
         STUDY_ORIGIN: `http://127.0.0.1:${port}`,
         STUDY_DB_PATH: join(directory, 'data/library.sqlite3'),
-        STUDY_ACCOUNTS_PATH: join(directory, 'data/accounts.sqlite3'),
         STUDY_PRIVATE_LIBRARIES_DIR: join(directory, 'data/users'),
         STUDY_LEGACY_OWNER_SUBJECT: '',
         STUDY_OIDC_ISSUER: 'http://127.0.0.1:1/fixture',

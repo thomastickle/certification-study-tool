@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -46,7 +47,7 @@ function sample(repository: LibraryRepository, id: string, at: number): StoredQu
 }
 
 test('report separates repeat activity, unique coverage and lifetime mastery without recomputing first-ever under filters', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const now = Date.parse('2026-10-20T16:00:00Z')
@@ -84,7 +85,7 @@ test('report separates repeat activity, unique coverage and lifetime mastery wit
 })
 
 test('repeats do not qualify tiny domains; missing identity and confidence stay unknown', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     const now = Date.now()

@@ -10,7 +10,12 @@ import type { AdmittedRequest } from './security-context.ts'
 import type { ServerResponse } from 'node:http'
 import { STUDY_REQUEST } from './security-context.ts'
 
-/** Retain personal storage through body parameters and the full asynchronous controller operation. */
+/**
+ * Retain personal storage through serial body parsing and explicitly awaited controller work.
+ * Native async parameter factories/pipes resolve concurrently and fail fast: they must be
+ * side-effect-free and must never borrow request-owned storage. Await DB-dependent validation
+ * in the controller/service instead; this interceptor cannot join unseen parameter siblings.
+ */
 @Injectable()
 export class StudyContextInterceptor implements NestInterceptor {
   constructor(
@@ -19,7 +24,7 @@ export class StudyContextInterceptor implements NestInterceptor {
     @Inject(SHARED_LIBRARY_REPOSITORY) private readonly shared: LibraryRepository,
   ) {}
 
-  /** Release ownership only after guards, parameters, handler work and personal cleanup settle. */
+  /** Release ownership after the supported input pipeline, awaited handler and personal cleanup. */
   intercept(context: ExecutionContext, next: CallHandler) {
     const request = context.switchToHttp().getRequest<AdmittedRequest>()
     const scoped = this.reflector.getAllAndOverride<boolean>(STUDY_REQUEST, [

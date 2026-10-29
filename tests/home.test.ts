@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { HomeService } from '../src/server/home/home-service.ts'
@@ -8,7 +9,7 @@ import { homeExam, homeNow } from './home-fixtures.ts'
 import { readinessScore } from '../src/server/home/readiness.ts'
 
 test('home groups real library certifications by provider, not one track per bank', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const importer = new ImportService(repository)
     for (const [key, provider, code, name] of [
@@ -42,7 +43,7 @@ test('home groups real library certifications by provider, not one track per ban
 })
 
 test('foreign CLF-C02 history uses generic readiness without borrowing the AWS blueprint', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const age of [3, 2, 1]) {
       const exam = homeExam(`foreign-${age}`, age)
@@ -70,7 +71,7 @@ test('foreign CLF-C02 history uses generic readiness without borrowing the AWS b
 })
 
 test('Home isolates scores and due counts by the complete provider/certification pair', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const age of [3, 2, 1]) {
       repository.quizStore().save(homeExam(`clf-${age}`, age))
@@ -117,7 +118,7 @@ test('combined scores use the approved 90% green boundary and retain component g
 })
 
 test('weak domains cap a high blended score and skips remain scored misses', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const age of [3, 2, 1]) {
       const exam = homeExam(`cap-${age}`, age, age === 1 ? 62 : 65)
@@ -144,7 +145,7 @@ test('weak domains cap a high blended score and skips remain scored misses', () 
 })
 
 test('broad, consistent low-nineties performance now makes a track exam-ready', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const [age, misses] of [
       [3, [0, 1, 16, 35, 57]],
@@ -179,7 +180,7 @@ test('same-day retries, pauses, short exams, stale and future results do not est
     'future',
     'unknown-confidence',
   ] as const) {
-    const repository = new LibraryRepository(':memory:')
+    const repository = new LibraryRepository(prepareManagedDatabase())
     try {
       for (const age of [3, 2, 1]) {
         const exam = homeExam(`${scenario}-${age}`, scenario === 'same-day' ? 1 : age)
@@ -219,7 +220,7 @@ test('same-day retries, pauses, short exams, stale and future results do not est
 })
 
 test('replaying an identical exam cannot qualify through broad quiz coverage', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const age of [8, 7, 6]) {
       const quiz = homeExam(`coverage-${age}`, age)
@@ -241,7 +242,7 @@ test('replaying an identical exam cannot qualify through broad quiz coverage', (
 })
 
 test('a same-day excellent retry does not hide a poor exam on that study day', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const age of [3, 2, 1]) {
       repository.quizStore().save(homeExam(`good-${age}`, age))
@@ -257,7 +258,7 @@ test('a same-day excellent retry does not hide a poor exam on that study day', (
 })
 
 test('current mastery uses lifetime recovery while unfinished and future attempts supply no credit', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     repository.quizStore().save(homeExam('old-misses', 40, 0, 'exam-3'))
     for (const age of [3, 2, 1]) {
@@ -285,7 +286,7 @@ test('current mastery uses lifetime recovery while unfinished and future attempt
 })
 
 test('broad, consistent recent exams make a single historical certification exam-ready', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     for (const age of [3, 2, 1]) {
       repository.quizStore().save(homeExam(`exam-${age}`, age))

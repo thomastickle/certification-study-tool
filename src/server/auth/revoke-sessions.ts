@@ -14,7 +14,7 @@ try {
   })
   if (values.help) {
     console.log(
-      'npm run auth:revoke -- --accounts <database> --issuer <exact-issuer> --subject <user-ID>',
+      'npm run auth:revoke -- --accounts <prepared-central-database> --issuer <exact-issuer> --subject <user-ID>',
     )
   } else {
     if (!values.accounts || !values.issuer || !values.subject?.trim()) {
@@ -22,7 +22,9 @@ try {
     }
     const path = resolve(values.accounts)
     if (!existsSync(path)) {
-      throw new Error('The account database does not exist. No sessions were changed.')
+      throw new Error(
+        'The prepared central database does not exist. Run external preparation with npm run database:admin. No sessions were changed.',
+      )
     }
     const accounts = new AccountRepository(path)
     try {

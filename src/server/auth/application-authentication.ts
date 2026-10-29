@@ -1,6 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { chmodSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { OidcSettings } from './oidc-login.ts'
 import { OidcLogin } from './oidc-login.ts'
@@ -31,28 +29,10 @@ export class ApplicationAuthentication {
     this.login = new OidcLogin(options)
     this.options = options
     this.now = options.now ?? Date.now
-    mkdirSync(dirname(options.accountsPath), { recursive: true, mode: 0o700 })
-    const accounts = new AccountRepository(options.accountsPath)
-    try {
-      chmodSync(options.accountsPath, 0o600)
-      this.accounts = accounts
-    } catch (error) {
-      accounts.close()
-      throw error
-    }
+    this.accounts = new AccountRepository(options.accountsPath)
     const secure = options.origin.protocol === 'https:'
     this.sessionName = secure ? '__Host-study_session' : 'study_session'
     this.loginName = secure ? '__Secure-study_login' : 'study_login'
-  }
-
-  /** Map an operator-selected legacy owner without issuing a login or granting any role. */
-  legacyOwnerId(subject: string): string {
-    if (!subject.trim()) {
-      throw new Error('STUDY_LEGACY_OWNER_SUBJECT must identify the previous study owner.')
-    }
-    const issuer = this.options.issuer
-    const existing = this.accounts.findIdentity(issuer, subject)
-    return existing?.id ?? this.accounts.identify({ issuer, subject, name: subject }).id
   }
 
   /** Permit provider return documents while retaining origin checks on auth and study operations. */

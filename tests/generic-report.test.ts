@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
@@ -14,7 +15,7 @@ import type { StudyReport } from '../src/shared/report-contracts.ts'
 
 /** Two completed attempts meet the old focus gate without any configured domain mapping. */
 function genericReport(provider = 'Azure', certification = 'AZ-900'): StudyReport {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   const now = Date.UTC(2026, 9, 20)
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -121,7 +122,7 @@ test('aggregate dashboard omits generic domain coverage and ranking while preser
         /Domains explored|\/ 4 domains|Domain 0|Insufficient evidence|Each supported domain|Ranking uses score|A clearer view of every domain/,
       )
     }
-    const repository = new LibraryRepository(':memory:')
+    const repository = new LibraryRepository(prepareManagedDatabase())
     try {
       const legacy = new ReportService(repository).get()
       delete legacy.provider

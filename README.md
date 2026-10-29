@@ -24,6 +24,11 @@ Each user has a separate database for private banks and study history.
 
 ```sh
 npm ci
+# Standalone Flyway prepares storage outside the server.
+docker pull --platform linux/amd64 redgate/flyway@sha256:b45087cccd267d326c5fd776bc06e9690e83509ce8bbf47acd65f1aa4a4b8b86
+# NEW installations only; private/app must not already exist.
+mkdir -p private
+npm run database:admin -- init private/app
 npm run dev
 ```
 
@@ -37,19 +42,22 @@ npm run build
 NODE_ENV=production npm start
 ```
 
-The database defaults to `private/app/library.sqlite3`. `STUDY_DB_PATH` selects a
-separate database path and `STUDY_PORT` selects a port. Do not point this app at
-the original Python app's database; existing unrelated databases are refused.
-Private databases default to `private/app/users/<internal-ID>.sqlite3`; identities
-and sessions remain in `accounts.sqlite3`. See [private-library storage and upgrade](docs/private-libraries.md).
-The current library schema is version 4 and uses an application identifier to recognize
-its own databases. Upgrading owner-only study history requires an explicit
-[legacy-owner mapping](docs/authentication.md#upgrade-from-the-owner-only-release).
+The prepared central database defaults to `private/app/central.sqlite3`.
+`STUDY_DB_PATH` selects the central file shared by accounts, sessions and library content;
+`STUDY_ACCOUNTS_PATH` is retired and causes a configuration error. Personal workspaces
+remain separate under `private/app/users/<internal-ID>.sqlite3` unless configured otherwise.
+Prepare or convert databases externally before starting the server. The deployment root
+must contain exact `READY` contents `1\n` and no `RESTART_BLOCKED` marker.
+Login never creates personal files: study requests return 503 until external provisioning
+completes. See [database administration](docs/database-management.md). Actual local data
+conversion is deferred until the complete change has merged into master.
 
 ## Run with Docker
 
 With Docker Engine/Desktop and Docker Compose running, follow the
-[role setup and upgrade instructions](docs/authentication.md) before starting:
+[role setup and upgrade instructions](docs/authentication.md) and the
+[fresh-volume preparation procedure](docs/database-management.md#fresh-docker-volume)
+before starting. A missing database is deliberately not initialized by the image:
 
 ```sh
 docker compose up --build -d
@@ -70,8 +78,8 @@ The `study-data` Docker volume stores SQLite data across container rebuilds and
 recreation. `docker compose down --volumes` **permanently deletes that library**.
 The `keycloak-data` volume separately preserves provider identities.
 Back up the volume while the service is stopped before removing volumes or
-moving machines. This starts a new, empty library; your existing
-`private/app/library.sqlite3` is not copied. Import banks through the browser as
+moving machines. Fresh volume preparation installs an externally generated empty
+library; your existing `private/app/central.sqlite3` is not copied. Import banks through the browser as
 usual. Private files, local databases, credentials, and Git history are excluded
 from the build context and image. No image publishing is required.
 
