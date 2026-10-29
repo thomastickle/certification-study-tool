@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -22,9 +23,10 @@ for (const damage of ['corrupt', 'foreign-owner'] as const) {
     const port = await availablePort()
     const origin = `http://127.0.0.1:${port}`
     const issuer = 'http://127.0.0.1:8080/realms/housekeeping-test'
-    const accountsPath = join(directory, 'accounts.sqlite3')
+    const accountsPath = join(directory, 'library.sqlite3')
     const sharedPath = join(directory, 'library.sqlite3')
     const usersPath = join(directory, 'users')
+    prepareRuntimeDatabase(sharedPath)
     const accounts = new AccountRepository(accountsPath)
     const libraries = new PrivateLibraries(usersPath)
     const sessions = new Map<string, string>()
@@ -33,6 +35,7 @@ for (const damage of ['corrupt', 'foreign-owner'] as const) {
       const token = randomBytes(32).toString('base64url')
       accounts.saveSession(token, account.id, Date.now() + 60_000)
       sessions.set(account.id, token)
+      provisionTestWorkspace(sharedPath, usersPath, account.id)
       libraries.open(account.id).close()
     }
     accounts.close()
@@ -56,7 +59,6 @@ for (const damage of ['corrupt', 'foreign-owner'] as const) {
     }
     new LibraryService(shared).deleteSource(shared.sources()[0]!.id)
     // The completed migration remains authoritative; routine upkeep alone encounters the damage.
-    libraries.migrateFrom(shared)
     shared.close()
     const damagedPath = join(usersPath, `${damaged}.sqlite3`)
     if (damage === 'corrupt') {
@@ -74,7 +76,6 @@ for (const damage of ['corrupt', 'foreign-owner'] as const) {
       STUDY_PORT: String(port),
       STUDY_ORIGIN: origin,
       STUDY_OIDC_ISSUER: issuer,
-      STUDY_ACCOUNTS_PATH: accountsPath,
       STUDY_DB_PATH: sharedPath,
       STUDY_PRIVATE_LIBRARIES_DIR: usersPath,
       STUDY_LEGACY_OWNER_SUBJECT: '',
@@ -177,12 +178,13 @@ for (const damage of ['corrupt', 'foreign-owner'] as const) {
   })
 }
 
-test('actual startup still refuses a damaged destination with pending shared study migration', async () => {
+test('actual startup still refuses a damaged destination with incomplete external shared study separation', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-migration-fail-closed-'))
   const port = await availablePort()
   const sharedPath = join(directory, 'library.sqlite3')
   const usersPath = join(directory, 'users')
-  const accounts = new AccountRepository(join(directory, 'accounts.sqlite3'))
+  prepareRuntimeDatabase(sharedPath)
+  const accounts = new AccountRepository(sharedPath)
   const account = accounts.identify({
     issuer: 'synthetic',
     subject: 'owner',
@@ -193,7 +195,11 @@ test('actual startup still refuses a damaged destination with pending shared stu
   shared.forAccount(account.id).quizStore().record('preserve-pending-migration', false)
   shared.close()
   const libraries = new PrivateLibraries(usersPath)
+  provisionTestWorkspace(sharedPath, usersPath, account.id)
   libraries.open(account.id).close()
+  const pending = new DatabaseSync(sharedPath)
+  pending.exec('UPDATE private_study_separation SET complete = 0')
+  pending.close()
   const damagedPath = join(usersPath, `${account.id}.sqlite3`)
   writeFileSync(damagedPath, 'Synthetic corrupt destination')
   const child = spawn(process.execPath, ['build/src/server/main.js'], {
@@ -204,7 +210,6 @@ test('actual startup still refuses a damaged destination with pending shared stu
       STUDY_PORT: String(port),
       STUDY_ORIGIN: `http://127.0.0.1:${port}`,
       STUDY_OIDC_ISSUER: 'http://127.0.0.1:8080/realms/housekeeping-test',
-      STUDY_ACCOUNTS_PATH: join(directory, 'accounts.sqlite3'),
       STUDY_DB_PATH: sharedPath,
       STUDY_PRIVATE_LIBRARIES_DIR: usersPath,
       STUDY_LEGACY_OWNER_SUBJECT: '',
@@ -222,9 +227,15 @@ test('actual startup still refuses a damaged destination with pending shared stu
     assert.notEqual(code, null, 'The application must exit on its own migration error')
     assert.notEqual(code, 0)
     assert.equal(listening, false)
-    const check = new LibraryRepository(sharedPath)
+    const check = new DatabaseSync(sharedPath, { readOnly: true })
     try {
-      assert.deepEqual(check.studyAccounts(), [account.id])
+      assert.deepEqual(
+        check
+          .prepare('SELECT DISTINCT account_id FROM quiz_mastery')
+          .all()
+          .map((row) => row.account_id),
+        [account.id],
+      )
     } finally {
       check.close()
     }

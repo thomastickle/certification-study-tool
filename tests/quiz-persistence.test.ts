@@ -1,9 +1,9 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
 import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import { ImportService } from '../src/server/importer/import-service.ts'
@@ -11,20 +11,16 @@ import { LibraryService } from '../src/server/questions/library-service.ts'
 import { bank } from './fixtures.ts'
 import { populate } from './quiz-fixtures.ts'
 
-test('migration preserves v1 library IDs/content; saved results survive reopen and source deletion', () => {
+test('prepared library preserves IDs/content; saved results survive reopen and source deletion', () => {
   const directory = mkdtempSync(join(tmpdir(), 'quiz-history-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   try {
     let repository = new LibraryRepository(path)
     populate(repository)
     const original = repository.allQuestions()
     repository.close()
-    // Recreate the previous version's schema around genuine synthetic library rows.
-    const old = new DatabaseSync(path)
-    old.exec(
-      'DROP TABLE quiz_sessions; DROP TABLE quiz_mastery; DROP TABLE earned_certifications; DROP TABLE deleted_sources; DROP TABLE shared_deletion_cursor; PRAGMA user_version=1;',
-    )
-    old.close()
+    // The external admin suite owns v1 conversion assertions. Runtime exercises the prepared result.
     repository = new LibraryRepository(path)
     assert.deepEqual(repository.allQuestions(), original)
     const importer = new ImportService(repository)
@@ -69,6 +65,7 @@ test('migration preserves v1 library IDs/content; saved results survive reopen a
 test('paused snapshot and remaining time survive database close and reopen', () => {
   const directory = mkdtempSync(join(tmpdir(), 'quiz-pause-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   let repository = new LibraryRepository(path)
   try {
     populate(repository)

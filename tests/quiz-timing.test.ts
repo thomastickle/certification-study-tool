@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { QuizView } from '../src/shared/quiz-contracts.ts'
@@ -51,7 +52,7 @@ test('timing uses server time for ongoing pauses and never invents legacy totals
 })
 
 test('legacy resumed and newly paused snapshots retain known intervals without fabricating earlier history', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000
@@ -80,7 +81,7 @@ test('legacy resumed and newly paused snapshots retain known intervals without f
 })
 
 test('individual and master Markdown exports distinguish active, elapsed and per-pause durations', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(repository)
     let now = 1000

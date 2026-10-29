@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -6,7 +7,7 @@ import { ImportService } from '../src/server/importer/import-service.ts'
 import { bank } from './fixtures.ts'
 
 test('question and source deletion affect only the selected occurrence/source and invalidate old previews', () => {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   try {
     const importer = new ImportService(repository)
     const library = new LibraryService(repository)

@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from '../managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -24,6 +25,7 @@ export async function libraryFixture(
     STUDY_DB_PATH: join(directory, 'library.sqlite3'),
     STUDY_OIDC_ISSUER: provider.issuerIdentifier,
   })
+  prepareRuntimeDatabase(config.databasePath)
   let now = Date.now()
   config.authentication.now = () => now
   const app = await createApplication(config, [...features])
@@ -100,7 +102,9 @@ export async function libraryFixture(
       value.startsWith('study_session='),
     )!.split(';')[0]!
     const session = await call('/api/session', 'GET', { Cookie: cookie })
-    sessions.set(cookie, JSON.parse(session.body).user.id)
+    const id = JSON.parse(session.body).user.id
+    sessions.set(cookie, id)
+    provisionTestWorkspace(config.databasePath, config.privateLibrariesDirectory, id)
     return cookie
   }
 

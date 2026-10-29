@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from '../managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { fork, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
@@ -78,6 +79,7 @@ async function fixture(publicHostname?: string) {
     STUDY_DB_PATH: join(root, 'private/library.sqlite3'),
     STUDY_OIDC_ISSUER: provider.issuerIdentifier,
   })
+  prepareRuntimeDatabase(configuration.databasePath)
   const owner = new DevelopmentApplication(configuration, root)
   const origin = configuration.origin.origin
 
@@ -106,6 +108,11 @@ async function fixture(publicHostname?: string) {
     const session = await call('/api/session', jar)
     assert.equal(session.status, 200)
     const user = (await session.json()).user as { id: string }
+    provisionTestWorkspace(
+      configuration.databasePath,
+      configuration.privateLibrariesDirectory,
+      user.id,
+    )
     return { jar, user }
   }
 
@@ -274,6 +281,7 @@ for (const phase of ['starting', 'serving', 'restarting']) {
     if (phase === 'starting') {
       writeFileSync(config, pendingConfig)
     }
+    prepareRuntimeDatabase(join(f.root, 'main/library.sqlite3'))
     const main = fork(resolve('build/src/server/main.js'), [], {
       cwd: f.root,
       execArgv: [],
@@ -789,6 +797,7 @@ for (const crash of [false, true]) {
     { timeout: 30000 },
     async () => {
       const f = await fixture()
+      prepareRuntimeDatabase(join(f.root, 'main/library.sqlite3'))
       const child = fork(resolve('build/src/server/main.js'), [], {
         cwd: f.root,
         execArgv: [],

@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -23,6 +24,7 @@ test('server permits its configured Host but requires login for study data', asy
   const port = socket.port
   await new Promise<void>((resolve) => probe.close(() => resolve()))
   const directory = mkdtempSync(join(tmpdir(), 'study-listen-'))
+  prepareRuntimeDatabase(join(directory, 'library.sqlite3'))
   const child = spawn(process.execPath, ['build/src/server/main.js'], {
     env: {
       ...process.env,
@@ -30,7 +32,6 @@ test('server permits its configured Host but requires login for study data', asy
       STUDY_HOST: '0.0.0.0',
       STUDY_PORT: String(port),
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
-      STUDY_ACCOUNTS_PATH: join(directory, 'accounts.sqlite3'),
       STUDY_ORIGIN: `http://localhost:${port}`,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from '../managed-database-fixture.ts'
 import { createProductionApplication } from '../../src/server/production-application.ts'
 import { ApplicationRuntime } from '../../src/server/runtime/application-runtime.ts'
 import { runtimeConfiguration } from '../../src/server/runtime/runtime-configuration.ts'
@@ -36,6 +37,7 @@ async function fixture(
     STUDY_OIDC_ISSUER: provider.issuerIdentifier,
     NODE_ENV: 'production',
   })
+  prepareRuntimeDatabase(configuration.databasePath)
   configuration.staticRoot = directory
   let now = Date.now()
   configuration.authentication.now = () => now
@@ -114,7 +116,13 @@ async function fixture(
     const sessionCookie = cookie?.split(';')[0] ?? ''
     if (response.status === 302) {
       const session = await call('/api/session', sessionCookie)
-      accounts.set(sessionCookie, (await session.json()).user.id)
+      const id = (await session.json()).user.id
+      accounts.set(sessionCookie, id)
+      provisionTestWorkspace(
+        configuration.databasePath,
+        configuration.privateLibrariesDirectory,
+        id,
+      )
     }
     return { response, cookie: sessionCookie }
   }
@@ -478,6 +486,7 @@ test('a browser can restart login 1001 times without exhausting pending capacity
 test('multi-user authentication does not provision study databases or require an owner', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-auth-config-'))
   try {
+    prepareRuntimeDatabase(join(directory, 'accounts.sqlite3'))
     const authentication = new ApplicationAuthentication({
       issuer: 'http://127.0.0.1:8080/realms/study',
       origin: new URL('http://127.0.0.1:3000'),

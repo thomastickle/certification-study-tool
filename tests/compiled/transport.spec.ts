@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
@@ -125,6 +126,7 @@ test('listen and missing-static failures can close their already initialized Nes
         NODE_ENV: 'production',
         STUDY_PORT: String(address.port),
       })
+      prepareRuntimeDatabase(configuration.databasePath)
       configuration.staticRoot = directory
       const captured = observeRuntime()
       try {
@@ -141,7 +143,11 @@ test('listen and missing-static failures can close their already initialized Nes
           /closed|not open/,
         )
         assert.throws(
-          () => captured.runtime.authentication.legacyOwnerId('closed'),
+          () =>
+            Reflect.get(captured.runtime.authentication, 'accounts').findIdentity(
+              'synthetic',
+              'probe',
+            ),
           /closed|not open/,
         )
       } finally {

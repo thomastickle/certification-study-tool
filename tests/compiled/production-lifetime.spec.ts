@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from '../managed-database-fixture.ts'
 import 'reflect-metadata'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
@@ -23,6 +24,7 @@ for (const disconnect of [false, true]) {
         STUDY_DB_PATH: join(directory, 'library.sqlite3'),
         NODE_ENV: 'production',
       })
+      prepareRuntimeDatabase(configuration.databasePath)
       configuration.port = 0
       configuration.staticRoot = directory
       const app = await createProductionApplication(configuration)
@@ -69,6 +71,11 @@ for (const disconnect of [false, true]) {
         })
         accounts.saveSession('synthetic-session', actor.id, Date.now() + 60000)
         accounts.close()
+        provisionTestWorkspace(
+          configuration.databasePath,
+          configuration.privateLibrariesDirectory,
+          actor.id,
+        )
         const req = request(`${origin}/api/quizzes`, {
           method: 'POST',
           headers: {

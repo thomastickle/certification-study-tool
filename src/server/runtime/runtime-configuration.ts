@@ -13,13 +13,12 @@ export type RuntimeConfiguration = {
   databasePath: string
   privateLibrariesDirectory: string
   authentication: AuthenticationOptions
-  legacyOwnerSubject: string | undefined
   production: boolean
   staticRoot: string
 }
 
 /** Resolve settings without opening files, contacting OIDC, or capturing environment at import time.
- * @throws {Error} For invalid ports, origin URLs, or colliding shared/accounts paths.
+ * @throws {Error} For invalid ports, origin URLs, or the retired separate accounts path.
  */
 export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeConfiguration {
   const host = environment.STUDY_HOST ?? '127.0.0.1'
@@ -52,7 +51,6 @@ export function runtimeConfiguration(environment: NodeJS.ProcessEnv): RuntimeCon
       environment.STUDY_PRIVATE_LIBRARIES_DIR ?? resolve(dirname(databasePath), 'users'),
     ),
     authentication,
-    legacyOwnerSubject: environment.STUDY_LEGACY_OWNER_SUBJECT || undefined,
     production: environment.NODE_ENV === 'production',
     staticRoot: resolve('dist'),
   }

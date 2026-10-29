@@ -1,5 +1,6 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -11,6 +12,7 @@ import { bank } from './fixtures.ts'
 test('a saved library survives closing and reopening SQLite', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-synthetic-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   try {
     const repository = new LibraryRepository(path)
     const service = new ImportService(repository)
@@ -31,13 +33,14 @@ test('a saved library survives closing and reopening SQLite', () => {
 test('an existing unrelated SQLite database is refused without altering it', () => {
   const directory = mkdtempSync(join(tmpdir(), 'study-foreign-'))
   const path = join(directory, 'foreign.sqlite3')
+  writeFileSync(join(directory, 'READY'), '1\n')
   try {
     const foreign = new DatabaseSync(path)
     foreign.exec(
       "CREATE TABLE personal_data (value TEXT); INSERT INTO personal_data VALUES ('synthetic')",
     )
     foreign.close()
-    assert.throws(() => new LibraryRepository(path), /separate application database/i)
+    assert.throws(() => new LibraryRepository(path), /not ready/i)
     const checked = new DatabaseSync(path)
     try {
       assert.equal(checked.prepare('SELECT value FROM personal_data').get()?.value, 'synthetic')

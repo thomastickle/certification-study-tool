@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, preparePersonalFixtures } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -15,6 +16,7 @@ import { populate } from './quiz-fixtures.ts'
 // Synthetic files only. Redirect output to a restricted file outside the repository.
 for (const population of [10, 100]) {
   const directory = mkdtempSync(join(tmpdir(), 'housekeeping-benchmark-'))
+  prepareRuntimeDatabase(join(directory, 'shared.sqlite3'))
   const shared = new LibraryRepository(join(directory, 'shared.sqlite3'))
   const libraries = new PrivateLibraries(join(directory, 'users'))
   const epoch = Date.now()
@@ -27,7 +29,9 @@ for (const population of [10, 100]) {
     const template = shared.quizStore().find(templateView.id)!
     shared.quizStore().remove(template.id)
     for (let owner = 0; owner < population; owner++) {
-      const personal = libraries.open(randomUUID())
+      const id = randomUUID()
+      preparePersonalFixtures(join(directory, 'users'), [id], directory)
+      const personal = libraries.open(id)
       try {
         for (let index = 0; index < 10; index++) {
           personal.quizStore().save({

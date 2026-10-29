@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase } from '../managed-database-fixture.ts'
 import { libraryFixture } from './library-http-fixture.ts'
 import assert from 'node:assert/strict'
 import { Controller, Get, Inject, Module, Scope } from '@nestjs/common'
@@ -53,6 +54,7 @@ for (const failure of ['web', 'partial', 'ended'] as const) {
     const configuration = runtimeConfiguration({
       STUDY_DB_PATH: join(directory, 'library.sqlite3'),
     })
+    prepareRuntimeDatabase(configuration.databasePath)
     // This focused public owner bypasses asset acquisition, not Nest admission or exception handling.
     const web = new PublicWeb(async (request: IncomingMessage, response: ServerResponse) => {
       if (request.url === '/healthy') {

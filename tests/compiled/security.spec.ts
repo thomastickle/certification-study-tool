@@ -1,3 +1,4 @@
+import { prepareRuntimeDatabase, provisionTestWorkspace } from '../managed-database-fixture.ts'
 import { ApplicationOwner } from '../../src/server/runtime/application-owner.ts'
 import assert from 'node:assert/strict'
 import { APP_PIPE, NestFactory } from '@nestjs/core'
@@ -49,6 +50,7 @@ async function fixture(
     STUDY_DB_PATH: join(directory, 'library.sqlite3'),
     STUDY_OIDC_ISSUER: provider.issuerIdentifier,
   })
+  prepareRuntimeDatabase(config.databasePath)
   let now = Date.now()
   config.authentication.now = () => now
   const app = await createApplication(config, [ProbeModule, ...features])
@@ -126,7 +128,9 @@ async function fixture(
       value.startsWith('study_session='),
     )!.split(';')[0]!
     const session = await call('/api/session', 'GET', { Cookie: cookie })
-    sessions.set(cookie, JSON.parse(session.body).user.id)
+    const id = JSON.parse(session.body).user.id
+    sessions.set(cookie, id)
+    provisionTestWorkspace(config.databasePath, config.privateLibrariesDirectory, id)
     return cookie
   }
 
@@ -407,13 +411,16 @@ for (const disconnect of [false, true]) {
         assert.equal(closed, false)
         personal.sources()
         runtime.sharedLibrary.sources()
-        runtime.authentication.legacyOwnerId('root-open-during-work')
+        Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe')
         release.resolve()
         await closing
         assert.deepEqual(events, ['observe', 'close'])
         assert.throws(() => personal.sources(), /closed|not open/)
         assert.throws(() => runtime!.sharedLibrary.sources(), /closed|not open/)
-        assert.throws(() => runtime!.authentication.legacyOwnerId('closed'), /closed|not open/)
+        assert.throws(
+          () => Reflect.get(runtime!.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+          /closed|not open/,
+        )
       } finally {
         release.resolve()
         observe.mock.restore()
@@ -446,11 +453,14 @@ test(
       })
       await setImmediate()
       assert.equal(closed, false)
-      runtime.authentication.legacyOwnerId('open-during-exchange')
+      Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe')
       release.resolve()
       await closing
       await completing
-      assert.throws(() => runtime!.authentication.legacyOwnerId('closed'), /closed|not open/)
+      assert.throws(
+        () => Reflect.get(runtime!.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+        /closed|not open/,
+      )
     } finally {
       release.resolve()
       await f.close()
@@ -570,6 +580,7 @@ test('private repositories selected by the verified actor isolate real imported 
 test('failed Nest feature construction releases the runtime acquired by the same graph', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-security-failure-'))
   const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  prepareRuntimeDatabase(config.databasePath)
   let runtime: ApplicationRuntime | undefined
   try {
     const feature = {
@@ -588,7 +599,10 @@ test('failed Nest feature construction releases the runtime acquired by the same
     await assert.rejects(createApplication(config, [feature]), /synthetic-construction-failure/)
     assert.ok(runtime)
     assert.throws(() => runtime!.sharedLibrary.sources(), /closed|not open/)
-    assert.throws(() => runtime!.authentication.legacyOwnerId('closed'), /closed|not open/)
+    assert.throws(
+      () => Reflect.get(runtime!.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+      /closed|not open/,
+    )
   } finally {
     await runtime?.onModuleDestroy()
     runtime?.onApplicationShutdown()
@@ -599,6 +613,7 @@ test('failed Nest feature construction releases the runtime acquired by the same
 test('startup owner closes HTTP and roots once after Nest init failure', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'nest-security-init-'))
   const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  prepareRuntimeDatabase(config.databasePath)
   const feature = {
     module: FailureModule,
     providers: [
@@ -622,7 +637,10 @@ test('startup owner closes HTTP and roots once after Nest init failure', async (
     await assert.rejects(owner.start(0, '127.0.0.1'), /synthetic-init-failure/)
     assert.equal(close.mock.callCount(), 1)
     assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
-    assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+    assert.throws(
+      () => Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+      /closed|not open/,
+    )
   } finally {
     await app.close()
     rmSync(directory, { recursive: true, force: true })
@@ -636,13 +654,17 @@ test('Nest listen failure releases initialized roots without closing another lis
   const address = listener.address()
   assert.ok(address && typeof address !== 'string')
   const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+  prepareRuntimeDatabase(config.databasePath)
   const app = await createApplication(config)
   const owner = new ApplicationOwner(Promise.resolve(app))
   const runtime = app.get(ApplicationRuntime)
   try {
     await assert.rejects(owner.start(address.port, '127.0.0.1'), /EADDRINUSE/)
     assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
-    assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+    assert.throws(
+      () => Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+      /closed|not open/,
+    )
     assert.equal(listener.listening, true)
   } finally {
     await app.close()
@@ -763,6 +785,7 @@ test(
   async () => {
     const directory = mkdtempSync(join(tmpdir(), 'nest-security-start-close-'))
     const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+    prepareRuntimeDatabase(config.databasePath)
     const entered = deferred()
     const release = deferred()
     const feature = {
@@ -817,6 +840,7 @@ test('failed startup refuses delayed DI acquisition after another provider has a
   const directory = mkdtempSync(join(tmpdir(), 'nest-security-delayed-di-'))
   try {
     const config = runtimeConfiguration({ STUDY_DB_PATH: join(directory, 'library.sqlite3') })
+    prepareRuntimeDatabase(config.databasePath)
     const startup = new RuntimeStartup()
     await startup.closeFailedStartup()
     await assert.rejects(startup.acquire(config), /already failed/)
@@ -1258,7 +1282,10 @@ test(
       assert.throws(() => personal!.sources(), /closed|not open/)
       const runtime = f.app.get(ApplicationRuntime)
       assert.throws(() => runtime.sharedLibrary.sources(), /closed|not open/)
-      assert.throws(() => runtime.authentication.legacyOwnerId('closed'), /closed|not open/)
+      assert.throws(
+        () => Reflect.get(runtime.authentication, 'accounts').findIdentity('synthetic', 'probe'),
+        /closed|not open/,
+      )
     } finally {
       release.resolve()
       // Release a broken baseline's cooperative input so a failing regression still cleans up.

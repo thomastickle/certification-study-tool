@@ -47,9 +47,15 @@ jobs:
           tags: study-tool:ci
           cache-from: type=gha,scope=study-tool
           cache-to: type=gha,mode=max,scope=study-tool
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: package.json
+          check-latest: true
+      - name: Prepare disposable smoke database outside the server image
+        run: node --input-type=module -e "import { prepareRuntimeDatabase } from './tests/managed-database-fixture.ts'; prepareRuntimeDatabase('/tmp/study-ci-data/central.sqlite3')"
       - name: Verify container health and web app
         run: |
-          docker run --detach --name study-tool --publish 127.0.0.1:3000:3000 study-tool:ci
+          docker run --detach --name study-tool --user "$(id -u):$(id -g)" --volume /tmp/study-ci-data:/data --publish 127.0.0.1:3000:3000 study-tool:ci
           for attempt in {1..30}; do
             status=$(docker inspect --format '{{.State.Health.Status}}' study-tool)
             if [ "$status" = healthy ]; then
@@ -70,6 +76,7 @@ jobs:
         with:
           node-version-file: package.json
           check-latest: true
+      - run: npm ci
       - name: Verify shared banks, private libraries and history against Keycloak
         env:
           STUDY_IMAGE: study-tool:ci

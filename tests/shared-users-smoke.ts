@@ -8,7 +8,11 @@ import { parseArgs } from 'node:util'
 import { bank } from './fixtures.ts'
 import { BrowserCookies } from './support/browser-cookies.ts'
 import { waitForApplication } from './support/application-readiness.ts'
-import { legacyAccountSchema, legacyStudySchema } from './legacy-study-schema.ts'
+import { prepareRuntimeDatabase, provisionTestWorkspace } from './managed-database-fixture.ts'
+import { DatabaseSync } from 'node:sqlite'
+import { LibraryRepository } from '../src/server/questions/library-repository.ts'
+import { ImportService } from '../src/server/importer/import-service.ts'
+import { QuizService } from '../src/server/quizzes/quiz-service.ts'
 import type { Session } from '../src/shared/auth-contracts.ts'
 
 const { values } = parseArgs({
@@ -74,7 +78,14 @@ writeFileSync(join(directory, 'study-realm.json'), JSON.stringify(realm), { mode
 // CI runners and local desktops need not use the same UID; fixture files stay private.
 const overridePath = join(directory, 'compose-smoke.yaml')
 const keycloakUser = `${process.getuid?.() ?? 1000}:0`
-const override = { services: { keycloak: { user: keycloakUser } } }
+const data = join(directory, 'data')
+const central = join(data, 'central.sqlite3')
+const override = {
+  services: {
+    keycloak: { user: keycloakUser },
+    study: { user: keycloakUser, volumes: [`${data}:/data`] },
+  },
+}
 writeFileSync(overridePath, JSON.stringify(override), { mode: 0o600 })
 const environment = {
   ...process.env,
@@ -82,7 +93,6 @@ const environment = {
   STUDY_KEYCLOAK_PORT: issuer.port,
   STUDY_ORIGIN: app.origin,
   STUDY_OIDC_ISSUER: issuer.href,
-  STUDY_LEGACY_OWNER_SUBJECT: owner.id,
   STUDY_KEYCLOAK_IMPORT_DIR: directory,
   KC_BOOTSTRAP_ADMIN_PASSWORD: randomUUID(),
 }
@@ -146,51 +156,53 @@ async function login(credentials: typeof owner): Promise<{ browser: Browser; sta
   return { browser, status: landing.status }
 }
 
-/** Seed the deployed single-owner schema so startup must map history to the explicit owner. */
+/** Seed prepared synthetic history; legacy conversion is verified at the external admin boundary. */
 function seedLibrary(): void {
+  prepareRuntimeDatabase(central)
+  const accounts = new DatabaseSync(central)
+  accounts
+    .prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)')
+    .run(previousOwnerAccount, issuer.href, owner.id, 'Synthetic owner')
+  accounts.close()
+  provisionTestWorkspace(central, join(data, 'users'), previousOwnerAccount)
   const input = bank()
   input.questions = Array.from({ length: 20 }, (_, index) => ({
     ...structuredClone(input.questions[0]!),
     source_ref: String(index),
     question: `Synthetic seed ${index}?`,
   }))
-  const script = `
-    import { LibraryRepository } from './build/src/server/questions/library-repository.js'
-    import { ImportService } from './build/src/server/importer/import-service.js'
-    import { QuizService } from './build/src/server/quizzes/quiz-service.js'
-    import { DatabaseSync } from 'node:sqlite'
-    const repo = new LibraryRepository('/data/library.sqlite3')
-    const input = ${JSON.stringify(input)}
-    const importer = new ImportService(repo)
-    const preview = importer.preview(input)
-    importer.confirm(input, preview.token, false)
-    const service = new QuizService(repo)
-    const options = {
+  const shared = new LibraryRepository(central)
+  const personal = new LibraryRepository(
+    join(data, 'users', `${previousOwnerAccount}.sqlite3`),
+    previousOwnerAccount,
+    { privateOwnerId: previousOwnerAccount, deploymentRoot: data },
+  )
+  try {
+    const importer = new ImportService(shared)
+    importer.confirm(input, importer.preview(input).token, false)
+    const study = shared.forAccount(previousOwnerAccount, personal)
+    const service = new QuizService(study)
+    const quiz = service.start({
       provider: 'Example',
       certification: 'DEMO-1',
       sourceFilter: 'mixed',
       questionType: 'mixed',
-    }
-    const quiz = service.start(options)
-    const answers = quiz.questions.map(question => ({
-      questionId: question.questionId,
-      selected: [],
-      confidence: 'Unsure',
-      flagged: false,
-    }))
-    service.submit(quiz.id, { answers })
-    repo.certificationStore().setEarned({ provider: 'Example', code: 'DEMO-1', name: 'Example' }, true)
-    repo.close()
-    const legacy = new DatabaseSync('/data/library.sqlite3')
-    legacy.exec(${JSON.stringify(legacyStudySchema)})
-    legacy.close()
-    const accounts = new DatabaseSync('/data/accounts.sqlite3')
-    accounts.exec(${JSON.stringify(legacyAccountSchema)})
-    const identity = accounts.prepare('INSERT INTO accounts VALUES (?, ?, ?, ?)')
-    identity.run(${JSON.stringify(previousOwnerAccount)}, ${JSON.stringify(issuer.href)}, ${JSON.stringify(owner.id)}, 'Legacy owner')
-    accounts.close()
-  `
-  compose('run', '--rm', '--no-deps', '-T', 'study', 'node', '--input-type=module', '-e', script)
+    })
+    service.submit(quiz.id, {
+      answers: quiz.questions.map((question) => ({
+        questionId: question.questionId,
+        selected: [],
+        confidence: 'Unsure',
+        flagged: false,
+      })),
+    })
+    study
+      .certificationStore()
+      .setEarned({ provider: 'Example', code: 'DEMO-1', name: 'Example' }, true)
+  } finally {
+    personal.close()
+    shared.close()
+  }
 }
 
 /** Bind every test API operation to the account returned by that browser's own session. */
@@ -239,6 +251,10 @@ try {
   assert.equal(signedIn.status, 200)
   assert.equal(student.status, 200)
   assert.equal(secondAdmin.status, 200)
+  for (const actor of [signedIn, student, secondAdmin]) {
+    const user = await currentUser(actor.browser)
+    provisionTestWorkspace(central, join(data, 'users'), user.id)
+  }
   const ownerSession = await currentUser(signedIn.browser)
   const studentSession = await currentUser(student.browser)
   assert.equal(ownerSession.role, 'admin')
@@ -408,7 +424,7 @@ try {
     import assert from 'node:assert/strict'
     import { readFileSync, statSync } from 'node:fs'
     import { DatabaseSync } from 'node:sqlite'
-    const shared = new DatabaseSync('/data/library.sqlite3', { readOnly: true })
+    const shared = new DatabaseSync('/data/central.sqlite3', { readOnly: true })
     assert.equal(shared.prepare('SELECT count(*) AS total FROM quiz_sessions').get().total, 0)
     assert.equal(shared.prepare('SELECT count(*) AS total FROM earned_certifications').get().total, 0)
     shared.close()
@@ -418,7 +434,7 @@ try {
     assert.equal(personal.prepare('SELECT count(*) AS total FROM questions').get().total, 20)
     personal.close()
     const privateQuestion = ${JSON.stringify(privateBank.questions[0]!.question)}
-    assert.equal(readFileSync('/data/library.sqlite3').includes(Buffer.from(privateQuestion)), false)
+    assert.equal(readFileSync('/data/central.sqlite3').includes(Buffer.from(privateQuestion)), false)
     assert.equal(readFileSync(path).includes(Buffer.from(privateQuestion)), true)
     assert.equal(statSync(path).mode & 0o777, 0o600)
   `
@@ -452,7 +468,7 @@ try {
   console.log(
     JSON.stringify({
       adminAndStudentLogin: true,
-      legacyOwnerHistory: 1,
+      preparedOwnerHistory: 1,
       privateStudentHistory: 2,
       sharedQuestions: 21,
       studentMutationDenied: true,

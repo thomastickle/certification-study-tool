@@ -1,3 +1,5 @@
+import { prepareRuntimeDatabase } from './managed-database-fixture.ts'
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -11,6 +13,7 @@ import { populate } from './quiz-fixtures.ts'
 test('shared questions do not share attempts, mastery, or earned certifications', () => {
   const directory = mkdtempSync(join(tmpdir(), 'shared-study-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   const alice = new LibraryRepository(path, 'alice')
   const bob = new LibraryRepository(path, 'bob')
   try {
@@ -50,6 +53,7 @@ test('shared questions do not share attempts, mastery, or earned certifications'
 test('deleting shared content marks every account snapshot without exposing private history', () => {
   const directory = mkdtempSync(join(tmpdir(), 'shared-provenance-'))
   const path = join(directory, 'library.sqlite3')
+  prepareRuntimeDatabase(path)
   const alice = new LibraryRepository(path, 'alice')
   const bob = new LibraryRepository(path, 'bob')
   try {
@@ -71,7 +75,7 @@ test('deleting shared content marks every account snapshot without exposing priv
 })
 
 test('colliding attempt IDs stay isolated through pause, scoring, deletion and retention', () => {
-  const shared = new LibraryRepository(':memory:')
+  const shared = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(shared)
     const alice = shared.forAccount('alice')

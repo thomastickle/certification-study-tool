@@ -1,3 +1,4 @@
+import { prepareManagedDatabase } from './managed-database-fixture.ts'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { LibraryRepository } from '../src/server/questions/library-repository.ts'
@@ -9,7 +10,7 @@ const options = { sourceFilter: 'mixed', questionType: 'mixed' }
 
 /** Create evidence for the first variation; leave its sibling unseen. */
 function setup(questionsPerDomain = 12) {
-  const repository = new LibraryRepository(':memory:')
+  const repository = new LibraryRepository(prepareManagedDatabase())
   populate(repository, questionsPerDomain)
   let now = Date.parse('2026-10-20T16:00:00Z')
   const quizzes = new QuizService(
@@ -181,7 +182,7 @@ test('concept preference preserves exam quotas and falls back when a quota requi
   } finally {
     repository.close()
   }
-  const small = new LibraryRepository(':memory:')
+  const small = new LibraryRepository(prepareManagedDatabase())
   try {
     populate(small, 7)
     const concepts = new ConceptService(small)
