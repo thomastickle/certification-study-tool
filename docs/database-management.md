@@ -107,7 +107,12 @@ v3/v4 still require a real protected fleet directory, even when empty. Symlinks,
 including dangling fleet links, and foreign entries remain errors. If legacy
 `quiz_evidence` exists, every row must have a known account and a matching saved
 attempt; unknown owners or orphan rows require explicit offline reconciliation
-before conversion. Older formats without that table remain supported.
+before conversion. Older formats without that table remain supported. Unmanaged
+personal v4 files created before study-evidence caching are also supported when
+the entire cache (table and three triggers) is absent and the remaining schema
+matches the frozen historical contract. Conversion preserves their saved attempts
+and installs the current empty cache; normal study reads rebuild derived evidence.
+Partial cache schemas and managed files missing the cache are rejected.
 
 ```sh
 node scripts/database-admin.ts preflight /synthetic/conversion.json
