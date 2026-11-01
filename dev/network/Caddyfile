@@ -1,0 +1,41 @@
+{
+	admin off
+	auto_https off
+}
+
+https://{$STUDY_HTTPS_HOST}:{$STUDY_HTTPS_PORT} {
+	tls /certificates/site.crt /certificates/site.key
+
+	@outside not remote_ip private_ranges
+	respond @outside 403
+
+	@identity path /realms/study/* /resources/*
+	handle @identity {
+		reverse_proxy 127.0.0.1:{$STUDY_KEYCLOAK_PORT}
+	}
+
+	@management path /admin* /realms/master* /metrics* /health*
+	handle @management {
+		respond "Not available on this listener" 404
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3000
+	}
+}
+
+http://:{$STUDY_CERTIFICATE_PORT} {
+	@outside not remote_ip private_ranges
+	respond @outside 403
+	root * /public
+	header X-Content-Type-Options nosniff
+	@certificate path /root.crt
+	header @certificate Content-Type application/x-x509-ca-cert
+	@enrollment path / /index.html /root.crt
+	handle @enrollment {
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}
