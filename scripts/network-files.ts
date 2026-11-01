@@ -1,20 +1,42 @@
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs'
+import { dirname, join } from 'node:path'
 import { networkOrigin } from './network-profile.ts'
 import type { NetworkProfile } from './network-profile.ts'
 import { rejectLinks } from './database-files.ts'
 
 /**
  * Replace generated configuration atomically without making private deployment details world-readable.
- * @throws {Error} For unsafe symlinked paths or failed writes; temporary files are retained for investigation.
+ * @throws {Error} For unsafe paths or failed durable writes; inspect the current file and any retained temporary before retrying.
  */
 export function writePrivate(path: string, contents: string): void {
   rejectLinks(path)
   const temporary = `${path}.${randomUUID()}.new`
   writeFileSync(temporary, contents, { mode: 0o600, flag: 'wx' })
+  const descriptor = openSync(temporary, 'r')
+  try {
+    fsyncSync(descriptor)
+  } finally {
+    closeSync(descriptor)
+  }
   renameSync(temporary, path)
+  const parent = openSync(dirname(path), 'r')
+  try {
+    fsyncSync(parent)
+  } finally {
+    closeSync(parent)
+  }
 }
 
 /**
@@ -207,6 +229,13 @@ export function hasLocalHostname(hosts: string, hostname: string): boolean {
  */
 export function enableNetworkCompose(environmentPath: string, files: string[]): void {
   const original = readFileSync(environmentPath, 'utf8')
+  writePrivate(environmentPath, networkEnvironment(original, files))
+}
+
+/**
+ * Build the exact environment bytes covered by the identity cutover's activation proof.
+ */
+export function networkEnvironment(original: string, files: string[]): string {
   const lines = original.split(/\r?\n/).filter((line) => !/^COMPOSE_FILE=/.test(line))
-  writePrivate(environmentPath, `${lines.join('\n').trimEnd()}\nCOMPOSE_FILE=${files.join(':')}\n`)
+  return `${lines.join('\n').trimEnd()}\nCOMPOSE_FILE=${files.join(':')}\n`
 }

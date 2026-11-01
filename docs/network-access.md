@@ -125,7 +125,11 @@ receives only its leaf certificate/key.
 
 The central volume retains `identity-backup-*.sqlite3` and an
 `identity-cutover-*.json` journal. Identity changes require stopped/drained writers,
-an exclusive maintenance lock and a durable `RESTART_BLOCKED` gate. Failure leaves
+an exclusive maintenance lock and a durable `RESTART_BLOCKED` gate. The database preparation keeps the gate installed even after its transaction
+commits. Only a separate finalizer releases that operation's gate after verifying
+the exact SHA-256 hashes of the planned `.env` and generated HTTPS override. Both
+configuration files are flushed before activation. Missing files, write failures,
+changed configuration or another operation's gate remain blocked. Failure leaves
 the gate in place for operator recovery. A retry never silently deletes an
 existing restart gate. There is no cross-service power-loss transaction: after an
 interrupted initial cutover, keep writers stopped, inspect the journal and backup,
@@ -134,7 +138,13 @@ and reconcile the issuer/configuration together before removing any gate.
 A cutover or startup failure stops the application rather than accepting logins
 under partially applied identity settings. Preflight refusals leave the existing
 valid deployment running. Read the restricted `operations.log` and
-`mdns.log`, resolve the reported problem, then rerun the same setup/mode command.
+`mdns.log`. Ordinary listener/startup failures can be retried with the same command.
+If the database restart gate remains, keep all writers stopped and inspect its
+operation ID and journal; do not blindly rerun preparation or delete the gate.
+After reconciling the saved activation plan and configuration, the offline
+`network-identity.ts complete` finalizer accepts only that operation and its exact
+configuration files. Restoring the matching central backup and original environment
+together is the alternative operator recovery path.
 If `operation.lock` survives a crash, check its recorded PID and ensure all access
 operations have stopped before removing that host-side lock. Do not remove an
 unrelated database-maintenance gate or lock to force startup.

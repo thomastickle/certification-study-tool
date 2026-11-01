@@ -16,11 +16,14 @@ import { fileURLToPath } from 'node:url'
 import { parseEnv } from 'node:util'
 import {
   enableNetworkCompose,
+  networkEnvironment,
   hasLocalHostname,
   prepareCertificates,
   writeHostSetup,
   writePrivate,
 } from './network-files.ts'
+import { sha256 } from './database-files.ts'
+import type { ActivationPlan } from './network-identity.ts'
 import { configureKeycloak } from './network-keycloak.ts'
 import { startAdvertisement, stopAdvertisement } from './network-publisher.ts'
 import { networkOrigin, renderNetworkCompose, validateProfile } from './network-profile.ts'
@@ -158,7 +161,7 @@ function writeProfile(state: AccessState): void {
  * Stop the existing writers before the one-time identity cutover, retaining a verified central backup.
  * @throws {Error} For unsupported mounts or a gated cutover; the app stays stopped on failure.
  */
-function adoptIdentity(state: AccessState): void {
+function adoptIdentity(state: AccessState, activation: ActivationPlan): string {
   const model = configuration(state)
   const installed = model.services.study
   const storage = installed.volumes.find((volume) => volume.target === '/data')
@@ -173,6 +176,46 @@ function adoptIdentity(state: AccessState): void {
     throw new Error('Cannot resolve the existing managed data volume.')
   }
   run('docker', ['volume', 'inspect', volumeName], false)
+  return run(
+    'docker',
+    [
+      'run',
+      '--rm',
+      '--pull',
+      'never',
+      '--network',
+      'none',
+      '--user',
+      'node',
+      '--mount',
+      `type=volume,source=${volumeName},target=/data`,
+      '--mount',
+      `type=bind,source=${join(repository, 'scripts')},target=/workspace/scripts,readonly`,
+      '--mount',
+      `type=bind,source=${join(repository, 'database')},target=/workspace/database,readonly`,
+      '--mount',
+      `type=bind,source=${join(repository, 'package.json')},target=/workspace/package.json,readonly`,
+      '--entrypoint',
+      'node',
+      installed.image,
+      '/workspace/scripts/network-identity.ts',
+      'prepare',
+      '/data/central.sqlite3',
+      state.previousIssuer,
+      `${networkOrigin(state.profile)}/realms/study`,
+      JSON.stringify(activation),
+      '--offline',
+    ],
+    false,
+  ).trim()
+}
+
+/**
+ * Present the committed host configuration to the gated offline identity finalizer.
+ */
+function finishIdentity(state: AccessState, operation: string): void {
+  const model = configuration(state)
+  const installed = model.services.study
   run('docker', [
     'run',
     '--rm',
@@ -183,20 +226,26 @@ function adoptIdentity(state: AccessState): void {
     '--user',
     'node',
     '--mount',
-    `type=volume,source=${volumeName},target=/data`,
+    `type=volume,source=${state.studyVolume},target=/data`,
     '--mount',
     `type=bind,source=${join(repository, 'scripts')},target=/workspace/scripts,readonly`,
     '--mount',
     `type=bind,source=${join(repository, 'database')},target=/workspace/database,readonly`,
     '--mount',
     `type=bind,source=${join(repository, 'package.json')},target=/workspace/package.json,readonly`,
+    '--mount',
+    `type=bind,source=${join(repository, '.env')},target=/activation/environment,readonly`,
+    '--mount',
+    `type=bind,source=${composePath},target=/activation/overlay,readonly`,
     '--entrypoint',
     'node',
     installed.image,
     '/workspace/scripts/network-identity.ts',
+    'complete',
     '/data/central.sqlite3',
-    state.previousIssuer,
-    `${networkOrigin(state.profile)}/realms/study`,
+    operation,
+    '/activation/environment',
+    '/activation/overlay',
     '--offline',
   ])
 }
@@ -278,12 +327,20 @@ async function apply(
   stopAdvertisement(directory)
   try {
     if (setup) {
-      adoptIdentity(state)
       const environmentBackup = join(directory, 'environment-before-network')
       if (!existsSync(environmentBackup)) {
         writePrivate(environmentBackup, readFileSync(join(repository, '.env'), 'utf8'))
       }
-      enableNetworkCompose(join(repository, '.env'), [...state.baseFiles, composePath])
+      const environmentPath = join(repository, '.env')
+      const files = [...state.baseFiles, composePath]
+      const plannedEnvironment = networkEnvironment(readFileSync(environmentPath, 'utf8'), files)
+      const activation = {
+        environmentHash: sha256(Buffer.from(plannedEnvironment)),
+        overlayHash: sha256(readFileSync(composePath)),
+      }
+      const operation = adoptIdentity(state, activation)
+      enableNetworkCompose(environmentPath, files)
+      finishIdentity(state, operation)
       run('docker', [
         ...compose,
         'up',
