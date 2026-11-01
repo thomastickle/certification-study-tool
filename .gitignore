@@ -21,6 +21,7 @@
 *.iml
 *.ipr
 *.iws
+.run/
 
 # VS Code, Atom, Zed, and Sublime Text project/workspace settings.
 .vscode/
