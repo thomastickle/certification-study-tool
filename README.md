@@ -87,6 +87,14 @@ For native runs, `STUDY_HOST` defaults to `127.0.0.1`; the image sets it to
 `0.0.0.0` so Docker can forward connections. Local Host/Origin protections remain
 active in either mode.
 
+## Access from a phone or another home computer
+
+Use the optional [home-network HTTPS setup](docs/network-access.md). It preserves
+one shared server and your existing accounts/history, with `npm run access:local`
+for loopback-only access and `npm run access:lan` for your selected home address.
+Devices trust the project's public local CA once. No router port forwarding is
+needed. The plain loopback setup above remains the default until explicitly enabled.
+
 ## Import and review
 
 1. In **Library**, choose **My private library**, or **Shared library** if you are
@@ -134,6 +142,13 @@ there is no undo. Reimporting the original file can restore deleted content.
 npm test
 npm run typecheck
 npm run build
+```
+
+Administration tests require the pinned Flyway image from the run instructions.
+HTTPS proxy tests also require:
+
+```sh
+docker pull caddy@sha256:36c24ad91a7ff7bc4c87fe22bfa8df3c4b18da0773d73fc12ee2c52b98c0bb7e
 ```
 
 Tests use synthetic data and temporary or in-memory databases. Private study

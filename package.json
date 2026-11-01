@@ -20,7 +20,11 @@
     "import:curated": "node src/server/importer/curated-batch-cli.ts",
     "database:admin": "node scripts/database-admin.ts",
     "auth:revoke": "node src/server/auth/revoke-sessions.ts",
-    "build:server": "node scripts/build-server.ts"
+    "build:server": "node scripts/build-server.ts",
+    "access:setup": "node scripts/network-access.ts setup",
+    "access:local": "node scripts/network-access.ts local",
+    "access:lan": "node scripts/network-access.ts lan",
+    "access:status": "node scripts/network-access.ts status"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",
