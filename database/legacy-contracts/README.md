@@ -19,8 +19,9 @@ Unmanaged personal v4 files with no evidence table or triggers use the frozen
 `9c75496`. Their saved attempts remain authoritative; conversion creates the
 current empty evidence cache, which runtime study reads rebuild lazily. Partial
 evidence groups remain invalid. Other personal v4 references use the current
-personal migration catalog. Managed files must always include the full cache. Managed personal history must match the pinned
-Flyway Community 13.11.1 SQLite audit layout and supported successful V1 record;
+personal migration catalog. Managed files must always include the full cache and
+match the pinned Flyway Community 13.11.1 SQLite audit layout and supported
+successful V1 record.
 Flyway itself validates its checksums on a staging audit copy before import.
 Unmanaged legacy auth/shared inputs have no Flyway history. A future supported
 release needs explicit contracts and real conversion/recovery tests.

@@ -180,13 +180,13 @@ export function validateLegacySchema(db: DatabaseSync, kind: LegacyKind): string
       kind === 'personal' &&
       !actual.has('flyway_schema_history') &&
       evidenceObjects.every((name) => !actual.has(name))
-    let path = join(sqlRoot, 'legacy-contracts', `${kind}-v${version}.sql`)
+    let contractPath = join(sqlRoot, 'legacy-contracts', `${kind}-v${version}.sql`)
     if (unmanagedPreEvidence) {
-      path = join(sqlRoot, 'legacy-contracts/personal-v4-pre-evidence.sql')
+      contractPath = join(sqlRoot, 'legacy-contracts/personal-v4-pre-evidence.sql')
     } else if (kind === 'personal') {
-      path = join(sqlRoot, 'migrations/personal/V1__current_schema.sql')
+      contractPath = join(sqlRoot, 'migrations/personal/V1__current_schema.sql')
     }
-    expected.exec(readFileSync(path, 'utf8'))
+    expected.exec(readFileSync(contractPath, 'utf8'))
     if (kind === 'shared') {
       sharedExtensions(db, expected, actual, version)
     }
